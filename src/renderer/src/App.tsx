@@ -9,12 +9,35 @@ import { StorageView } from './StorageView'
 import { SharingView } from './SharingView'
 import { AgentAccessView } from './AgentAccessView'
 import { CardsView } from './CardsView'
+import { UnlockView } from './UnlockView'
 import type { Loaded, SharingTab, UpdateProjects, UpdateSecrets } from './types'
+import type { VaultStatus } from '../../shared/vault'
 
 type Route = { view: 'projects' } | { view: 'project'; id: string } | { view: 'secrets' } | { view: 'storage' } | { view: 'sharing'; projectId?: string; tab?: SharingTab } | { view: 'cards' } | { view: 'agent' }
 
 export function App() {
   const route = parseRoute(useSyncExternalStore(subscribeToHash, () => window.location.hash))
+  const [status, setStatus] = useState<Loaded<VaultStatus>>({ state: 'loading' })
+
+  useEffect(() => {
+    let active = true
+    window.sct.getVaultStatus().then((value) => {
+      if (active) setStatus({ state: 'ready', value })
+    }).catch((cause: unknown) => {
+      if (active) setStatus({ state: 'error', error: errorText(cause, 'Cannot open the vault.') })
+    })
+    return () => { active = false }
+  }, [])
+
+  if (status.state === 'loading') {
+    return <div className="app"><main><p role="status">Opening the vault…</p></main></div>
+  }
+  if (status.state === 'error') {
+    return <div className="app"><main><p className="error" role="alert">{status.error}</p></main></div>
+  }
+  if (status.value.locked) {
+    return <UnlockView status={status.value} onUnlocked={() => window.location.reload()} />
+  }
   return route.view === 'agent' ? <AgentAccessView /> : <DesktopApp route={route} />
 }
 

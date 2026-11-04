@@ -3,7 +3,7 @@
 .sct is a macOS app that keeps project secrets out of project folders.
 Your project needs no `.env` file.
 
-- **Vault.** .sct keeps secrets in an encrypted local vault. Each value has its own key in macOS Keychain.
+- **Vault.** .sct keeps secrets in an encrypted local vault. A passphrase derives one master key, and each value has its own data key. The OS secret store is optional.
 - **Runtime injection.** `sct run -- <command>` gives the command its secrets as environment variables.
 - **SDK.** The dependency-free `@sct/env` package loads secrets into `process.env` and applies saved changes without a restart.
 - **Sharing.** .sct sends encrypted secrets to a verified Mac through AirDrop or a relay.
@@ -42,7 +42,7 @@ bun run package:mac
 bun run install:cli   # Installs ~/.local/bin/sct
 ```
 
-Then, in the app, add a project folder and its secrets. Run the project from its folder:
+Create a vault passphrase at the first start. Then add a project folder and its secrets. Run the project from its folder:
 
 ```sh
 sct run -- bun run dev
@@ -126,5 +126,6 @@ Rules:
 - [Sharing](docs/sharing.md) and [relay setup](docs/relay.md)
 - [Agent Access](docs/agent-access.md) and the [Claude Code demo project](examples/claude-code/README.md)
 - [Architecture](docs/architecture.md), [vault storage](docs/storage.md), and the [glossary](docs/glossary.md)
+- [Fork plan and change assessment](docs/fork-plan.md)
 
 Contributors and agents follow [AGENTS.md](AGENTS.md).

@@ -1,7 +1,8 @@
 # .sct architecture and implementation order
 
 .sct uses Electron, React, and TypeScript. The Electron main process owns every sensitive operation on a Mac.
-These operations include vault access, Keychain, encryption, child processes, sharing, relay connections, and Agent Access.
+These operations include vault access, the vault key, encryption, child processes, sharing, relay connections, and Agent Access.
+A passphrase derives the master key. The OS secret store only remembers it.
 The sandboxed renderer calls a narrow preload bridge and receives metadata only.
 Each Mac keeps its own vault, private keys, cached activity, and pending messages. No local server or separate daemon runs.
 
@@ -52,7 +53,7 @@ SpacetimeDB keeps a separate delivery status for each recipient.
 flowchart LR
   subgraph A[Sender device]
     SU[Sharing UI] <-->|checked preload IPC| SM[Electron main process]
-    SM <--> SK[(Local vault and Keychain)]
+    SM <--> SK[(Local vault and vault key)]
     SM <--> SQ[(Pending ciphertext and activity)]
   end
   SM -->|TLS: signed encrypted transfer| AUTH
@@ -62,7 +63,7 @@ flowchart LR
   end
   SUB -->|TLS: recipient messages| RM
   subgraph B[Recipient device]
-    RM[Electron main process] <--> RK[(Local vault and Keychain)]
+    RM[Electron main process] <--> RK[(Local vault and vault key)]
     RM <--> RQ[(Delivery records and activity)]
     RM <-->|metadata and notification| RU[Sharing UI]
   end

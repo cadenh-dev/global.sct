@@ -1,4 +1,3 @@
-import { AsyncEntry } from '@napi-rs/keyring'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { cp, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
@@ -7,22 +6,30 @@ import type { ProjectStore } from './projects.ts'
 import type { Project } from '../shared/projects.ts'
 import type { SecretMetadata } from '../shared/secrets.ts'
 import type { RelayGrant } from '../shared/envelope.ts'
+import type { SealedField, UnlockInput, VaultStatus } from '../shared/vault.ts'
 import type { TransferSecret } from './transfer.ts'
 import { decodeFile, encodeFile, open, seal } from './seal.ts'
-import type { Sealed } from './seal.ts'
+import { createVaultHeader, decodeSealed, deriveMasterKey, encodeSealed, readVaultHeader, verifyPassphrase,
+  writeVaultHeader } from './vault-header.ts'
+import type { SecretStore } from './key-store.ts'
 
-// secrets.sct layout: magic | IV | GCM tag | ciphertext. The ciphertext holds names and individually encrypted values.
-const magic = Buffer.from('SCT1')
-const cleanupMagic = Buffer.from('SCG1')
+// secrets.sct layout: magic | IV | GCM tag | ciphertext. The ciphertext holds names and individually sealed values.
+const magic = Buffer.from('SCT2')
+const cleanupMagic = Buffer.from('SCG2')
 const vaultDirectoryName = '.sct'
 const secretsFileName = 'secrets.sct'
+const headerFileName = 'vault.json'
+const cleanupFileName = 'grant-cleanup.sct'
+const cleanupData = Buffer.from('grant-cleanup')
+const minimumPassphraseLength = 8
 
 interface StoredSecret {
   id: string
   name: string
-  iv: string
-  tag: string
-  value: string
+  // The value data key, wrapped by the master key.
+  wrappedKey: SealedField
+  // The value, sealed by the data key.
+  value: SealedField
   transferId?: string
   grant?: RelayGrant
 }
@@ -41,16 +48,17 @@ export interface GrantCleanupOutcome {
 export class Vault {
   private pending: Promise<void> = Promise.resolve()
   private root = ''
+  private masterKey: Buffer | null = null
   private readonly projects: ProjectStore
   private readonly settingsFile: string
   private readonly defaultRoot: string
-  private readonly service: string
+  private readonly store: SecretStore
 
-  constructor(projects: ProjectStore, settingsFile: string, defaultRoot: string, service = '.sct') {
+  constructor(projects: ProjectStore, settingsFile: string, defaultRoot: string, store: SecretStore) {
     this.projects = projects
     this.settingsFile = settingsFile
     this.defaultRoot = defaultRoot
-    this.service = service
+    this.store = store
   }
 
   async start(): Promise<void> {
@@ -61,11 +69,91 @@ export class Vault {
     } catch (error) {
       throw new Error(`Cannot create the vault folders at ${this.location()}.`, { cause: error })
     }
-    await this.cleanupExpiredGrants()
   }
 
   location(): string {
     return join(this.root, vaultDirectoryName)
+  }
+
+  isLocked(): boolean {
+    return this.masterKey === null
+  }
+
+  status(): Promise<VaultStatus> {
+    return this.serialize(() => this.readStatus())
+  }
+
+  unlock(input: unknown): Promise<VaultStatus> {
+    return this.serialize(async () => {
+      const { passphrase, remember } = requireUnlockInput(input)
+      this.root = await this.readRoot()
+      const file = this.headerFile()
+      const saved = await readVaultHeader(file)
+      if (saved) {
+        const masterKey = await deriveMasterKey(passphrase, saved.kdf, saved.salt)
+        if (!verifyPassphrase(masterKey, saved)) {
+          masterKey.fill(0)
+          throw new Error('The passphrase is not correct. Try again.')
+        }
+        this.setMasterKey(masterKey)
+      } else {
+        if (passphrase.length < minimumPassphraseLength) {
+          throw new Error(`Use a passphrase of at least ${minimumPassphraseLength} characters.`)
+        }
+        const { header, masterKey } = await createVaultHeader(passphrase)
+        await writeVaultHeader(file, header)
+        this.setMasterKey(masterKey)
+      }
+      if (remember && !(await this.store.available())) {
+        this.setMasterKey(null)
+        throw new Error('This system has no secret service. Clear "Remember this device" and use the passphrase.')
+      }
+      if (remember) {
+        try {
+          await this.store.write(this.masterKey as Buffer)
+        } catch (error) {
+          this.setMasterKey(null)
+          throw new Error('Cannot save the vault key in the system secret store. Clear "Remember this device" and try again.', { cause: error })
+        }
+      } else {
+        await this.store.clear()
+      }
+      return await this.readStatus()
+    })
+  }
+
+  // The app calls this at each start. A missing or wrong remembered key falls back to the passphrase.
+  unlockWithRememberedKey(): Promise<boolean> {
+    return this.serialize(async () => {
+      if (this.masterKey) return true
+      this.root = await this.readRoot()
+      const header = await readVaultHeader(this.headerFile())
+      if (!header) return false
+      const stored = await this.store.read()
+      if (!stored) return false
+      if (!verifyPassphrase(stored, header)) {
+        stored.fill(0)
+        await this.store.clear()
+        return false
+      }
+      this.setMasterKey(stored)
+      return true
+    })
+  }
+
+  lock(): Promise<VaultStatus> {
+    return this.serialize(async () => {
+      this.setMasterKey(null)
+      return await this.readStatus()
+    })
+  }
+
+  forget(): Promise<VaultStatus> {
+    return this.serialize(async () => {
+      await this.store.clear()
+      this.setMasterKey(null)
+      return await this.readStatus()
+    })
   }
 
   moveTo(root: unknown): Promise<string> {
@@ -114,19 +202,16 @@ export class Vault {
     }))
   }
 
-  // Deletes the project's vault directory and Keychain items. The project folder itself stays unchanged.
+  // Deletes the project's vault directory. The project folder itself stays unchanged.
   deleteProject(id: unknown): Promise<void> {
     return this.serialize(() => this.projects.remove(id, async (project) => {
-      const secrets = await this.readSecrets(project)
-      let remaining = secrets
-      for (const secret of secrets) remaining = await this.removeSecret(project, remaining, secret.id)
       await rm(this.projectDirectory(project.name), { recursive: true, force: true })
-      await this.entry(project, 'file').deleteCredential()
     }))
   }
 
   listSecrets(): Promise<SecretMetadata[]> {
     return this.serialize(async () => {
+      this.requireKey()
       const secrets: SecretMetadata[] = []
       for (const project of await this.projects.list()) {
         for (const { id, name } of await this.readSecrets(project)) secrets.push({ id, projectId: project.id, name })
@@ -153,13 +238,15 @@ export class Vault {
       }
 
       const id = randomUUID()
-      const key = randomBytes(32)
-      await this.entry(project, id).setSecret(key)
+      const dataKey = randomBytes(32)
+      const plaintext = Buffer.from(value)
       try {
-        await this.writeSecrets(project, [...secrets, { id, name, ...encodeSealed(seal(key, Buffer.from(value), valueData(project, id))) }])
-      } catch (error) {
-        await this.entry(project, id).deleteCredential()
-        throw error
+        const sealed = seal(dataKey, plaintext, valueData(project, id))
+        const wrappedKey = encodeSealed(seal(this.requireKey(), dataKey, keyData(project, id)))
+        await this.writeSecrets(project, [...secrets, { id, name, wrappedKey, value: encodeSealed(sealed) }])
+      } finally {
+        dataKey.fill(0)
+        plaintext.fill(0)
       }
       return { id, projectId: project.id, name }
     })
@@ -171,9 +258,15 @@ export class Vault {
       const project = await this.projects.find(projectId)
       const secrets = await this.readSecrets(project)
       const secret = requireSecret(secrets, id)
-      const key = await this.readKey(project, secret.id)
-      const updated = { ...secret, ...encodeSealed(seal(key, Buffer.from(value), valueData(project, secret.id))) }
-      await this.writeSecrets(project, secrets.map((saved) => saved.id === secret.id ? updated : saved))
+      const dataKey = this.unwrapDataKey(project, secret)
+      const plaintext = Buffer.from(value)
+      try {
+        const updated = { ...secret, value: encodeSealed(seal(dataKey, plaintext, valueData(project, secret.id))) }
+        await this.writeSecrets(project, secrets.map((saved) => saved.id === secret.id ? updated : saved))
+      } finally {
+        dataKey.fill(0)
+        plaintext.fill(0)
+      }
       return { id: secret.id, projectId: project.id, name: secret.name }
     })
   }
@@ -239,29 +332,20 @@ export class Vault {
       }
       await beforeWrite()
       const added: StoredSecret[] = []
-      try {
-        const writes = await Promise.allSettled(incoming.map(async (entry) => {
-          const id = randomUUID()
-          const key = randomBytes(32)
-          const plaintext = Buffer.from(entry.value)
-          try {
-            const sealed = encodeSealed(seal(key, plaintext, valueData(project, id)))
-            await this.entry(project, id).setSecret(key)
-            added.push({ id, name: entry.name, transferId, grant, ...sealed })
-          } finally {
-            key.fill(0)
-            plaintext.fill(0)
-          }
-        }))
-        for (const write of writes) if (write.status === 'rejected') throw write.reason
-        await this.writeSecrets(project, [...stored, ...added])
-      } catch (error) {
-        const removed = await Promise.allSettled(added.map((secret) => this.entry(project, secret.id).deleteCredential()))
-        if (removed.some((result) => result.status === 'rejected')) {
-          throw new Error('Import failed. Some unused Keychain keys could not be removed. Unlock Keychain before retrying.', { cause: error })
+      for (const entry of incoming) {
+        const id = randomUUID()
+        const dataKey = randomBytes(32)
+        const plaintext = Buffer.from(entry.value)
+        try {
+          const sealed = seal(dataKey, plaintext, valueData(project, id))
+          const wrappedKey = encodeSealed(seal(this.requireKey(), dataKey, keyData(project, id)))
+          added.push({ id, name: entry.name, transferId, grant, wrappedKey, value: encodeSealed(sealed) })
+        } finally {
+          dataKey.fill(0)
+          plaintext.fill(0)
         }
-        throw error
       }
+      await this.writeSecrets(project, [...stored, ...added])
       return added.map(({ id, name }) => ({ id, name, projectId: project.id }))
     })
   }
@@ -376,19 +460,48 @@ export class Vault {
     return this.serialize(() => this.readGrantCleanupOutcomes())
   }
 
+  private requireKey(): Buffer {
+    if (!this.masterKey) throw new Error('The vault is locked. Unlock it with your passphrase.')
+    return this.masterKey
+  }
+
+  private setMasterKey(key: Buffer | null): void {
+    this.masterKey?.fill(0)
+    this.masterKey = key
+  }
+
+  private async readStatus(): Promise<VaultStatus> {
+    const [header, rememberAvailable] = await Promise.all([readVaultHeader(this.headerFile()), this.store.available()])
+    const remembered = rememberAvailable ? await this.store.read() : null
+    return {
+      initialized: header !== null,
+      locked: this.masterKey === null,
+      rememberAvailable,
+      rememberEnabled: remembered !== null
+    }
+  }
+
+  private headerFile(): string {
+    return join(this.location(), headerFileName)
+  }
+
   private async decryptSecret(project: Project, secret: StoredSecret): Promise<Buffer> {
     requireActiveGrant(secret)
-    const key = await this.readKey(project, secret.id)
+    const dataKey = this.unwrapDataKey(project, secret)
     try {
-      return open(key, {
-        iv: Buffer.from(secret.iv, 'base64'),
-        tag: Buffer.from(secret.tag, 'base64'),
-        ciphertext: Buffer.from(secret.value, 'base64')
-      }, valueData(project, secret.id))
+      return open(dataKey, decodeSealed(secret.value), valueData(project, secret.id))
     } catch (error) {
-      throw new Error('Cannot decrypt this secret. Its encrypted value or Keychain key is invalid.', { cause: error })
+      throw new Error('Cannot decrypt this secret. Its encrypted value is invalid.', { cause: error })
     } finally {
-      key.fill(0)
+      dataKey.fill(0)
+    }
+  }
+
+  private unwrapDataKey(project: Project, secret: StoredSecret): Buffer {
+    try {
+      return open(this.requireKey(), decodeSealed(secret.wrappedKey), keyData(project, secret.id))
+    } catch (error) {
+      throw new Error('Cannot open this secret. The vault key is wrong, or the stored key is damaged.', { cause: error })
     }
   }
 
@@ -408,15 +521,7 @@ export class Vault {
   private async removeSecret(project: Project, secrets: StoredSecret[], id: string): Promise<StoredSecret[]> {
     const secret = requireSecret(secrets, id)
     const remaining = secrets.filter((saved) => saved.id !== secret.id)
-    const contents = await readFile(join(this.projectDirectory(project.name), secretsFileName))
     await this.writeSecrets(project, remaining)
-    try {
-      await this.entry(project, secret.id).deleteCredential()
-    } catch (error) {
-      // Restore encrypted bytes without Keychain access, because Keychain can be locked after the file changes.
-      await this.writeSecretsFile(project, contents)
-      throw new Error('Cannot delete the Keychain key. The secret remains saved. Unlock Keychain and try again.', { cause: error })
-    }
     return remaining
   }
 
@@ -472,26 +577,8 @@ export class Vault {
     return directory
   }
 
-  private entry(project: Project, account: string): AsyncEntry {
-    return new AsyncEntry(this.service, `${project.id}/${account}`)
-  }
-
-  private async readKey(project: Project, account: string): Promise<Buffer> {
-    const key = await this.findKey(project, account)
-    if (!key) throw new Error(`A Keychain key for ${project.name} is missing. .sct cannot read this secret.`)
-    return key
-  }
-
-  private async findKey(project: Project, account: string): Promise<Buffer | null> {
-    try {
-      const key = await this.entry(project, account).getSecret()
-      return key ? Buffer.from(key) : null
-    } catch (error) {
-      throw new Error('Cannot read macOS Keychain. Unlock Keychain and try again.', { cause: error })
-    }
-  }
-
   private async readSecrets(project: Project, required = false): Promise<StoredSecret[]> {
+    const key = this.requireKey()
     let contents: Buffer
     try {
       contents = await readFile(join(this.projectDirectory(project.name), secretsFileName))
@@ -503,7 +590,6 @@ export class Vault {
     const invalid = `The secrets file of ${project.name} is invalid or belongs to a different project. .sct did not change it.`
     const sealed = decodeFile(magic, contents)
     if (!sealed) throw new Error(invalid)
-    const key = await this.readKey(project, 'file')
     let secrets: unknown
     try {
       secrets = JSON.parse(open(key, sealed, fileData(project)).toString('utf8'))
@@ -515,7 +601,7 @@ export class Vault {
   }
 
   private async writeSecrets(project: Project, secrets: StoredSecret[]): Promise<void> {
-    await this.writeSecretsFile(project, encodeFile(magic, seal(await this.fileKey(project), Buffer.from(JSON.stringify(secrets)), fileData(project))))
+    await this.writeSecretsFile(project, encodeFile(magic, seal(this.requireKey(), Buffer.from(JSON.stringify(secrets)), fileData(project))))
   }
 
   private async writeSecretsFile(project: Project, contents: Buffer): Promise<void> {
@@ -530,29 +616,18 @@ export class Vault {
     }
   }
 
-  private async fileKey(project: Project): Promise<Buffer> {
-    const existing = await this.findKey(project, 'file')
-    if (existing) return existing
-    const key = randomBytes(32)
-    await this.entry(project, 'file').setSecret(key)
-    return key
-  }
-
   private async readGrantCleanupOutcomes(): Promise<GrantCleanupOutcome[]> {
     try {
-      const contents = await readFile(join(dirname(this.settingsFile), 'grant-cleanup.sct'))
+      const contents = await readFile(this.cleanupFile())
       const sealed = decodeFile(cleanupMagic, contents)
-      const saved = await new AsyncEntry(this.service, 'grant-cleanup').getSecret()
-      if (!sealed || !saved) throw new Error('The cleanup history or its Keychain key is missing.')
-      const key = Buffer.from(saved)
+      if (!sealed) throw new Error('The cleanup history is invalid.')
       let plaintext: Buffer | undefined
       try {
-        plaintext = open(key, sealed, Buffer.from('grant-cleanup'))
+        plaintext = open(this.requireKey(), sealed, cleanupData)
         const parsed: unknown = JSON.parse(plaintext.toString('utf8'))
         if (!Array.isArray(parsed) || !parsed.every(isGrantCleanupOutcome)) throw new Error('The cleanup history is invalid.')
         return parsed
       } finally {
-        key.fill(0)
         plaintext?.fill(0)
       }
     } catch (error) {
@@ -562,18 +637,19 @@ export class Vault {
   }
 
   private async writeGrantCleanupOutcomes(outcomes: GrantCleanupOutcome[]): Promise<void> {
-    const entry = new AsyncEntry(this.service, 'grant-cleanup')
-    const saved = await entry.getSecret()
-    const key = saved ? Buffer.from(saved) : randomBytes(32)
+    const file = this.cleanupFile()
     try {
-      if (!saved) await entry.setSecret(key)
-      await mkdir(dirname(this.settingsFile), { recursive: true, mode: 0o700 })
-      await writeFile(`${join(dirname(this.settingsFile), 'grant-cleanup.sct')}.tmp`,
-        encodeFile(cleanupMagic, seal(key, Buffer.from(JSON.stringify(outcomes)), Buffer.from('grant-cleanup'))), { mode: 0o600 })
-      await rename(`${join(dirname(this.settingsFile), 'grant-cleanup.sct')}.tmp`, join(dirname(this.settingsFile), 'grant-cleanup.sct'))
-    } finally {
-      key.fill(0)
+      await mkdir(dirname(file), { recursive: true, mode: 0o700 })
+      await writeFile(`${file}.tmp`,
+        encodeFile(cleanupMagic, seal(this.requireKey(), Buffer.from(JSON.stringify(outcomes)), cleanupData)), { mode: 0o600 })
+      await rename(`${file}.tmp`, file)
+    } catch (error) {
+      throw new Error('Cannot save the encrypted grant cleanup history.', { cause: error })
     }
+  }
+
+  private cleanupFile(): string {
+    return join(dirname(this.settingsFile), cleanupFileName)
   }
 }
 
@@ -586,6 +662,10 @@ function valueData(project: Project, id: string): Buffer {
   return Buffer.from(`${project.id}/${id}`)
 }
 
+function keyData(project: Project, id: string): Buffer {
+  return Buffer.from(`${project.id}/${id}/data-key`)
+}
+
 export function requireExternalVault(project: Project, location: string): void {
   const storage = relative(project.directory, location)
   if (!isAbsolute(storage) && storage !== '..' && !storage.startsWith(`..${sep}`)) {
@@ -593,16 +673,19 @@ export function requireExternalVault(project: Project, location: string): void {
   }
 }
 
-function encodeSealed({ iv, tag, ciphertext }: Sealed): Pick<StoredSecret, 'iv' | 'tag' | 'value'> {
-  return { iv: iv.toString('base64'), tag: tag.toString('base64'), value: ciphertext.toString('base64') }
-}
-
 function isStoredSecret(value: unknown): value is StoredSecret {
   if (typeof value !== 'object' || value === null) return false
   const secret = value as Record<string, unknown>
-  return ['id', 'name', 'iv', 'tag', 'value'].every((field) => typeof secret[field] === 'string') &&
+  return typeof secret.id === 'string' && typeof secret.name === 'string' &&
+    isSealedField(secret.wrappedKey) && isSealedField(secret.value) &&
     (secret.transferId === undefined || typeof secret.transferId === 'string') &&
     (secret.grant === undefined || isRelayGrant(secret.grant))
+}
+
+function isSealedField(value: unknown): value is SealedField {
+  if (typeof value !== 'object' || value === null) return false
+  const field = value as Record<string, unknown>
+  return typeof field.iv === 'string' && typeof field.tag === 'string' && typeof field.ciphertext === 'string'
 }
 
 function isRelayGrant(value: unknown): value is RelayGrant {
@@ -652,6 +735,16 @@ function isSecretName(name: unknown): name is string {
 
 function isSecretValue(value: unknown): value is string {
   return typeof value === 'string' && value.length <= 65536 && !value.includes('\0')
+}
+
+function requireUnlockInput(input: unknown): UnlockInput {
+  if (typeof input !== 'object' || input === null) throw new Error('Enter your vault passphrase.')
+  const { passphrase, remember } = input as Record<string, unknown>
+  if (typeof passphrase !== 'string' || passphrase.length === 0 || passphrase.length > 1024) {
+    throw new Error('Enter your vault passphrase.')
+  }
+  if (typeof remember !== 'boolean') throw new Error('Choose whether to remember this device.')
+  return { passphrase, remember }
 }
 
 function requireSecretInput(input: unknown): { projectId: string; name: string; value: string } {

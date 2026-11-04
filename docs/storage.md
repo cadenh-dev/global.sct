@@ -7,7 +7,7 @@ A project is a name and an existing folder. .sct does not read, move, or change 
 
 - Each project name must be unique. The comparison ignores letter case.
 - Each folder can belong to one project only. .sct also rejects a symbolic link to a saved folder.
-- To delete a project, type its name. The deletion also deletes the vault folder and the Keychain keys of the project.
+- To delete a project, type its name. The deletion also deletes the vault folder of the project.
 
 ## Secrets
 
@@ -18,24 +18,45 @@ The renderer clears the value field after each request. It never receives a stor
 A secret that arrives through the relay keeps its grant. See [relay delivery](relay.md#relay-delivery).
 After the access deadline, .sct refuses every read of that secret, including `sct run`.
 .sct does not share an injection-only secret again through AirDrop or the relay.
-.sct deletes an expired received secret at startup, each minute, and after the Mac resumes.
-It deletes the encrypted vault entry and the applicable Keychain key.
+.sct deletes an expired received secret at each unlock, each minute, and after the Mac resumes.
+It deletes the encrypted vault entry.
 The app saves cleanup results in an encrypted file in its application data folder.
 If the Mac is off or asleep, cleanup starts when the app starts or the Mac resumes.
 
 ## Files and keys
 
 When .sct starts, it makes the vault folder `~/.sct`. Each project has one file: `.sct/[project-name]/secrets.sct`.
+The folder also has `vault.json`. That file holds the key settings, the salt, and the verifier. It holds no secret.
 
-- The file contains encrypted secret names and encrypted values. Each value has its own key.
-- macOS Keychain keeps the file key and the value keys under the `.sct` service.
-- To read a value, .sct needs the file and the Keychain keys.
+- One master key opens the whole vault. A passphrase derives it with `scrypt`.
+- Each value has its own data key. The master key wraps that data key. This is envelope encryption.
+- `secrets.sct` holds encrypted names and encrypted values. Its magic value is `SCT2`.
+- The OS secret store is optional. "Remember this device" keeps a copy of the master key there.
+
+The passphrase is not stored. A wrong passphrase fails the verifier, and .sct clears the derived key.
+
+## Unlock
+
+The app asks for the passphrase at each start, unless "Remember this device" stored the key.
+The paths `sct run`, `sct _env`, and `sct mcp` open one unlock window when the vault is locked.
+The master key stays in main-process memory. It never reaches the renderer.
+
+If the system has no secret service, "Remember this device" is off.
+The passphrase still opens the vault.
+
+## The clean break
+
+The new build reads no `SCT1` file and no old transfer file.
+Add your secrets again after the first unlock.
+The old Keychain items stay on the Mac until you delete them. The new build does not read them.
+
+## Move the vault
 
 To move the vault folder, select **Storage**, then select **Change location…**.
-.sct saves the new location in `settings.json` in the `userData` folder. The Keychain keys do not move.
+.sct saves the new location in `settings.json` in the `userData` folder.
+`vault.json` moves with the folder, so the same passphrase opens the vault in its new location.
 Keep the vault outside source folders.
 
-If Keychain rejects a deletion, .sct restores the encrypted entry. You can then try again.
 If a project deletion fails, .sct keeps the project and its remaining entries for another attempt.
 
 ## Internal reads

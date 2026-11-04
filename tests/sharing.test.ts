@@ -9,6 +9,7 @@ import { AsyncEntry } from '@napi-rs/keyring'
 import { Sharing } from '../src/main/sharing.ts'
 import { ProjectStore } from '../src/main/projects.ts'
 import { Vault } from '../src/main/vault.ts'
+import { InMemorySecretStore } from '../src/main/key-store.ts'
 import { createIdentity, decodeIdentity, decryptTransfer, describeDevice, encodeIdentity, encryptTransfer,
   pairingCode, readDeviceCard, readEnvelope, transferLifetime, transferLimit } from '../src/main/transfer.ts'
 
@@ -84,8 +85,9 @@ async function devices(t: TestContext) {
     const directory = join(root, name)
     await mkdir(join(directory, 'source'), { recursive: true })
     const projects = new ProjectStore(join(directory, 'projects.json'))
-    const vault = new Vault(projects, join(directory, 'settings.json'), directory, service)
+    const vault = new Vault(projects, join(directory, 'settings.json'), directory, new InMemorySecretStore())
     await vault.start()
+    await vault.unlock({ passphrase: 'test passphrase for the vault', remember: false })
     instances.push({ root: directory, vault, projects, sharing: new Sharing(join(directory, 'sharing'), vault, name, service) })
   }
   const sender = instances[0]

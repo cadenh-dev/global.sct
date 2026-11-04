@@ -48,7 +48,7 @@ macOS reports the same result for a sent file and for **Cancel**. Thus the sende
 4. Select **Import secrets**.
 
 The sender's project name and folder do not select the destination.
-.sct saves the copies in the vault file of the destination project. Each copy gets a new Keychain key.
+.sct saves the copies in the vault file of the destination project. Each copy gets a new data key.
 If a secret name already exists in the destination, the import fails before any secret changes.
 
 ## Rules

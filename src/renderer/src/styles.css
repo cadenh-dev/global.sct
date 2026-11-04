@@ -310,3 +310,13 @@ select:disabled { color: var(--color-muted); cursor: not-allowed; opacity: 0.55;
   .handoff { --card-w: 128px; --card-h: 81px; --inset: 26px; }
   .handoff-dialog, .import-dialog { padding: 20px; }
 }
+
+/* The unlock screen is the first screen. It uses the same tokens and square rules as the app shell. */
+.unlock-screen { display: grid; place-items: center; min-height: 100vh; padding: 40px; }
+.unlock-panel { width: min(560px, 100%); }
+.unlock-panel .wordmark { display: inline-flex; margin-bottom: 32px; }
+.unlock-panel .description { margin-bottom: 28px; }
+.check-field { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
+.check-field input { width: 18px; min-height: 18px; flex: 0 0 auto; }
+.check-field span { color: var(--color-ink-2); font-size: 12px; }
+.unlock-panel .error { margin: 24px 0 0; }

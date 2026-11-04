@@ -5,6 +5,7 @@ import type { SecretInput, SecretMetadata, SecretReference, SecretUpdate } from 
 import type { PairingPreview, SharingDevice, SharingState, TransferPreview } from '../shared/sharing'
 import type { ConfirmRelayPairInput, RelayAcceptInput, RelayActivityKey, RelayQueueInput, RelayState, RelayTaskDecision } from '../shared/relay'
 import type { AgentRequestView } from '../shared/agent'
+import type { UnlockInput, VaultStatus } from '../shared/vault'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   const reply: Reply<T> = await ipcRenderer.invoke(channel, ...args)
@@ -31,6 +32,10 @@ const api: SctAPI = {
   deleteSecret: (input: SecretReference) => invoke<void>('secrets:delete', input),
   getVaultLocation: () => invoke<string>('vault:location'),
   chooseVaultLocation: () => invoke<string | null>('vault:choose-location'),
+  getVaultStatus: () => invoke<VaultStatus>('vault:status'),
+  unlockVault: (input: UnlockInput) => invoke<VaultStatus>('vault:unlock', input),
+  lockVault: () => invoke<VaultStatus>('vault:lock'),
+  forgetDevice: () => invoke<VaultStatus>('vault:forget'),
   getSharingState: () => invoke<SharingState>('sharing:state'),
   shareDeviceCard: () => invoke<void>('sharing:device-card'),
   pickSharingPeer: () => invoke<PairingPreview | null>('sharing:pick-peer'),

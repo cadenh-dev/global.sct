@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,15 +8,16 @@ import { test } from 'node:test'
 import type { TestContext } from 'node:test'
 import { ProjectStore } from '../src/main/projects.ts'
 import { Vault } from '../src/main/vault.ts'
+import { InMemorySecretStore } from '../src/main/key-store.ts'
 import { installCli } from '../scripts/install-cli.ts'
 import { decodeMessage } from '../packages/env/src/protocol.ts'
 
 async function fixture(t: TestContext) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sct-runtime-')))
   const projects = new ProjectStore(join(root, 'projects.json'))
-  const service = `.sct-test-${randomUUID()}`
-  const vault = new Vault(projects, join(root, 'settings.json'), root, service)
+  const vault = new Vault(projects, join(root, 'settings.json'), root, new InMemorySecretStore())
   await vault.start()
+  await vault.unlock({ passphrase: 'test passphrase for the vault', remember: false })
   await mkdir(join(root, 'project'))
   const project = await vault.addProject({ name: 'Demo', directory: join(root, 'project') })
   t.after(async () => {
@@ -27,11 +27,13 @@ async function fixture(t: TestContext) {
   await writeFile(join(root, 'entry.ts'), `
     import { ProjectStore } from ${JSON.stringify(join(__dirname, '../src/main/projects.ts'))}
     import { Vault } from ${JSON.stringify(join(__dirname, '../src/main/vault.ts'))}
+    import { InMemorySecretStore } from ${JSON.stringify(join(__dirname, '../src/main/key-store.ts'))}
     import { runProject } from ${JSON.stringify(join(__dirname, '../src/main/launch.ts'))}
     import { streamEnvironment } from ${JSON.stringify(join(__dirname, '../src/main/runtime.ts'))}
     const projects = new ProjectStore(${JSON.stringify(join(root, 'projects.json'))})
-    const vault = new Vault(projects, ${JSON.stringify(join(root, 'settings.json'))}, ${JSON.stringify(root)}, ${JSON.stringify(service)})
+    const vault = new Vault(projects, ${JSON.stringify(join(root, 'settings.json'))}, ${JSON.stringify(root)}, new InMemorySecretStore())
     await vault.start()
+    await vault.unlock({ passphrase: ${JSON.stringify('test passphrase for the vault')}, remember: false })
     if (process.argv[2] === '_env') await streamEnvironment(projects, vault, process.argv[3])
     else process.exit(await runProject(projects, vault, process.argv.slice(2)))
   `)

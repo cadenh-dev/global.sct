@@ -6,25 +6,25 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import type { TestContext } from 'node:test'
-import { AsyncEntry } from '@napi-rs/keyring'
 import { ProjectStore } from '../src/main/projects.ts'
 import { Vault } from '../src/main/vault.ts'
+import { InMemorySecretStore } from '../src/main/key-store.ts'
 import { launchProject, runProject } from '../src/main/launch.ts'
 
-// Each test uses real macOS Keychain under its own service, and removes every item that it created.
+const passphrase = 'test passphrase for the vault'
+
+// Each test uses a fresh vault folder and an in-memory key store. No OS secret service is necessary.
 async function setup(t: TestContext) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sct-vault-')))
-  const service = `.sct-test-${randomUUID()}`
-  const accounts: string[] = []
+  const store = new InMemorySecretStore()
   const open = async () => {
     const projects = new ProjectStore(join(root, 'app-data', 'projects.json'))
-    const vault = new Vault(projects, join(root, 'app-data', 'settings.json'), root, service)
+    const vault = new Vault(projects, join(root, 'app-data', 'settings.json'), root, store)
     await vault.start()
+    if (vault.isLocked()) await vault.unlock({ passphrase, remember: false })
+    // The app runs this after each unlock. It removes secrets whose grant expired while the app was closed.
+    await vault.cleanupExpiredGrants()
     return vault
-  }
-  const keychainKey = (account: string) => {
-    accounts.push(account)
-    return new AsyncEntry(service, account).getSecret()
   }
   const folder = async (name: string) => {
     const directory = join(root, 'folders', name)
@@ -36,14 +36,13 @@ async function setup(t: TestContext) {
     for (const project of await new ProjectStore(join(root, 'app-data', 'projects.json')).list()) {
       await vault.deleteProject(project.id).catch(() => undefined)
     }
-    for (const account of accounts) await new AsyncEntry(service, account).deleteCredential()
     await rm(root, { recursive: true, force: true })
   })
-  return { root, service, open, keychainKey, folder }
+  return { root, store, open, folder }
 }
 
 test('secrets stay encrypted at rest and renderer operations return only metadata', async (t) => {
-  const { root, open, keychainKey, folder } = await setup(t)
+  const { root, open, folder } = await setup(t)
   const vault = await open()
   assert.equal(vault.location(), join(root, '.sct'))
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
@@ -53,10 +52,12 @@ test('secrets stay encrypted at rest and renderer operations return only metadat
   const secret = await vault.addSecret({ projectId: project.id, name: 'OPENAI_API_KEY', value })
   assert.deepEqual(Object.keys(secret).sort(), ['id', 'name', 'projectId'])
   const file = await readFile(join(root, '.sct', 'Demo', 'secrets.sct'))
-  assert.equal(file.subarray(0, 4).toString(), 'SCT1')
+  assert.equal(file.subarray(0, 4).toString(), 'SCT2')
   assert.ok(!file.includes(value) && !file.includes('OPENAI_API_KEY'))
-  assert.ok(await keychainKey(`${project.id}/file`))
-  assert.ok(await keychainKey(`${project.id}/${secret.id}`))
+
+  const header = JSON.parse(await readFile(join(root, '.sct', 'vault.json'), 'utf8')) as Record<string, unknown>
+  assert.equal(header.version, 1)
+  assert.ok(!JSON.stringify(header).includes(passphrase))
 
   assert.deepEqual(await (await open()).listSecrets(), [secret])
   await (await open()).withSecret(secret, (plaintext) => assert.equal(plaintext.toString('utf8'), value))
@@ -67,8 +68,64 @@ test('secrets stay encrypted at rest and renderer operations return only metadat
 
   await vault.deleteSecret({ projectId: project.id, id: secret.id })
   assert.deepEqual(await vault.listSecrets(), [])
-  assert.equal(await keychainKey(`${project.id}/${secret.id}`), null)
   await assert.rejects(vault.withSecret(secret, () => assert.fail('A deleted secret must not reach the consumer.')), /does not exist/)
+})
+
+test('a locked vault refuses every secret operation', async (t) => {
+  const { root, store, folder } = await setup(t)
+  const unlocked = await (async () => {
+    const projects = new ProjectStore(join(root, 'app-data', 'projects.json'))
+    const vault = new Vault(projects, join(root, 'app-data', 'settings.json'), root, store)
+    await vault.start()
+    await vault.unlock({ passphrase, remember: false })
+    return vault
+  })()
+  const project = await unlocked.addProject({ name: 'Demo', directory: await folder('demo') })
+  await unlocked.addSecret({ projectId: project.id, name: 'TOKEN', value: 'value' })
+
+  const locked = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
+    join(root, 'app-data', 'settings.json'), root, new InMemorySecretStore())
+  await locked.start()
+  assert.equal(locked.isLocked(), true)
+  await assert.rejects(locked.listSecrets(), /locked/)
+  await assert.rejects(locked.addSecret({ projectId: project.id, name: 'OTHER', value: 'x' }), /locked/)
+})
+
+test('a wrong passphrase does not open the vault', async (t) => {
+  const { root, store } = await setup(t)
+  const first = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
+    join(root, 'app-data', 'settings.json'), root, store)
+  await first.start()
+  await first.unlock({ passphrase, remember: false })
+
+  const second = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
+    join(root, 'app-data', 'settings.json'), root, new InMemorySecretStore())
+  await second.start()
+  await assert.rejects(second.unlock({ passphrase: 'this is not the passphrase', remember: false }), /not correct/)
+  assert.equal(second.isLocked(), true)
+  await second.unlock({ passphrase, remember: false })
+  assert.equal(second.isLocked(), false)
+})
+
+test('remember this device unlocks without the passphrase when the store keeps the key', async (t) => {
+  const { root, store } = await setup(t)
+  const first = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
+    join(root, 'app-data', 'settings.json'), root, store)
+  await first.start()
+  const status = await first.unlock({ passphrase, remember: true })
+  assert.equal(status.rememberEnabled, true)
+
+  const second = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
+    join(root, 'app-data', 'settings.json'), root, store)
+  await second.start()
+  assert.equal(await second.unlockWithRememberedKey(), true)
+  assert.equal(second.isLocked(), false)
+
+  await second.forget()
+  const third = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
+    join(root, 'app-data', 'settings.json'), root, store)
+  await third.start()
+  assert.equal(await third.unlockWithRememberedKey(), false)
 })
 
 test('internal reads clear plaintext after asynchronous success and failure', async (t) => {
@@ -103,8 +160,8 @@ test('internal reads clear plaintext after asynchronous success and failure', as
   await vault.withSecret(secret, (buffer) => assert.equal(buffer.toString('utf8'), value))
 })
 
-test('an expired received grant blocks new secret access', async (t) => {
-  const { root, open, keychainKey, folder } = await setup(t)
+test('an expired received grant blocks new secret access and cleanup forgets the secret', async (t) => {
+  const { root, open, folder } = await setup(t)
   const vault = await open()
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
   const [secret] = await vault.importSecrets(project.id, [{ name: 'TOKEN', value: 'received value' }],
@@ -113,25 +170,22 @@ test('an expired received grant blocks new secret access', async (t) => {
   await assert.rejects(vault.withSecret(secret, () => assert.fail('An expired value must not reach the consumer.')), /expired access grant/)
   await assert.rejects(vault.withSelectedSecrets(project.id, [secret.id], () => undefined), /expired access grant/)
   await assert.rejects(vault.withProjectEnvironment(project.id, () => undefined), /expired access grant/)
-  assert.ok(await keychainKey(`${project.id}/${secret.id}`))
   const outcomes = await vault.cleanupExpiredGrants()
   assert.deepEqual(outcomes.map(({ transferId, status }) => ({ transferId, status })),
     [{ transferId: 'relay:expired', status: 'removed' }])
   assert.deepEqual(await vault.listSecrets(), [])
-  assert.equal(await keychainKey(`${project.id}/${secret.id}`), null)
-  assert.ok(await keychainKey('grant-cleanup'))
   const history = await readFile(join(root, 'app-data', 'grant-cleanup.sct'))
+  assert.equal(history.subarray(0, 4).toString(), 'SCG2')
   assert.ok(!history.includes('TOKEN') && !history.includes('received value') && !history.includes('relay:expired'))
   assert.deepEqual(await (await open()).grantCleanupOutcomes(), outcomes)
   const [restartSecret] = await vault.importSecrets(project.id, [{ name: 'RESTART_TOKEN', value: 'restart value' }],
     'relay:restart', async () => undefined, { accessExpiresAt: Date.now() - 1, injectionOnly: true })
   assert.ok(restartSecret)
   assert.deepEqual(await (await open()).listSecrets(), [])
-  assert.equal(await keychainKey(`${project.id}/${restartSecret.id}`), null)
 })
 
-test('internal reads reject invalid references, other projects, and missing or incorrect keys', async (t) => {
-  const { root, service, open, keychainKey, folder } = await setup(t)
+test('internal reads reject invalid references and other projects', async (t) => {
+  const { root, open, folder } = await setup(t)
   const vault = await open()
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
   const other = await vault.addProject({ name: 'Other', directory: await folder('other') })
@@ -142,21 +196,6 @@ test('internal reads reject invalid references, other projects, and missing or i
     { ...secret, projectId: other.id }, { ...secret, id: 'missing' }]) {
     await assert.rejects(vault.withSecret(input, rejectConsumer))
   }
-
-  const key = await keychainKey(`${project.id}/${secret.id}`)
-  assert.ok(key)
-  const entry = new AsyncEntry(service, `${project.id}/${secret.id}`)
-  await entry.deleteCredential()
-  await assert.rejects(vault.withSecret(secret, rejectConsumer), /Keychain key .* is missing/)
-  await entry.setSecret(Buffer.alloc(32))
-  await assert.rejects(vault.withSecret(secret, rejectConsumer), /Cannot decrypt this secret/)
-  await entry.setSecret(Buffer.from(key))
-  const fileKey = await keychainKey(`${project.id}/file`)
-  assert.ok(fileKey)
-  const fileEntry = new AsyncEntry(service, `${project.id}/file`)
-  await fileEntry.deleteCredential()
-  await assert.rejects(vault.withSecret(secret, rejectConsumer), /Keychain key .* is missing/)
-  await fileEntry.setSecret(Buffer.from(fileKey))
   await vault.withSecret(secret, (buffer) => assert.equal(buffer.toString('utf8'), 'private value'))
   assert.deepEqual(await readFile(join(root, '.sct', project.name, 'secrets.sct')), contents)
 })
@@ -231,23 +270,15 @@ test('launches resolve renamed projects and moved storage, and preserve command 
   await assert.rejects(runProject(projects, vault, ['run', 'Renamed']), /Usage:/)
 })
 
-test('launches fail before execution when the vault, required keys, command, or source folder is missing', async (t) => {
-  const { root, service, open, keychainKey, folder } = await setup(t)
+test('launches fail before execution when the vault, command, or source folder is missing', async (t) => {
+  const { root, open, folder } = await setup(t)
   const vault = await open()
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
   const marker = join(root, 'must-not-exist')
   const commandArgs = ['-e', "require('node:fs').writeFileSync(process.argv[1], 'launched')", marker]
   await assert.rejects(launchProject(vault, project.id, 'node', commandArgs), /Cannot read the secrets/)
   await assert.rejects(launchProject(vault, 'missing', 'node', commandArgs), /not in your project list/)
-  const secret = await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: randomUUID() })
-  for (const account of ['file', secret.id]) {
-    const key = await keychainKey(`${project.id}/${account}`)
-    assert.ok(key)
-    const entry = new AsyncEntry(service, `${project.id}/${account}`)
-    await entry.deleteCredential()
-    await assert.rejects(launchProject(vault, project.id, 'node', commandArgs), /Keychain key .* is missing/)
-    await entry.setSecret(Buffer.from(key))
-  }
+  await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: randomUUID() })
   await assert.rejects(launchProject(vault, project.id, 'sct-command-that-does-not-exist', []), /Cannot start the command/)
   await rm(project.directory, { recursive: true })
   await assert.rejects(launchProject(vault, project.id, 'node', commandArgs), /Cannot start the command/)
@@ -255,23 +286,25 @@ test('launches fail before execution when the vault, required keys, command, or 
 })
 
 test('the terminal entrypoint forwards interruption and termination to the command', { timeout: 15_000 }, async (t) => {
-  const { root, service, open, folder } = await setup(t)
+  const { root, open, folder } = await setup(t)
   const vault = await open()
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
   await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: randomUUID() })
   await writeFile(join(root, 'terminal.ts'), `
     import { ProjectStore } from ${JSON.stringify(join(__dirname, '../src/main/projects.ts'))}
     import { Vault } from ${JSON.stringify(join(__dirname, '../src/main/vault.ts'))}
+    import { InMemorySecretStore } from ${JSON.stringify(join(__dirname, '../src/main/key-store.ts'))}
     import { runProject } from ${JSON.stringify(join(__dirname, '../src/main/launch.ts'))}
     import { join } from 'node:path'
     const projects = new ProjectStore(join(process.argv[2], 'app-data', 'projects.json'))
-    const vault = new Vault(projects, join(process.argv[2], 'app-data', 'settings.json'), process.argv[2], process.argv[3])
+    const vault = new Vault(projects, join(process.argv[2], 'app-data', 'settings.json'), process.argv[2], new InMemorySecretStore())
     await vault.start()
+    await vault.unlock({ passphrase: ${JSON.stringify(passphrase)}, remember: false })
     process.exit(await runProject(projects, vault, ['run', 'Demo', '--', 'node', '-e',
-      "process.on(process.argv[1], () => process.exit(37)); console.log('ready'); setInterval(() => {}, 1000)", process.argv[4]]))
+      "process.on(process.argv[1], () => process.exit(37)); console.log('ready'); setInterval(() => {}, 1000)", process.argv[3]]))
   `)
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    const terminal = spawn(process.execPath, [join(root, 'terminal.ts'), root, service, signal], { stdio: ['ignore', 'pipe', 'pipe'] })
+    const terminal = spawn(process.execPath, [join(root, 'terminal.ts'), root, signal], { stdio: ['ignore', 'pipe', 'pipe'] })
     t.after(() => { terminal.kill('SIGKILL') })
     const exit = new Promise((resolve, reject) => { terminal.once('close', resolve); terminal.once('error', reject) })
     await new Promise<void>((resolve, reject) => {
@@ -284,68 +317,6 @@ test('the terminal entrypoint forwards interruption and termination to the comma
   }
 })
 
-test('a failed Keychain deletion keeps the secret available for another attempt', async (t) => {
-  const { root, open, keychainKey, folder } = await setup(t)
-  const vault = await open()
-  const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
-  const secret = await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: 'value' })
-  assert.ok(await keychainKey(`${project.id}/${secret.id}`))
-  const filename = join(root, '.sct', project.name, 'secrets.sct')
-  const contents = await readFile(filename)
-  const originalRead = AsyncEntry.prototype.getSecret
-  let locked = false
-  const read = t.mock.method(AsyncEntry.prototype, 'getSecret', function (this: AsyncEntry) {
-    return locked ? Promise.reject(new Error('Keychain is locked.')) : originalRead.call(this)
-  })
-  // Simulate a locked Keychain without locking the user's login Keychain.
-  const deletion = t.mock.method(AsyncEntry.prototype, 'deleteCredential', async () => {
-    locked = true
-    throw new Error('Keychain deletion denied.')
-  })
-  try {
-    await assert.rejects(vault.deleteSecret({ projectId: project.id, id: secret.id }), /The secret remains saved/)
-  } finally {
-    deletion.mock.restore()
-    read.mock.restore()
-  }
-
-  assert.deepEqual(await readFile(filename), contents)
-  assert.deepEqual(await (await open()).listSecrets(), [secret])
-  assert.ok(await keychainKey(`${project.id}/${secret.id}`))
-  await vault.updateSecret({ projectId: project.id, id: secret.id, value: 'replacement' })
-  await vault.deleteSecret({ projectId: project.id, id: secret.id })
-  assert.deepEqual(await vault.listSecrets(), [])
-  assert.equal(await keychainKey(`${project.id}/${secret.id}`), null)
-})
-
-test('project deletion can retry the remaining Keychain items after a failure', async (t) => {
-  const { open, keychainKey, folder } = await setup(t)
-  const vault = await open()
-  const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
-  const first = await vault.addSecret({ projectId: project.id, name: 'FIRST', value: 'one' })
-  const second = await vault.addSecret({ projectId: project.id, name: 'SECOND', value: 'two' })
-  assert.ok(await keychainKey(`${project.id}/${first.id}`))
-  assert.ok(await keychainKey(`${project.id}/${second.id}`))
-  const original = AsyncEntry.prototype.deleteCredential
-  let attempts = 0
-  const deletion = t.mock.method(AsyncEntry.prototype, 'deleteCredential', function (this: AsyncEntry) {
-    if (++attempts === 2) return Promise.reject(new Error('Keychain deletion denied.'))
-    return original.call(this)
-  })
-  try {
-    await assert.rejects(vault.deleteProject(project.id), /Keychain/)
-  } finally {
-    deletion.mock.restore()
-  }
-
-  assert.deepEqual(await (await open()).listSecrets(), [second])
-  assert.equal(await keychainKey(`${project.id}/${first.id}`), null)
-  assert.ok(await keychainKey(`${project.id}/${second.id}`))
-  await vault.deleteProject(project.id)
-  assert.equal(await keychainKey(`${project.id}/${second.id}`), null)
-  assert.equal(await keychainKey(`${project.id}/file`), null)
-})
-
 test('project names cannot leave the vault folder or repeat', async (t) => {
   const { root, open, folder } = await setup(t)
   const vault = await open()
@@ -354,19 +325,19 @@ test('project names cannot leave the vault folder or repeat', async (t) => {
   }
   await vault.addProject({ name: 'Demo', directory: await folder('demo') })
   await assert.rejects(vault.addProject({ name: 'demo', directory: await folder('other') }), /already exists/)
-  assert.deepEqual(await readdir(join(root, '.sct')), ['Demo'])
+  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['Demo', 'vault.json'])
   assert.deepEqual((await readdir(root)).sort(), ['.sct', 'app-data', 'folders'])
 })
 
-test('renaming a project moves its secrets, and deleting it removes its files and Keychain items', async (t) => {
-  const { root, open, keychainKey, folder } = await setup(t)
+test('renaming a project moves its secrets, and deleting it removes its files', async (t) => {
+  const { root, open, folder } = await setup(t)
   const vault = await open()
   const directory = await folder('demo')
   const project = await vault.addProject({ name: 'Demo', directory })
   const secret = await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: 'value' })
 
   await vault.renameProject({ id: project.id, name: 'Renamed' })
-  assert.deepEqual(await readdir(join(root, '.sct')), ['Renamed'])
+  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['Renamed', 'vault.json'])
   assert.deepEqual(await vault.listSecrets(), [secret])
   await (await open()).withSecret(secret, (buffer) => assert.equal(buffer.toString('utf8'), 'value'))
 
@@ -374,13 +345,11 @@ test('renaming a project moves its secrets, and deleting it removes its files an
   await assert.rejects(vault.renameProject({ id: project.id, name: 'Taken' }), /already contains a folder named Taken/)
   await rm(join(root, '.sct', 'Taken'), { recursive: true })
   await vault.renameProject({ id: project.id, name: 'renamed' })
-  assert.deepEqual(await readdir(join(root, '.sct')), ['renamed'])
+  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['renamed', 'vault.json'])
   assert.deepEqual(await vault.listSecrets(), [secret])
 
   await vault.deleteProject(project.id)
-  assert.deepEqual(await readdir(join(root, '.sct')), [])
-  assert.equal(await keychainKey(`${project.id}/${secret.id}`), null)
-  assert.equal(await keychainKey(`${project.id}/file`), null)
+  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['vault.json'])
   assert.ok((await stat(directory)).isDirectory())
 })
 
@@ -392,11 +361,11 @@ test('startup creates folders for existing projects and skips names that are not
     { id: 'older', name: 'older/name', directory: await folder('older') }
   ]))
   await open()
-  assert.deepEqual(await readdir(join(root, '.sct')), ['Existing'])
+  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['Existing', 'vault.json'])
 })
 
 test('a secrets file copied into a different project does not open', async (t) => {
-  const { root, open, keychainKey, folder } = await setup(t)
+  const { root, open, folder } = await setup(t)
   const vault = await open()
   const first = await vault.addProject({ name: 'First', directory: await folder('first') })
   const second = await vault.addProject({ name: 'Second', directory: await folder('second') })
@@ -405,9 +374,6 @@ test('a secrets file copied into a different project does not open', async (t) =
   await copyFile(join(root, '.sct', 'First', 'secrets.sct'), join(root, '.sct', 'Second', 'secrets.sct'))
   await assert.rejects(vault.listSecrets(), /different project/)
   await assert.rejects(vault.withSecret(other, () => assert.fail('A copied vault must not open.')), /different project/)
-  // Second cannot open its file now, so cleanup cannot delete it. These calls record its Keychain items for removal.
-  assert.ok(await keychainKey(`${second.id}/file`))
-  assert.ok(await keychainKey(`${second.id}/${other.id}`))
 })
 
 test('moving the storage location moves the vault and persists after restart', async (t) => {

@@ -2,7 +2,8 @@
 
 .sct gives a registered project its secrets without `.env` files or project-local manifests.
 The CLI and the SDK work offline. They need no relay, no MCP server, and no agent.
-In both paths, the signed Electron main process owns Keychain access and decryption.
+In both paths, the signed Electron main process owns the vault key and decryption.
+The OS secret store is optional. A passphrase always opens the vault.
 
 ## Set up one time
 
@@ -21,6 +22,15 @@ In both paths, the signed Electron main process owns Keychain access and decrypt
 
 Keep the vault outside the source folder. The project needs no `.sct` configuration file.
 The desktop window can be open or closed during injection.
+
+### Unlock
+
+Each CLI path needs an unlocked vault.
+
+- When the vault is locked, `sct run` opens one passphrase window from the signed executable.
+- `sct _env` and `sct mcp` have no terminal. They open the same window.
+- With "Remember this device" on, no window opens.
+- The window closes after the vault opens. A window that closes early stops the command with a clear error.
 
 ### The `sct` command script
 

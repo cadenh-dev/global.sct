@@ -8,6 +8,7 @@ import { rmSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { ProjectStore } from './projects'
 import { Vault } from './vault'
+import { createSecretStore } from './key-store'
 import { demoOutcome, runProject, startFixedDemo } from './launch'
 import { runAgent, writeCliOutput } from './agent'
 import { AgentAccess } from './agent-access'
@@ -23,6 +24,8 @@ const launchArguments = process.argv.slice(process.defaultApp ? 2 : 1)
 const incomingFiles: string[] = []
 let sharing: Sharing | undefined
 let openingFiles = false
+let pendingUnlock: (() => void) | undefined
+let desktopStarted: Promise<void> | undefined
 
 // macOS can deliver a document before the app and its renderer are ready.
 app.on('open-file', (event, path) => {
@@ -57,7 +60,7 @@ function rendererPage(): string {
   return join(__dirname, '../renderer/index.html')
 }
 
-async function createWindow(hash = incomingFiles.length ? '/sharing' : undefined): Promise<void> {
+async function createWindow(hash = incomingFiles.length ? '/sharing' : undefined): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     title: '.sct',
     width: 1000,
@@ -94,6 +97,7 @@ async function createWindow(hash = incomingFiles.length ? '/sharing' : undefined
     // Closing a window during its first load cancels loading without a startup failure.
     if (!closing) throw error
   }
+  return window
 }
 
 async function pickDirectory(options: OpenDialogOptions): Promise<string | null> {
@@ -111,11 +115,6 @@ function reportStartupError(error: unknown): void {
 app.setName('.sct')
 nativeTheme.themeSource = 'dark'
 app.whenReady().then(async () => {
-  if (launchArguments[0] === 'agent' || launchArguments[0] === 'mcp') {
-    app.dock?.hide()
-    app.exit(await runAgentSession())
-    return
-  }
   if (launchArguments[0] === 'skills') {
     if (launchArguments.length !== 1) throw new Error('Usage: sct skills. Return the bundled skill directory and names.')
     await writeCliOutput(JSON.stringify({ directory: skillsDirectory(), skills: (await readdir(skillsDirectory())).filter((name) => name.startsWith('sct-')) }))
@@ -123,10 +122,19 @@ app.whenReady().then(async () => {
     return
   }
   const projects = new ProjectStore(join(app.getPath('userData'), 'projects.json'))
-  const vault = new Vault(projects, join(app.getPath('userData'), 'settings.json'), homedir())
+  const store = await createSecretStore('.sct')
+  const vault = new Vault(projects, join(app.getPath('userData'), 'settings.json'), homedir(), store)
   await vault.start()
+  registerVaultHandlers(vault, projects)
+  if (launchArguments[0] === 'agent' || launchArguments[0] === 'mcp') {
+    app.dock?.hide()
+    await unlockVault(vault)
+    app.exit(await runAgentSession(projects, vault))
+    return
+  }
   if (launchArguments[0] === 'run' || launchArguments[0] === '_env') {
     app.dock?.hide()
+    await unlockVault(vault)
     if (launchArguments[0] === '_env') {
       await streamEnvironment(projects, vault, launchArguments[1])
       app.exit(0)
@@ -134,6 +142,71 @@ app.whenReady().then(async () => {
       app.exit(await runProject(projects, vault, launchArguments))
     }
     return
+  }
+  if (await vault.unlockWithRememberedKey()) {
+    await startDesktop(vault, projects)
+    return
+  }
+  await createWindow('/unlock')
+}).catch((error: unknown) => {
+  if (['run', '_env', 'agent', 'mcp', 'skills'].includes(launchArguments[0])) {
+    console.error(error instanceof Error ? error.message : 'The project command could not start.')
+    app.exit(1)
+  } else {
+    reportStartupError(error)
+  }
+})
+
+function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
+  handle('vault:status', () => vault.status())
+  handle('vault:unlock', async (input) => {
+    const status = await vault.unlock(input)
+    if (pendingUnlock) {
+      const resume = pendingUnlock
+      pendingUnlock = undefined
+      resume()
+    } else {
+      await startDesktop(vault, projects)
+    }
+    return status
+  })
+  handle('vault:lock', () => vault.lock())
+  handle('vault:forget', () => vault.forget())
+  handle('vault:location', () => vault.location())
+}
+
+// A CLI launch has no terminal for the passphrase. The same signed executable opens one window for it.
+async function unlockVault(vault: Vault): Promise<void> {
+  if (!(await vault.unlockWithRememberedKey())) {
+    await new Promise<void>((resolve, reject) => {
+      pendingUnlock = resolve
+      createWindow('/unlock').then((window) => {
+        window.once('closed', () => {
+          if (!pendingUnlock) return
+          pendingUnlock = undefined
+          reject(new Error('The unlock window closed before the vault opened.'))
+        })
+      }).catch(reject)
+    })
+    mainWindow?.close()
+  }
+  try {
+    await vault.cleanupExpiredGrants()
+  } catch (error) {
+    console.error('Startup grant cleanup failed.', error)
+  }
+}
+
+function startDesktop(vault: Vault, projects: ProjectStore): Promise<void> {
+  desktopStarted ??= startDesktopOnce(vault, projects)
+  return desktopStarted
+}
+
+async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<void> {
+  try {
+    await vault.cleanupExpiredGrants()
+  } catch (error) {
+    console.error('Startup grant cleanup failed.', error)
   }
   const service = new Sharing(join(app.getPath('userData'), 'sharing'), vault, hostname().slice(0, 100))
   sharing = service
@@ -184,7 +257,6 @@ app.whenReady().then(async () => {
   handle('secrets:add', (input) => vault.addSecret(input))
   handle('secrets:update', (input) => vault.updateSecret(input))
   handle('secrets:delete', (input) => vault.deleteSecret(input))
-  handle('vault:location', () => vault.location())
   handle('vault:choose-location', async () => {
     const root = await pickDirectory({
       title: 'Choose a storage location',
@@ -195,20 +267,13 @@ app.whenReady().then(async () => {
   })
   registerSharing(service)
   registerCards(new Cards(join(app.getPath('userData'), 'cards')))
-  await createWindow()
+  if (!mainWindow) await createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow().catch(reportStartupError)
   })
-}).catch((error: unknown) => {
-  if (['run', '_env', 'agent', 'mcp', 'skills'].includes(launchArguments[0])) {
-    console.error(error instanceof Error ? error.message : 'The project command could not start.')
-    app.exit(1)
-  } else {
-    reportStartupError(error)
-  }
-})
+}
 
-async function runAgentSession(): Promise<number> {
+async function runAgentSession(projects: ProjectStore, vault: Vault): Promise<number> {
   let access: AgentAccess | undefined
   let loading: Promise<AgentAccess> | undefined
   let sessionSharing: Sharing | undefined
@@ -230,9 +295,6 @@ async function runAgentSession(): Promise<number> {
   }
   const getAccess = async (): Promise<AgentAccess> => {
     loading ??= (async () => {
-      const projects = new ProjectStore(join(app.getPath('userData'), 'projects.json'))
-      const vault = new Vault(projects, join(app.getPath('userData'), 'settings.json'), homedir())
-      await vault.start()
       sessionSharing = new Sharing(join(app.getPath('userData'), 'sharing'), vault, hostname().slice(0, 100))
       access = new AgentAccess(projects, vault, {
         review: async () => {
