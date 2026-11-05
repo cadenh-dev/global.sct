@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import { sctExecutable } from './executable'
+import { sctEnvironment, sctExecutable } from './executable'
 import { decodeMessage } from './protocol'
 
 export interface LoadEnvOptions {
@@ -11,7 +11,8 @@ export interface LoadEnvOptions {
 
 /** Load this project's global.sct secrets and keep process.env current. The returned function stops updates and restores inherited values. */
 export function loadEnv(options: LoadEnvOptions = {}): Promise<() => void> {
-  const child = spawn(sctExecutable(), ['_env', ...(options.project ? [options.project] : [])], { stdio: ['pipe', 'pipe', 'pipe'] })
+  const child = spawn(sctExecutable(), ['_env', ...(options.project ? [options.project] : [])],
+    { env: sctEnvironment(), stdio: ['pipe', 'pipe', 'pipe'] })
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity })
   const inherited = new Map<string, string | undefined>()
   let loaded = false

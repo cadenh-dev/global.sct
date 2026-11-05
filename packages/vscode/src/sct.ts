@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { z } from 'zod/v4'
-import { sctExecutable } from '../../env/src/executable'
+import { sctEnvironment, sctExecutable } from '../../env/src/executable'
 import type { AgentOutcome } from '../../../src/shared/agent'
 import type { SecretMetadata } from '../../../src/shared/secrets'
 
@@ -22,14 +22,14 @@ export interface SctStatus {
 export async function readSctStatus(): Promise<SctStatus> {
   const executable = sctExecutable()
   // A global.sct release without --version opens the desktop window and does not exit, so the check stops after a time limit.
-  const { stdout } = await promisify(execFile)(executable, ['--version'], { timeout: 10_000 })
+  const { stdout } = await promisify(execFile)(executable, ['--version'], { timeout: 10_000, env: sctEnvironment() })
   return { executable, version: stdout.trim() }
 }
 
 export function readSecretMetadata(cwd: string): Promise<SctSecret[]> {
   return new Promise((resolve, reject) => {
     const child = spawn(sctExecutable(), ['agent', 'list_secrets', '--stdin'], {
-      cwd, shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore']
+      cwd, shell: false, windowsHide: true, env: sctEnvironment(), stdio: ['pipe', 'pipe', 'ignore']
     })
     let output = ''
     child.stdout.setEncoding('utf8')
