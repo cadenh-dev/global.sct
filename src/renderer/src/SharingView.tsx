@@ -12,6 +12,7 @@ import type { HandoffStage } from './SharingMotion'
 import type { Loaded, Run, SharingTab, UpdateProjects, UpdateSecrets } from './types'
 import type { PendingLink } from '../../shared/transport'
 import { LinkSharing } from './LinkSharing'
+import { DirectSharing } from './DirectSharing'
 import { SecretSelection } from './SecretSelection'
 
 interface SharingViewProps {
@@ -73,7 +74,7 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
       <div className="page-heading">
         <div>
           <h1>Sharing</h1>
-          <p className="description">{isMac ? 'Send encrypted secrets by link, AirDrop, or relay.' : 'Send encrypted secrets by link or relay.'} Received values stay in the main process.</p>
+          <p className="description">{isMac ? 'Send encrypted secrets by link, Direct, AirDrop, or relay.' : 'Send encrypted secrets by link, Direct, or relay.'} Received values stay in the main process.</p>
         </div>
       </div>
 
@@ -99,6 +100,10 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
           peers={sharing.value.peers} busy={operation.busy} run={operation.run} updateSecrets={updateSecrets}
           pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
       </div>}
+      <div hidden={activeTab !== 'direct'}>
+        <DirectSharing projectId={projectId} active={activeTab === 'direct'} projects={projects} secrets={secrets}
+          updateSecrets={updateSecrets} busy={operation.busy} run={operation.run} />
+      </div>
     </>
   )
 }
@@ -177,7 +182,7 @@ interface Receipt {
 
 // A waiting transfer or a new receipt opens the Receive tab unless the route names another tab.
 function activeSharingTab(sharing: Loaded<SharingState>, received: boolean, tab: SharingTab | undefined, isMac: boolean): SharingTab {
-  if (tab === 'link') return 'link'
+  if (tab === 'link' || tab === 'direct') return tab
   if (!isMac) return tab === 'devices' ? 'devices' : 'relay'
   if (tab === 'relay') return 'relay'
   if (tab === 'receive') return 'receive'
@@ -233,6 +238,8 @@ function SharingTabs({ activeTab, projectId, canShare, isMac }: {
         <a href={sharingRoute('relay', projectId)} aria-current={activeTab === 'relay' ? 'page' : undefined}>Relay</a>
         <a href={sharingRoute('link', projectId)} aria-current={activeTab === 'link' ? 'page' : undefined}
           aria-label="Link sharing">Link</a>
+        <a href={sharingRoute('direct', projectId)} aria-current={activeTab === 'direct' ? 'page' : undefined}
+          aria-label="Direct sharing">Direct</a>
       </nav>
       {isMac && !canShare && activeTab !== 'relay' && <p id="sharing-verification-required" className="field-help sharing-tab-help">
         Verify a device before you can send secrets.

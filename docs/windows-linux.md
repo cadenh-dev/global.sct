@@ -10,13 +10,15 @@ global.sct runs on Windows and Linux. The macOS-only features stay on macOS.
 | `sct run` and `sct _env` | Yes | Yes | Yes |
 | Agent Access | Yes | Yes | Yes |
 | Device pairing by link or file | Yes | Yes | Yes |
+| Direct sharing | Yes | Yes | Yes |
 | Link sharing | Yes | Yes | Yes |
 | Relay sharing | Yes | Yes | Yes, with libsecret |
 | AirDrop sharing | Yes | No | No |
 | Wallet cards | Yes | No | No |
 | Caller signature check | Apple code signature | Authenticode signer | No code signature. The caller is unverified |
 
-On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** tabs. Use **Verify devices** to pair devices without the relay. Use **Link** to send without a relay, or **Relay** to send through the relay.
+On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** tabs. Use **Verify devices** to pair devices without the relay. Use **Direct** to send while both apps are online, **Link** to send without a relay, or **Relay** to send through the relay.
+Direct needs outbound UDP. Both apps must be open and unlocked. The Windows and Linux packages include the Hyperswarm native modules.
 
 ## Requirements
 
@@ -41,7 +43,7 @@ The output is in `dist/`:
 - Windows: `dist/global.sct-win32-<arch>/sct.exe`
 - Linux: `dist/global.sct-linux-<arch>/sct`
 
-The build copies the platform `@napi-rs/keyring` binary into the package.
+The build installs the production dependency closure, including the `@napi-rs/keyring` and Hyperswarm native modules for the host platform.
 The build does not run `swiftc` on Windows or Linux.
 The build does not sign the package. See [Signing](#signing).
 
@@ -97,7 +99,7 @@ Verify the metadata with the real Claude Code build before release. A certificat
 - Linux has no code signature. A process name match gives an unverified caller. The app asks for the extra confirmation.
 - The relay keeps its per-server cache keys in the OS secret store. A Linux system with no secret service cannot use the relay mailbox until these keys move. See [Relay cache keys](storage-design.md#7-decisions-and-remaining-questions).
 - Linux needs `libsecret` for "Remember this device" and the relay cache keys. The passphrase path works without it.
-- The Linux package selects the glibc or musl `@napi-rs/keyring` binary from the active `ldd`. Set `SCT_LIBC=gnu` or `SCT_LIBC=musl` to override detection.
+- The Linux package uses the native packages that Bun selects for the host platform. Treat a musl build as unverified until its package loads the keyring and Hyperswarm native modules.
 - On Windows, file access uses the folder ACL. Keep the vault in a folder that only your account can access.
 - A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
 - The existing Playwright suite now unlocks the vault, but it still uses macOS and POSIX assumptions. `tests/platform.spec.ts` is the Windows smoke test.

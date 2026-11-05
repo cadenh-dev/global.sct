@@ -61,6 +61,24 @@ The sender's project name and folder do not select the destination.
 global.sct saves the copies in the vault file of the destination project. Each copy gets a new data key.
 If a secret name already exists in the destination, the import fails before any secret changes.
 
+## Direct mode
+
+Direct mode sends an encrypted transfer to a verified peer without a relay.
+Both apps must be open and unlocked. Both peers must be online at the same time.
+
+1. Open **Sharing**, then open the **Direct** tab.
+2. Choose the source project and a verified device. A device shows **online** after both apps authenticate.
+3. Choose the secrets and select **Send directly**.
+4. On the recipient, choose a destination project and select **Import and send receipt**.
+
+The sender receives the signed receipt in the same session and the row changes to `received`.
+If the session closes before the receipt returns, the row changes to `manual` after ten minutes.
+Paste the receipt link from the recipient to verify it.
+
+Direct uses Hyperswarm discovery and an encrypted connection. The discovery topic changes each UTC day.
+A failed connection shows **Peer not reachable**. Use Link or Relay. Direct never uploads a failed transfer to Relay.
+The transfer deadline is 24 hours. A Direct session has no automatic retry.
+
 ## Link mode
 
 A Link is a text string that carries an encrypted transfer. Use any trusted conversation to send it.

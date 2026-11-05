@@ -8,7 +8,7 @@ Existing installations: follow the [storage migration guide](docs/fork-storage-m
 - **Vault.** global.sct keeps secrets in an encrypted local vault. A passphrase derives one master key, and each value has its own data key. The OS secret store is optional.
 - **Runtime injection.** `sct run -- <command>` gives the command its secrets as environment variables.
 - **SDK.** The dependency-free `@sct/env` package loads secrets into `process.env` and applies saved changes without a restart.
-- **Sharing.** global.sct sends encrypted secrets to a verified device by link, through AirDrop on macOS, or through a relay.
+- **Sharing.** global.sct sends encrypted secrets to a verified device by Direct connection, by link, through AirDrop on macOS, or through a relay.
 - **Agent Access.** Coding agents use secrets through a CLI and an MCP server. Each request opens a local approval window. Agents never receive secret values.
 
 

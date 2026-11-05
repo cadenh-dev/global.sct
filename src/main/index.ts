@@ -23,7 +23,9 @@ import type { Relay } from './relay-connection'
 import { readThemePreference, writeThemePreference } from './preferences'
 import { getProtocolStatus, registerProtocol, removeProtocol } from './protocol-registration'
 import { protocolLinksFromArguments, readProtocolLink } from './protocol'
+import { HyperswarmTransport } from './transport-hyperswarm'
 import type { Reply, ThemePreference, ThemeVariant } from '../shared/api'
+import type { DirectState } from '../shared/direct'
 
 let mainWindow: BrowserWindow | null = null
 app.setName('global.sct')
@@ -35,6 +37,7 @@ const initialProtocolLinks = desktopMode ? protocolLinksFromArguments(launchArgu
 const primaryInstance = !desktopMode || app.requestSingleInstanceLock()
 const incomingFiles: string[] = []
 let sharing: Sharing | undefined
+let direct: HyperswarmTransport | undefined
 let openingFiles = false
 let pendingUnlock: (() => void) | undefined
 let desktopStarted: Promise<void> | undefined
@@ -331,10 +334,14 @@ function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
       resume()
     } else {
       await startDesktop(vault, projects)
+      await direct?.start()
     }
     return status
   })
-  handle('vault:lock', () => vault.lock())
+  handle('vault:lock', async () => {
+    await direct?.stop()
+    return vault.lock()
+  })
   handle('vault:forget', () => vault.forget())
   handle('vault:location', () => vault.location())
 }
@@ -375,6 +382,13 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   const service = new Sharing(join(app.getPath('userData'), 'sharing'), vault, hostname().slice(0, 100))
   sharing = service
   await service.cleanOutbox()
+  direct = new HyperswarmTransport(service, join(app.getPath('userData'), 'direct'),
+    () => mainWindow?.webContents.send('direct:changed'))
+  try {
+    await direct.start()
+  } catch (error) {
+    console.error('The Direct transport could not start.', error)
+  }
   const { Relay, relayServer } = await import('./relay-connection')
   // Only this process writes relay files and runs remote tasks. Agent sessions open a passive relay.
   const relay = new Relay(relayServer(), join(app.getPath('userData'), 'relay'), async () => service,
@@ -397,6 +411,7 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   app.on('will-quit', () => {
     clearInterval(cleanupTimer)
     relay.stop()
+    void direct?.stop()
   })
   handle('relay:state', () => relay.state())
   handle('relay:request-pair', (identity) => relay.requestPair(identity))
@@ -408,6 +423,10 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   handle('relay:respond-task', (input) => relay.respondTask(input))
   handle('relay:hide-activity', (input) => relay.hideActivity(input))
   handle('relay:hide-all-activity', () => relay.hideAllActivity())
+  handle('direct:state', () => direct?.state() ?? emptyDirect())
+  handle('direct:send', (input) => requireDirect().send(input))
+  handle('direct:import', (input) => requireDirect().import(input))
+  handle('direct:verify-receipt', (input) => requireDirect().verifyReceipt(input))
   handle('projects:list', () => projects.list())
   handle('projects:add', (input) => vault.addProject(input))
   handle('projects:rename', (input) => vault.renameProject(input))
@@ -543,6 +562,7 @@ function registerSharing(service: Sharing): void {
   handle('sharing:confirm-peer', async (token) => {
     const peer = await service.confirmPeer(token)
     sharingChanged()
+    await direct?.refresh()
     return peer
   })
   handle('sharing:send', async (input) => sendToNearbyMac(await service.exportSecrets(input)))
@@ -590,6 +610,15 @@ function sendToNearbyMac(path: string): Promise<void> {
 
 function sharingChanged(): void {
   mainWindow?.webContents.send('sharing:changed')
+}
+
+function requireDirect(): HyperswarmTransport {
+  if (!direct) throw new Error('Direct sharing is not ready.')
+  return direct
+}
+
+function emptyDirect(): DirectState {
+  return { connection: 'off', peers: [], incoming: [], sent: [], error: null }
 }
 
 async function openIncomingFiles(): Promise<void> {

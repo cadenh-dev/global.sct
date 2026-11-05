@@ -8,6 +8,7 @@ import type { ConfirmRelayPairInput, RelayAcceptInput, RelayActivityKey, RelayQu
 import type { AgentRequestView } from '../shared/agent'
 import type { UnlockInput, VaultStatus } from '../shared/vault'
 import type { LinkImportResult, LinkPreview, LinkRecord, LinkState, PendingLink, TransferReceipt } from '../shared/transport'
+import type { DirectImportResult, DirectReceiptInput, DirectSendInput, DirectState } from '../shared/direct'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   const reply: Reply<T> = await ipcRenderer.invoke(channel, ...args)
@@ -67,6 +68,15 @@ const api: SctAPI = {
   verifyLinkReceipt: (input) => invoke<TransferReceipt>('sharing:verify-link-receipt', input),
   getLinkState: () => invoke<LinkState>('sharing:link-state'),
   copyText: (text) => invoke<void>('sharing:copy-text', text),
+  getDirectState: () => invoke<DirectState>('direct:state'),
+  sendDirect: (input: DirectSendInput) => invoke<void>('direct:send', input),
+  importDirect: (input) => invoke<DirectImportResult>('direct:import', input),
+  verifyDirectReceipt: (input: DirectReceiptInput) => invoke<TransferReceipt>('direct:verify-receipt', input),
+  onDirectChanged: (listener) => {
+    const changed = () => listener()
+    ipcRenderer.on('direct:changed', changed)
+    return () => { ipcRenderer.removeListener('direct:changed', changed) }
+  },
   shareDeviceCard: () => invoke<void>('sharing:device-card'),
   copyPairingLink: () => invoke<void>('sharing:copy-pairing-link'),
   saveDeviceCard: () => invoke<boolean>('sharing:save-device-card'),

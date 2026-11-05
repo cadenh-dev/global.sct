@@ -1,9 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, diffieHellman, hkdfSync, randomUUID, sign, verify } from 'node:crypto'
 import { mkdir, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod/v4'
 import { createIdentity, decodeIdentity, decryptTransfer, describeDevice, encodeIdentity, encryptTransfer,
-  pairingCode, readDeviceCard, readEnvelope, readObject, readPairingLink, transferLimit } from './transfer'
+  pairingCode, publicKey, readDeviceCard, readEnvelope, readObject, readPairingLink, transferLimit } from './transfer'
 import type { DeviceCard, DeviceIdentity, TransferEnvelope } from './transfer'
 import { openExpiryNotice, openMessage, openTransfer as openRelayEnvelope, readTransfer, sealExpiryNotice, sealMessage, sealReceipt,
   sealTransfer, verifyTransferReceipt } from './envelope'
@@ -66,6 +66,43 @@ export class Sharing {
   // The relay registers the same public keys as the AirDrop device card.
   async deviceCard(): Promise<DeviceCard> {
     return (await this.getIdentity()).card
+  }
+
+  async directDevice(): Promise<{ id: string; card: DeviceCard }> {
+    const card = await this.deviceCard()
+    return { id: describeDevice(card).id, card }
+  }
+
+  async directPeers(): Promise<SharingDevice[]> {
+    return (await this.readPeers()).map(describeDevice)
+  }
+
+  async directPeer(peerId: unknown): Promise<SharingDevice | null> {
+    const peers = await this.readPeers()
+    const peer = peers.find((card) => describeDevice(card).id === peerId)
+    return peer ? describeDevice(peer) : null
+  }
+
+  // Link and Direct use the same verified peer cards. The day rotates the discovery topic at UTC midnight.
+  async directTopic(peerId: unknown, day: string): Promise<Buffer> {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('The Direct topic day is invalid.')
+    const identity = await this.getIdentity()
+    const peer = requirePeer(await this.readPeers(), peerId)
+    const shared = diffieHellman({ privateKey: identity.encryptionKey, publicKey: publicKey(peer.encryptionKey, 'x25519') })
+    try {
+      return Buffer.from(hkdfSync('sha256', shared, Buffer.from('sct-direct-topic-v1'), Buffer.from(day, 'utf8'), 32))
+    } finally {
+      shared.fill(0)
+    }
+  }
+
+  async directSign(message: Buffer): Promise<Buffer> {
+    return sign(null, message, (await this.getIdentity()).signingKey)
+  }
+
+  async directVerify(peerId: unknown, message: Buffer, signature: Buffer): Promise<boolean> {
+    const peer = (await this.readPeers()).find((card) => describeDevice(card).id === peerId)
+    return peer ? verify(null, message, publicKey(peer.signingKey, 'ed25519'), signature) : false
   }
 
   async prepareRelayTransfer(identity: string, recipient: RelayPeerKeys, input: RelayTransferInput): Promise<SealedTransfer> {

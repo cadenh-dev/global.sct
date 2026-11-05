@@ -139,7 +139,7 @@ function parseRoute(hash: string, isMac: boolean): Route {
   if (view === 'cards' && isMac) return { view: 'cards' }
   if (view === 'agent') return { view: 'agent' }
   if (view === 'sharing') {
-    if (id === 'devices' || id === 'secrets' || id === 'receive' || id === 'relay' || id === 'link') {
+    if (id === 'devices' || id === 'secrets' || id === 'receive' || id === 'relay' || id === 'link' || id === 'direct') {
       return { view: 'sharing', tab: id, projectId: projectId ? decodeURIComponent(projectId) : undefined }
     }
     return { view: 'sharing', projectId: id ? decodeURIComponent(id) : undefined }

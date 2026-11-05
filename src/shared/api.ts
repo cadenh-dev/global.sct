@@ -4,6 +4,7 @@ import type { SharingAPI } from './sharing'
 import type { RelayAPI } from './relay'
 import type { AgentAPI } from './agent'
 import type { CardsAPI } from './cards'
+import type { DirectAPI } from './direct'
 import type { UnlockInput, VaultStatus } from './vault'
 import type { PendingLink } from './transport'
 
@@ -34,7 +35,7 @@ export interface ProtocolStatus {
   detail: string
 }
 
-export interface SctAPI extends SharingAPI, RelayAPI, AgentAPI, CardsAPI {
+export interface SctAPI extends SharingAPI, RelayAPI, AgentAPI, CardsAPI, DirectAPI {
   platform: SctPlatform
   // The variant at window creation. onThemeChanged reports later changes.
   theme: ThemeVariant

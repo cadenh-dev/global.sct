@@ -33,6 +33,15 @@ The AirDrop sharing flow encrypts selected secrets for one verified device and s
 Device pairing uses a device card link or file, so it works on macOS, Windows, and Linux.
 See [sharing](sharing.md). Relay sharing below is the second transport. The **Relay** tab of **Sharing** uses it.
 
+## Direct sharing
+
+Direct mode uses Hyperswarm for peer discovery and an encrypted stream for the transfer and receipt.
+The discovery topic is derived from the two verified X25519 keys and the UTC day.
+Each connection authenticates both device cards with fresh nonces and Ed25519 signatures before a transfer is offered.
+The main process keeps the encrypted records and the receipt state.
+The renderer receives metadata only.
+See [sharing](sharing.md#direct-mode).
+
 ## Link sharing
 
 Link mode encrypts selected secrets for one verified device and encodes the envelope and its wrapped key as an
