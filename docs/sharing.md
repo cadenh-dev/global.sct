@@ -101,6 +101,25 @@ The state changes to `received` after the signature check.
 A receipt from a different device or transfer fails.
 After a restart, the saved record and its receipt state stay in the vault sharing folder.
 
+### Open a link from another app
+
+The packaged app can receive `global-sct://` links from the operating system.
+Open **Storage**, find **Links**, and select **Register global.sct links**.
+The action is per user and needs no administrator rights.
+
+- A pairing link opens **Verify devices** and fills **Paste pairing link**.
+- An import link opens **Link** and fills **Paste import link**.
+- A receipt link opens **Link** and asks you to select the sent link that it answers.
+
+Nothing imports on arrival. Review the link and confirm the operation.
+The app holds one waiting link. If another link arrives, choose the link to keep.
+If another app owns `global-sct` links, select **Replace handler**.
+If the registration is not available, use paste.
+
+On Windows and Linux, moving the portable package changes the registered executable path.
+Register the links again from the new location.
+On macOS, use the packaged `global.sct.app` for external link checks. The development build uses paste.
+
 ## Rules
 
 - A package expires after 24 hours. A package holds a maximum of 1000 secrets and 8 MiB.

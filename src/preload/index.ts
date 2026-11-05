@@ -1,13 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import type { Reply, SctAPI, ThemePreference, ThemeVariant } from '../shared/api'
+import type { ProtocolStatus, Reply, SctAPI, ThemePreference, ThemeVariant } from '../shared/api'
 import type { Project, ProjectInput, ProjectRename } from '../shared/projects'
 import type { SecretInput, SecretMetadata, SecretReference, SecretUpdate } from '../shared/secrets'
 import type { PairingPreview, SharingDevice, SharingState, TransferPreview } from '../shared/sharing'
 import type { ConfirmRelayPairInput, RelayAcceptInput, RelayActivityKey, RelayQueueInput, RelayState, RelayTaskDecision } from '../shared/relay'
 import type { AgentRequestView } from '../shared/agent'
 import type { UnlockInput, VaultStatus } from '../shared/vault'
-import type { LinkImportResult, LinkPreview, LinkRecord, LinkState, TransferReceipt } from '../shared/transport'
+import type { LinkImportResult, LinkPreview, LinkRecord, LinkState, PendingLink, TransferReceipt } from '../shared/transport'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   const reply: Reply<T> = await ipcRenderer.invoke(channel, ...args)
@@ -27,6 +27,16 @@ const api: SctAPI = {
     }
     ipcRenderer.on('theme:changed', changed)
     return () => { ipcRenderer.removeListener('theme:changed', changed) }
+  },
+  getProtocolStatus: () => invoke<ProtocolStatus>('protocol:status'),
+  registerProtocol: (replace) => invoke<ProtocolStatus>('protocol:register', replace),
+  removeProtocol: () => invoke<ProtocolStatus>('protocol:remove'),
+  getPendingLink: () => invoke<PendingLink | null>('protocol:pending-link'),
+  dismissPendingLink: (id) => invoke<void>('protocol:dismiss-link', id),
+  onPendingLinkChanged: (listener) => {
+    const changed = () => listener()
+    ipcRenderer.on('protocol:pending-link', changed)
+    return () => { ipcRenderer.removeListener('protocol:pending-link', changed) }
   },
   getAgentRequests: () => invoke<AgentRequestView[]>('agent:requests'),
   respondToAgent: (input) => invoke<void>('agent:respond', input),

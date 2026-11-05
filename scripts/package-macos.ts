@@ -39,6 +39,11 @@ const [output] = await packager({
   appCategoryType: 'public.app-category.developer-tools',
   icon: 'build/icon.icns',
   extendInfo: {
+    CFBundleURLTypes: [{
+      CFBundleURLName: 'app.global-sct.desktop.link',
+      CFBundleTypeRole: 'Viewer',
+      CFBundleURLSchemes: ['global-sct']
+    }],
     CFBundleDocumentTypes: [{
       CFBundleTypeName: 'global.sct encrypted transfer',
       CFBundleTypeRole: 'Viewer',

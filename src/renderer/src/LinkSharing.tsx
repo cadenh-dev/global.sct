@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import type { Project } from '../../shared/projects'
 import type { SecretMetadata } from '../../shared/secrets'
 import type { SharingDevice } from '../../shared/sharing'
-import type { LinkImportResult, LinkPreview, LinkRecord, LinkState } from '../../shared/transport'
+import type { LinkImportResult, LinkPreview, LinkRecord, LinkState, PendingLink } from '../../shared/transport'
 import { SecretSelection } from './SecretSelection'
 import { errorText } from './operation'
 import type { Loaded, Run, UpdateSecrets } from './types'
@@ -17,9 +17,12 @@ interface LinkSharingProps {
   busy: boolean
   run: Run
   updateSecrets: UpdateSecrets
+  pendingLink: PendingLink | null
+  onDismissPendingLink: (id: string) => void
 }
 
-export function LinkSharing({ projectId, active, projects, secrets, peers, busy, run, updateSecrets }: LinkSharingProps) {
+export function LinkSharing({ projectId, active, projects, secrets, peers, busy, run, updateSecrets,
+  pendingLink, onDismissPendingLink }: LinkSharingProps) {
   const [links, setLinks] = useState<Loaded<LinkState>>({ state: 'loading' })
 
   useEffect(() => {
@@ -41,6 +44,8 @@ export function LinkSharing({ projectId, active, projects, secrets, peers, busy,
   const refresh = async () => setLinks({ state: 'ready', value: await window.sct.getLinkState() })
   return <>
     <LinkSend projectId={projectId} projects={projects} secrets={secrets} peers={peers} busy={busy} run={run} refresh={refresh} />
+    {pendingLink?.kind === 'receipt' && <PendingReceipt link={pendingLink} links={links} busy={busy} run={run}
+      refresh={refresh} onDismiss={() => onDismissPendingLink(pendingLink.id)} />}
     <section className="panel" aria-labelledby="sent-links-heading">
       <h2 id="sent-links-heading">Sent links</h2>
       {links.state === 'loading' && <p role="status">Loading sent links…</p>}
@@ -50,11 +55,15 @@ export function LinkSharing({ projectId, active, projects, secrets, peers, busy,
           <SentLink key={record.transferId} record={record} peers={peers} busy={busy} run={run} refresh={refresh} />
         )}</ul>)}
     </section>
-    <LinkReceive projects={projects} busy={busy} run={run} updateSecrets={updateSecrets} />
+    <LinkReceive key={pendingLink?.kind === 'import' ? pendingLink.id : 'link-receive'}
+      projects={projects} busy={busy} run={run} updateSecrets={updateSecrets}
+      initialLink={pendingLink?.kind === 'import' ? pendingLink.link : undefined}
+      onImported={pendingLink?.kind === 'import' ? () => onDismissPendingLink(pendingLink.id) : undefined} />
   </>
 }
 
-function LinkSend({ projectId, projects, secrets, peers, busy, run, refresh }: Omit<LinkSharingProps, 'active' | 'updateSecrets'> & {
+function LinkSend({ projectId, projects, secrets, peers, busy, run, refresh }: Pick<LinkSharingProps,
+  'projectId' | 'projects' | 'secrets' | 'peers' | 'busy' | 'run'> & {
   refresh: () => Promise<void>
 }) {
   const [source, setSource] = useState(projectId ?? '')
@@ -153,8 +162,66 @@ function SentLink({ record, peers, busy, run, refresh }: {
   </li>
 }
 
-function LinkReceive({ projects, busy, run, updateSecrets }: Pick<LinkSharingProps, 'projects' | 'busy' | 'run' | 'updateSecrets'>) {
-  const [link, setLink] = useState('')
+function PendingReceipt({ link, links, busy, run, refresh, onDismiss }: {
+  link: PendingLink
+  links: Loaded<LinkState>
+  busy: boolean
+  run: Run
+  refresh: () => Promise<void>
+  onDismiss: () => void
+}) {
+  const [transferId, setTransferId] = useState('')
+  const records = links.state === 'ready' ? links.value : []
+  const selected = records.find((record) => record.transferId === transferId)
+
+  async function verify(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await run('Verifying the receipt…', async () => {
+      await window.sct.verifyLinkReceipt({ transferId, link: link.link })
+      await refresh()
+      onDismiss()
+      return 'Receipt verified. The recipient imported the secrets.'
+    })
+  }
+
+  return <section className="panel" aria-labelledby="pending-receipt-heading">
+    <h2 id="pending-receipt-heading">Receipt link</h2>
+    <p>A global-sct receipt link arrived. Select the sent link that it answers.</p>
+    {links.state === 'loading' && <p role="status">Loading sent links…</p>}
+    {links.state === 'error' && <p className="error" role="alert">{links.error}</p>}
+    {links.state === 'ready' && records.length === 0 && <>
+      <p>No sent links are saved on this device. The receipt cannot be matched.</p>
+      <div className="form-actions"><button type="button" className="secondary" disabled={busy}
+        onClick={onDismiss}>Dismiss link</button></div>
+    </>}
+    {links.state === 'ready' && records.length > 0 && <form onSubmit={(event) => { void verify(event) }}>
+      <fieldset disabled={busy}>
+        <label htmlFor="pending-receipt-target">Sent link</label>
+        <select id="pending-receipt-target" value={transferId} required
+          onChange={(event) => setTransferId(event.target.value)}>
+          <option value="">Choose a sent link</option>
+          {records.map((record) => <option key={record.transferId} value={record.transferId}>
+            {record.projectName} · {record.recipientId.slice(0, 8)} · {record.transferId.slice(0, 8)}
+          </option>)}
+        </select>
+        <label htmlFor="pending-receipt-link">Receipt link</label>
+        <textarea className="link-text" id="pending-receipt-link" value={link.link} readOnly spellCheck={false} />
+        {selected && <p className="field-help">{selected.projectName}: {selected.secretNames.join(', ')}.
+          Import deadline {new Date(selected.deliverBy).toLocaleString()}.</p>}
+        <div className="form-actions">
+          <button type="submit" disabled={!transferId}>Verify receipt</button>
+          <button type="button" className="secondary" onClick={onDismiss}>Dismiss link</button>
+        </div>
+      </fieldset>
+    </form>}
+  </section>
+}
+
+function LinkReceive({ projects, busy, run, updateSecrets, initialLink, onImported }: Pick<LinkSharingProps, 'projects' | 'busy' | 'run' | 'updateSecrets'> & {
+  initialLink?: string
+  onImported?: () => void
+}) {
+  const [link, setLink] = useState(initialLink ?? '')
   const [preview, setPreview] = useState<LinkPreview | null>(null)
   const [destination, setDestination] = useState('')
   const [imported, setImported] = useState<LinkImportResult | null>(null)
@@ -212,6 +279,8 @@ function LinkReceive({ projects, busy, run, updateSecrets }: Pick<LinkSharingPro
     {imported && <>
       <p>Imported from {imported.sender.name}: {imported.secretNames.join(', ')}.</p>
       <LinkOutput id="received-link" label="Receipt link" link={imported.receiptLink} busy={busy} run={run} receipt />
+      {onImported && <div className="form-actions"><button type="button" className="secondary" disabled={busy}
+        onClick={onImported}>Dismiss link</button></div>}
     </>}
   </section>
 }

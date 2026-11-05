@@ -6,6 +6,15 @@ import type { SharingDevice } from './sharing'
 
 export const linkLimit = 16_384
 
+export type PendingLinkKind = 'pairing' | 'import' | 'receipt'
+
+// One incoming link held in the main process until the user reviews or dismisses it.
+export interface PendingLink {
+  id: string
+  kind: PendingLinkKind
+  link: string
+}
+
 export type DeliveryMode = 'direct' | 'mailbox' | 'link'
 export type TransportName = 'hyperswarm' | 'webrtc' | 'relay' | 'link'
 

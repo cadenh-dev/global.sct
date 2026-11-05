@@ -67,6 +67,17 @@ Check the command. It returns the bundled skill list and exits:
 sct skills
 ```
 
+## Open links from other apps
+
+Use the packaged app. Open **Storage**, find **Links**, and select **Register global.sct links**.
+
+- Windows writes per-user registry values under `HKCU\Software\Classes\global-sct`. It needs no administrator rights. Moving the portable folder requires registration again.
+- Linux writes `app.global-sct.desktop` under `$XDG_DATA_HOME/applications`, or `~/.local/share/applications`, and calls `xdg-mime`. A desktop session with `xdg-mime` is required.
+- macOS uses the `CFBundleURLTypes` entry in the packaged `global.sct.app`.
+
+If another app owns the scheme, select **Replace handler** in the app.
+The development build uses paste. It does not change the operating-system handler.
+
 ## Signing
 
 The Windows and Linux packages are unsigned beta builds. Releases use versioned tags such as `v0.1.0-beta.1`.

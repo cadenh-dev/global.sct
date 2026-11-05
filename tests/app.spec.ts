@@ -42,9 +42,9 @@ test('adds existing folders offline and restores projects after restart', async 
       .toEqual({ process: false, require: false })
     expect(await page.evaluate(() => Object.keys(window.sct).sort()))
       .toEqual(['acceptRelayTransfer', 'addProject', 'addSecret', 'chooseVaultLocation', 'confirmRelayPair', 'confirmSharingPeer', 'copyPairingLink', 'copyText', 'createLink', 'createMockCard',
-        'deleteProject', 'deleteSecret', 'dismissTransfer', 'forgetDevice', 'getAgentRequests', 'getLinkState', 'getRelayState', 'getSharingState',
-        'getThemePreference', 'getVaultLocation', 'getVaultStatus', 'hideAllRelayActivity', 'hideRelayActivity', 'importLink', 'importTransfer', 'listProjects', 'listSecrets', 'lockVault', 'onAgentChanged', 'onRelayChanged',
-        'onSharingChanged', 'onThemeChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'platform', 'previewLink', 'previewPairingLink', 'queueRelayTask', 'queueRelayTransfer', 'removeRelayPair', 'renameProject',
+        'deleteProject', 'deleteSecret', 'dismissPendingLink', 'dismissTransfer', 'forgetDevice', 'getAgentRequests', 'getLinkState', 'getPendingLink', 'getProtocolStatus', 'getRelayState', 'getSharingState',
+        'getThemePreference', 'getVaultLocation', 'getVaultStatus', 'hideAllRelayActivity', 'hideRelayActivity', 'importLink', 'importTransfer', 'listProjects', 'listSecrets', 'lockVault', 'onAgentChanged', 'onPendingLinkChanged', 'onRelayChanged',
+        'onSharingChanged', 'onThemeChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'platform', 'previewLink', 'previewPairingLink', 'queueRelayTask', 'queueRelayTransfer', 'registerProtocol', 'removeProtocol', 'removeRelayPair', 'renameProject',
         'requestRelayPair', 'respondRelayTask', 'respondToAgent', 'saveDeviceCard', 'setThemePreference', 'shareDeviceCard', 'shareMockCard', 'shareSecrets', 'theme', 'unlockVault', 'updateSecret', 'verifyLinkReceipt'])
 
     await page.getByRole('button', { name: 'Add a project', exact: true }).click()

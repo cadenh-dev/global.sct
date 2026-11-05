@@ -17,21 +17,32 @@ import { streamEnvironment } from './runtime'
 import { Sharing } from './sharing'
 import { encodePairingLink } from './transfer'
 import { linkLimit } from '../shared/transport'
+import type { PendingLink } from '../shared/transport'
 import { Cards } from './cards'
 import type { Relay } from './relay-connection'
 import { readThemePreference, writeThemePreference } from './preferences'
+import { getProtocolStatus, registerProtocol, removeProtocol } from './protocol-registration'
+import { protocolLinksFromArguments, readProtocolLink } from './protocol'
 import type { Reply, ThemePreference, ThemeVariant } from '../shared/api'
 
 let mainWindow: BrowserWindow | null = null
+app.setName('global.sct')
+if (process.platform === 'win32') app.setAppUserModelId('app.global-sct.desktop')
 const launchArguments = process.argv.slice(process.defaultApp ? 2 : 1)
 const cliLaunch = ['run', '_env', 'agent', 'mcp', 'skills', '--version'].includes(launchArguments[0])
 const desktopMode = !cliLaunch
+const initialProtocolLinks = desktopMode ? protocolLinksFromArguments(launchArguments) : []
+const primaryInstance = !desktopMode || app.requestSingleInstanceLock()
 const incomingFiles: string[] = []
 let sharing: Sharing | undefined
 let openingFiles = false
 let pendingUnlock: (() => void) | undefined
 let desktopStarted: Promise<void> | undefined
 let themePreference: Promise<ThemePreference> | undefined
+let desktopReady = false
+let pendingLink: PendingLink | null = null
+
+if (!primaryInstance) app.exit(0)
 
 // macOS can deliver a document before the app and its renderer are ready.
 app.on('open-file', (event, path) => {
@@ -40,6 +51,83 @@ app.on('open-file', (event, path) => {
   if (sharing && !mainWindow) void createWindow().catch(reportStartupError)
   else void openIncomingFiles()
 })
+
+// macOS delivers links through open-url. Windows and Linux deliver them through the second-instance arguments.
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  acceptProtocolLink(url)
+})
+
+if (desktopMode && primaryInstance) {
+  app.on('second-instance', (_event, argv) => {
+    const links = protocolLinksFromArguments(argv)
+    if (links.length === 0) {
+      showMainWindow()
+      return
+    }
+    for (const link of links) acceptProtocolLink(link)
+  })
+}
+
+function acceptProtocolLink(value: string): void {
+  let link: PendingLink
+  try {
+    link = readProtocolLink(value)
+  } catch (error) {
+    reportLinkError(error)
+    return
+  }
+  if (pendingLink) {
+    if (pendingLink.link === link.link) {
+      showMainWindow()
+      return
+    }
+    const choose = () => offerPendingLink(link)
+    if (app.isReady()) void choose()
+    else void app.whenReady().then(choose)
+    return
+  }
+  pendingLink = link
+  pendingLinkChanged()
+  showMainWindow()
+}
+
+async function offerPendingLink(next: PendingLink): Promise<void> {
+  const result = await dialog.showMessageBox({
+    type: 'question',
+    buttons: ['Keep current', 'Use new link'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Another link is waiting',
+    message: 'A link is already waiting.',
+    detail: 'Finish or dismiss the current link before you open another one.'
+  })
+  if (result.response !== 1) return
+  pendingLink = next
+  pendingLinkChanged()
+  showMainWindow()
+}
+
+function pendingLinkChanged(): void {
+  mainWindow?.webContents.send('protocol:pending-link')
+}
+
+function showMainWindow(): void {
+  if (!desktopReady) return
+  if (!mainWindow) {
+    if (app.isReady()) void createWindow().catch(reportStartupError)
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function reportLinkError(error: unknown): void {
+  const message = error instanceof Error ? error.message : 'The link could not be opened.'
+  if (app.isReady()) dialog.showErrorBox('Cannot open this link', message)
+  else void app.whenReady().then(() => dialog.showErrorBox('Cannot open this link', message))
+}
 
 function handle(channel: string, operation: (...args: unknown[]) => unknown): void {
   ipcMain.handle(channel, async (event: IpcMainInvokeEvent, ...args: unknown[]): Promise<Reply<unknown>> => {
@@ -162,9 +250,8 @@ function reportStartupError(error: unknown): void {
   app.quit()
 }
 
-app.setName('global.sct')
-if (process.platform === 'win32') app.setAppUserModelId('app.global-sct.desktop')
 app.whenReady().then(async () => {
+  if (!primaryInstance) return
   if (launchArguments[0] === '--version') {
     if (launchArguments.length !== 1) throw new Error('Usage: sct --version. Return the global.sct version.')
     await writeCliOutput(app.getVersion())
@@ -203,9 +290,11 @@ app.whenReady().then(async () => {
   }
   if (await vault.unlockWithRememberedKey()) {
     await startDesktop(vault, projects)
-    return
+  } else {
+    await createWindow('/unlock')
   }
-  await createWindow('/unlock')
+  desktopReady = true
+  for (const link of initialProtocolLinks) acceptProtocolLink(link)
 }).catch((error: unknown) => {
   if (['run', '_env', 'agent', 'mcp', 'skills', '--version'].includes(launchArguments[0])) {
     console.error(error instanceof Error ? error.message : 'The project command could not start.')
@@ -224,6 +313,15 @@ function requireForkStorage(): void {
 }
 
 function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
+  handle('protocol:status', () => getProtocolStatus())
+  handle('protocol:register', (replace) => registerProtocol(replace === true))
+  handle('protocol:remove', () => removeProtocol())
+  handle('protocol:pending-link', () => pendingLink)
+  handle('protocol:dismiss-link', (id) => {
+    if (typeof id !== 'string' || pendingLink?.id !== id) return
+    pendingLink = null
+    pendingLinkChanged()
+  })
   handle('vault:status', () => vault.status())
   handle('vault:unlock', async (input) => {
     const status = await vault.unlock(input)

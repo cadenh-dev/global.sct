@@ -291,7 +291,8 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.2 | Done. The main process verifies the relay receipt and maps it to `TransferReceipt` with mode `mailbox`. Each sent row carries the shared receipt state. |
 | 2.3 | Done. Pairing uses a link, a saved file, or a pasted link. The Windows smoke test covers the flow. macOS and Linux are not run here. |
 | 2.4 | Done. Link mode uses `global-sct://import/` and `global-sct://receipt/` links with the current envelope. The link limit is 16,384 characters. A manual receipt link verifies the import. The Link tab and saved records work on all platforms. A two-device check is not done here. |
-| 2.5-2.11 | Open. |
+| 2.5 | Partly done. The app accepts pairing, import, and receipt links from the OS, validates them, holds one pending link, and fills the matching screen. Windows second-instance routing is verified. Packaged registration and macOS/Linux registration are not run. |
+| 2.6-2.11 | Open. |
 
 A possible shape for the shared types. All names are proposals:
 

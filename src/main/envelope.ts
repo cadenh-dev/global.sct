@@ -300,7 +300,7 @@ function hasExactKeys(data: Record<string, unknown>, keys: string[]): boolean {
   return Object.keys(data).length === keys.length && keys.every((key) => Object.hasOwn(data, key))
 }
 
-function readReceipt(bytes: Buffer): RelayReceipt {
+export function readReceipt(bytes: Buffer): RelayReceipt {
   const data = readObject(bytes)
   if (data.format !== 'sct-relay' || data.version !== 1 || data.kind !== 'receipt' || !isMessageId(data.correlationId) ||
     !isHex(data.sender) || !isHex(data.senderDevice) || !isHex(data.recipient) || !Number.isSafeInteger(data.createdAt)) {

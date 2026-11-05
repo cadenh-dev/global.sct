@@ -10,6 +10,7 @@ import { errorText, StatusLine, useOperation } from './operation'
 import { HandoffModal, Scramble } from './SharingMotion'
 import type { HandoffStage } from './SharingMotion'
 import type { Loaded, Run, SharingTab, UpdateProjects, UpdateSecrets } from './types'
+import type { PendingLink } from '../../shared/transport'
 import { LinkSharing } from './LinkSharing'
 import { SecretSelection } from './SecretSelection'
 
@@ -20,6 +21,8 @@ interface SharingViewProps {
   secrets: Loaded<SecretMetadata[]>
   updateProjects: UpdateProjects
   updateSecrets: UpdateSecrets
+  pendingLink: PendingLink | null
+  onDismissPendingLink: (id: string) => void
 }
 
 type SharingValue = SharingState & { location: string }
@@ -38,9 +41,12 @@ interface ReadySharingProps {
   setSharing: SetSharing
   updateProjects: UpdateProjects
   updateSecrets: UpdateSecrets
+  pendingLink: PendingLink | null
+  onDismissPendingLink: (id: string) => void
 }
 
-export function SharingView({ projectId, tab, projects, secrets, updateProjects, updateSecrets }: SharingViewProps) {
+export function SharingView({ projectId, tab, projects, secrets, updateProjects, updateSecrets,
+  pendingLink, onDismissPendingLink }: SharingViewProps) {
   const [sharing, setSharing] = useState<Loaded<SharingState & { location: string }>>({ state: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
@@ -83,19 +89,22 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
 
       {sharing.state === 'ready' && (isMac ? <MacSharing sharing={sharing.value} activeTab={activeTab} projectId={projectId}
         projects={projects} secrets={secrets} receipt={receipt} setReceipt={setReceipt} operation={operation}
-        setSharing={setSharing} updateProjects={updateProjects} updateSecrets={updateSecrets} />
+        setSharing={setSharing} updateProjects={updateProjects} updateSecrets={updateSecrets}
+        pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
         : <RelayAndPairing sharing={sharing.value} setSharing={setSharing} activeTab={activeTab} projectId={projectId} projects={projects} secrets={secrets}
-          operation={operation} updateProjects={updateProjects} updateSecrets={updateSecrets} />)}
+          operation={operation} updateProjects={updateProjects} updateSecrets={updateSecrets}
+          pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />)}
       {sharing.state === 'ready' && <div hidden={activeTab !== 'link'}>
         <LinkSharing projectId={projectId} active={activeTab === 'link'} projects={projects} secrets={secrets}
-          peers={sharing.value.peers} busy={operation.busy} run={operation.run} updateSecrets={updateSecrets} />
+          peers={sharing.value.peers} busy={operation.busy} run={operation.run} updateSecrets={updateSecrets}
+          pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
       </div>}
     </>
   )
 }
 
 function MacSharing({ sharing, activeTab, projectId, projects, secrets, receipt, setReceipt, operation, setSharing,
-  updateProjects, updateSecrets }: ReadySharingProps) {
+  updateProjects, updateSecrets, pendingLink, onDismissPendingLink }: ReadySharingProps) {
   return (
     <>
       {activeTab !== 'receive' && sharing.incoming.length > 0 && <p className="sharing-waiting">
@@ -117,8 +126,11 @@ function MacSharing({ sharing, activeTab, projectId, projects, secrets, receipt,
           } : current)} />
       </div>
       <div hidden={activeTab !== 'devices'}>
-        <DeviceVerification projectId={projectId} device={sharing.device} peers={sharing.peers}
+        <DeviceVerification key={pendingLink?.kind === 'pairing' ? pendingLink.id : 'device-verification'}
+          projectId={projectId} device={sharing.device} peers={sharing.peers}
           busy={operation.busy} run={operation.run} isMac
+          initialLink={pendingLink?.kind === 'pairing' ? pendingLink.link : undefined}
+          onDismissLink={pendingLink?.kind === 'pairing' ? () => onDismissPendingLink(pendingLink.id) : undefined}
           onVerified={(device) => setSharing((current) => current.state === 'ready' ? {
             state: 'ready', value: { ...current.value, peers: [...current.value.peers.filter((peer) => peer.id !== device.id), device] }
           } : current)} />
@@ -131,14 +143,19 @@ function MacSharing({ sharing, activeTab, projectId, projects, secrets, receipt,
   )
 }
 
-function RelayAndPairing({ sharing, setSharing, activeTab, projectId, projects, secrets, operation, updateProjects, updateSecrets }: Pick<ReadySharingProps,
-  'sharing' | 'setSharing' | 'activeTab' | 'projectId' | 'projects' | 'secrets' | 'operation' | 'updateProjects' | 'updateSecrets'>) {
+function RelayAndPairing({ sharing, setSharing, activeTab, projectId, projects, secrets, operation, updateProjects, updateSecrets,
+  pendingLink, onDismissPendingLink }: Pick<ReadySharingProps,
+  'sharing' | 'setSharing' | 'activeTab' | 'projectId' | 'projects' | 'secrets' | 'operation' | 'updateProjects' | 'updateSecrets' |
+  'pendingLink' | 'onDismissPendingLink'>) {
   return (
     <>
       <SharingTabs activeTab={activeTab} projectId={projectId} canShare={false} isMac={false} />
       <div hidden={activeTab !== 'devices'}>
-        <DeviceVerification projectId={projectId} device={sharing.device} peers={sharing.peers}
+        <DeviceVerification key={pendingLink?.kind === 'pairing' ? pendingLink.id : 'device-verification'}
+          projectId={projectId} device={sharing.device} peers={sharing.peers}
           busy={operation.busy} run={operation.run} isMac={false}
+          initialLink={pendingLink?.kind === 'pairing' ? pendingLink.link : undefined}
+          onDismissLink={pendingLink?.kind === 'pairing' ? () => onDismissPendingLink(pendingLink.id) : undefined}
           onVerified={(device) => setSharing((current) => current.state === 'ready' ? {
             state: 'ready', value: { ...current.value, peers: [...current.value.peers.filter((peer) => peer.id !== device.id), device] }
           } : current)} />
@@ -894,18 +911,20 @@ function SendSecrets({ projectId, active, projects, secrets, peers, busy, run }:
   )
 }
 
-function DeviceVerification({ projectId, device, peers, busy, run, isMac, onVerified }: {
+function DeviceVerification({ projectId, device, peers, busy, run, isMac, initialLink, onDismissLink, onVerified }: {
   projectId?: string
   device: SharingDevice
   peers: SharingDevice[]
   busy: boolean
   run: Run
   isMac: boolean
+  initialLink?: string
+  onDismissLink?: () => void
   onVerified: (device: SharingDevice) => void
 }) {
   const [pairing, setPairing] = useState<PairingPreview | null>(null)
   const [compared, setCompared] = useState(false)
-  const [link, setLink] = useState('')
+  const [link, setLink] = useState(initialLink ?? '')
   const [cardStage, setCardStage] = useState<HandoffStage | null>(null)
   const importButton = useRef<HTMLButtonElement>(null)
   const comparisonHeading = useRef<HTMLHeadingElement>(null)
@@ -945,6 +964,7 @@ function DeviceVerification({ projectId, device, peers, busy, run, isMac, onVeri
     await run('Saving the verified device…', async () => {
       const verified = await window.sct.confirmSharingPeer(pairing.token)
       onVerified(verified)
+      onDismissLink?.()
       setPairing(null)
       setCompared(false)
       return `${verified.name} is verified on this device.`
@@ -1019,6 +1039,7 @@ function DeviceVerification({ projectId, device, peers, busy, run, isMac, onVeri
           </label>
           <div className="form-actions">
             <button type="button" className="secondary" disabled={busy} onClick={() => {
+              onDismissLink?.()
               setPairing(null)
               setCompared(false)
               importButton.current?.focus()

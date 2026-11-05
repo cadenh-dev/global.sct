@@ -39,6 +39,9 @@ Link mode encrypts selected secrets for one verified device and encodes the enve
 `global-sct://import/...` string. The recipient imports the link and returns an `global-sct://receipt/...` string.
 The main process keeps the link records in the vault sharing folder.
 The renderer receives the ciphertext links and metadata only.
+The main process also accepts `global-sct://pair/v1/`, `global-sct://import/`, and `global-sct://receipt/` links from the operating system.
+It validates one link, holds it in memory, and opens the matching screen. Nothing imports until the user reviews it.
+The `global-sct://connect/v1/` route is reserved for WebRTC.
 See [sharing](sharing.md#link-mode).
 
 ## Mock Wallet cards

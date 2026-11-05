@@ -5,6 +5,7 @@ import type { RelayAPI } from './relay'
 import type { AgentAPI } from './agent'
 import type { CardsAPI } from './cards'
 import type { UnlockInput, VaultStatus } from './vault'
+import type { PendingLink } from './transport'
 
 export type SctPlatform =
   | 'aix'
@@ -25,6 +26,14 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 // The variant on screen: Cream for light, Terminal for dark.
 export type ThemeVariant = 'cream' | 'terminal'
 
+export interface ProtocolStatus {
+  supported: boolean
+  registered: boolean
+  owner: string | null
+  conflict: boolean
+  detail: string
+}
+
 export interface SctAPI extends SharingAPI, RelayAPI, AgentAPI, CardsAPI {
   platform: SctPlatform
   // The variant at window creation. onThemeChanged reports later changes.
@@ -32,6 +41,12 @@ export interface SctAPI extends SharingAPI, RelayAPI, AgentAPI, CardsAPI {
   getThemePreference: () => Promise<ThemePreference>
   setThemePreference: (preference: ThemePreference) => Promise<ThemeVariant>
   onThemeChanged: (listener: (variant: ThemeVariant) => void) => () => void
+  getProtocolStatus: () => Promise<ProtocolStatus>
+  registerProtocol: (replace: boolean) => Promise<ProtocolStatus>
+  removeProtocol: () => Promise<ProtocolStatus>
+  getPendingLink: () => Promise<PendingLink | null>
+  dismissPendingLink: (id: string) => Promise<void>
+  onPendingLinkChanged: (listener: () => void) => () => void
   listProjects: () => Promise<Project[]>
   pickDirectory: () => Promise<string | null>
   addProject: (input: ProjectInput) => Promise<Project>

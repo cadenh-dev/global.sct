@@ -12,6 +12,7 @@ import { CardsView } from './CardsView'
 import { UnlockView } from './UnlockView'
 import type { Loaded, SharingTab, UpdateProjects, UpdateSecrets } from './types'
 import type { VaultStatus } from '../../shared/vault'
+import type { PendingLink } from '../../shared/transport'
 
 type Route = { view: 'projects' } | { view: 'project'; id: string } | { view: 'secrets' } | { view: 'storage' } | { view: 'sharing'; projectId?: string; tab?: SharingTab } | { view: 'cards' } | { view: 'agent' }
 
@@ -45,6 +46,7 @@ export function App() {
 function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>; isMac: boolean }) {
   const [projects, setProjects] = useState<Loaded<Project[]>>({ state: 'loading' })
   const [secrets, setSecrets] = useState<Loaded<SecretMetadata[]>>({ state: 'loading' })
+  const [pendingLink, setPendingLink] = useState<PendingLink | null>(null)
 
   useEffect(() => {
     let active = true
@@ -64,6 +66,22 @@ function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>
   useEffect(() => window.sct.onSharingChanged(() => {
     if (!window.location.hash.startsWith('#/sharing')) window.location.hash = '#/sharing'
   }), [])
+
+  useEffect(() => {
+    let active = true
+    const refresh = () => window.sct.getPendingLink().then((value) => {
+      if (active) setPendingLink(value)
+    }).catch(() => undefined)
+    const stop = window.sct.onPendingLinkChanged(refresh)
+    void refresh()
+    return () => { active = false; stop() }
+  }, [])
+
+  useEffect(() => {
+    if (!pendingLink) return
+    const target = pendingLink.kind === 'pairing' ? '#/sharing/devices' : '#/sharing/link'
+    if (window.location.hash !== target) window.location.hash = target
+  }, [pendingLink])
 
   const updateProjects: UpdateProjects = (change) =>
     setProjects((current) => current.state === 'ready' ? { state: 'ready', value: change(current.value) } : current)
@@ -97,7 +115,11 @@ function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>
         {route.view === 'cards' && <CardsView />}
         {route.view === 'sharing' && (
           <SharingView key={route.projectId ?? 'sharing'} projectId={route.projectId}
-            tab={route.tab} projects={projects} secrets={secrets} updateProjects={updateProjects} updateSecrets={updateSecrets} />
+            tab={route.tab} projects={projects} secrets={secrets} updateProjects={updateProjects} updateSecrets={updateSecrets}
+            pendingLink={pendingLink} onDismissPendingLink={(id) => {
+              void window.sct.dismissPendingLink(id)
+              setPendingLink(null)
+            }} />
         )}
       </main>
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { errorText, StatusLine, useOperation } from './operation'
 import type { Loaded } from './types'
-import type { ThemePreference } from '../../shared/api'
+import type { ProtocolStatus, ThemePreference } from '../../shared/api'
 
 const themeLabels: Record<ThemePreference, string> = { light: 'Light (Cream)', dark: 'Dark (Terminal)', system: 'System' }
 
@@ -77,8 +77,58 @@ export function StorageView() {
         </select>
         <p className="field-help">System follows the light or dark setting of this computer.</p>
       </section>
+
+      <LinkRegistration operation={operation} />
     </>
   )
+}
+
+function LinkRegistration({ operation }: { operation: ReturnType<typeof useOperation> }) {
+  const [protocol, setProtocol] = useState<Loaded<ProtocolStatus>>({ state: 'loading' })
+
+  useEffect(() => {
+    let active = true
+    window.sct.getProtocolStatus().then((value) => {
+      if (active) setProtocol({ state: 'ready', value })
+    }).catch((cause: unknown) => {
+      if (active) setProtocol({ state: 'error', error: errorText(cause, 'Cannot read the link registration status.') })
+    })
+    return () => { active = false }
+  }, [])
+
+  async function register(replace: boolean) {
+    await operation.run('Registering global-sct links…', async () => {
+      const status = await window.sct.registerProtocol(replace)
+      setProtocol({ state: 'ready', value: status })
+      return status.detail
+    })
+  }
+
+  async function remove() {
+    await operation.run('Removing the link registration…', async () => {
+      const status = await window.sct.removeProtocol()
+      setProtocol({ state: 'ready', value: status })
+      return status.detail
+    })
+  }
+
+  return <section className="panel" aria-labelledby="links-heading">
+    <h2 id="links-heading">Links</h2>
+    <p className="field-help">Open global-sct:// links from another app in global.sct.</p>
+    {protocol.state === 'loading' && <p role="status">Loading the link registration…</p>}
+    {protocol.state === 'error' && <p className="error" role="alert">{protocol.error}</p>}
+    {protocol.state === 'ready' && <>
+      <p>{protocol.value.detail}</p>
+      {protocol.value.supported && <div className="form-actions">
+        {!protocol.value.registered && !protocol.value.conflict && <button type="button" disabled={operation.busy}
+          onClick={() => { void register(false) }}>Register global.sct links</button>}
+        {protocol.value.conflict && <button type="button" disabled={operation.busy}
+          onClick={() => { void register(true) }}>Replace handler</button>}
+        {protocol.value.registered && <button type="button" className="secondary" disabled={operation.busy}
+          onClick={() => { void remove() }}>Remove registration</button>}
+      </div>}
+    </>}
+  </section>
 }
 
 function isThemePreference(value: string): value is ThemePreference {
