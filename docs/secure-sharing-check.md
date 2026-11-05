@@ -71,6 +71,24 @@ The check did these steps:
 
 The live relay password, token, and secret value did not appear in the UI or test output.
 
+## TURN-only check (2026-11-05)
+
+A local `node-turn` server supplied a TURN-only path on Windows x64.
+The server used `127.0.0.1:3478` with a synthetic username and password.
+The check file and the temporary server folder were removed after the run.
+
+The check did these steps:
+
+1. Both apps saved the TURN URL and credentials in the WebRTC network settings.
+2. Both apps selected **Use TURN only**.
+3. The apps exchanged one offer link and one answer link.
+4. The connection reported **Direct via TURN**.
+5. A secret crossed the TURN-only data channel, the recipient imported it, and the sender received the signed receipt.
+
+This proves the TURN configuration, credential storage, relay policy, route label, and data path.
+It does not prove public STUN, a remote TURN server, or a cross-network path.
+Those checks need separate network conditions.
+
 ## Application checks
 
 - `bun run test`: 39 passed, 3 skipped.
