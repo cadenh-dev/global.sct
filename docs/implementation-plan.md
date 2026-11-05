@@ -296,7 +296,7 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.7 | Done on Windows. Signed and sealed offer and answer links, the hidden window, chunked transfer, receipt, manual fallback, SDP checks, and the connection deadline work between two app instances. A 60,000-character secret completed an import and receipt. TURN and cross-network checks are not run. |
 | 2.8 | Done. The relay is the Mailbox mode. The send gate, verified relay peers, and explicit server-copy permission guard it. A live Maincloud transfer completed pairing, queue, import, and receipt on Windows. |
 | 2.9 | Done. The **Send** tab selects Direct, WebRTC, Link, or Mailbox from the current sessions. Mailbox needs the permission checkbox. |
-| 2.10 | Done. Relay, Link, Direct, and WebRTC rows show the receipt state. The live relay display is not run. |
+| 2.10 | Done. Relay, Link, Direct, and WebRTC rows show the receipt state. The live Maincloud Mailbox check showed the received state on the sender. |
 | 2.11 | Done. This document, [sharing](sharing.md), [relay](relay.md), and [architecture](architecture.md) record the three modes and the remaining platform checks. |
 
 A possible shape for the shared types. All names are proposals:
