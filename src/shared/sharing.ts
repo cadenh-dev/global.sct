@@ -1,4 +1,5 @@
 import type { SecretMetadata } from './secrets'
+import type { LinkImportInput, LinkImportResult, LinkPreview, LinkReceiptInput, LinkRecord, LinkSendInput, LinkState, TransferReceipt } from './transport'
 
 export const pairingLinkLimit = 16_384
 
@@ -40,6 +41,12 @@ export interface ImportTransferInput {
 }
 
 export interface SharingAPI {
+  createLink: (input: LinkSendInput) => Promise<LinkRecord>
+  previewLink: (link: string) => Promise<LinkPreview>
+  importLink: (input: LinkImportInput) => Promise<LinkImportResult>
+  verifyLinkReceipt: (input: LinkReceiptInput) => Promise<TransferReceipt>
+  getLinkState: () => Promise<LinkState>
+  copyText: (text: string) => Promise<void>
   getSharingState: () => Promise<SharingState>
   shareDeviceCard: () => Promise<void>
   copyPairingLink: () => Promise<void>

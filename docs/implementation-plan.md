@@ -285,7 +285,8 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.1 | Done. `src/shared/transport.ts` has the delivery mode, receipt, and record types. |
 | 2.2 | Partial. `src/main/transport.ts` has the relay-to-contract mapping. The relay UI does not use it yet. |
 | 2.3 | Done. Pairing uses a link, a saved file, or a pasted link. The Windows smoke test covers the flow. macOS and Linux are not run here. |
-| 2.4-2.11 | Open. |
+| 2.4 | Done. Link mode uses `sct://import/` and `sct://receipt/` links with the current envelope. The link limit is 16,384 characters. A manual receipt link verifies the import. The Link tab and saved records work on all platforms. A two-device check is not done here. |
+| 2.5-2.11 | Open. |
 
 A possible shape for the shared types. All names are proposals:
 

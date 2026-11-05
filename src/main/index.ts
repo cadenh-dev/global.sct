@@ -16,6 +16,7 @@ import { identifyCaller } from './caller'
 import { streamEnvironment } from './runtime'
 import { Sharing } from './sharing'
 import { encodePairingLink } from './transfer'
+import { linkLimit } from '../shared/transport'
 import { Cards } from './cards'
 import type { Relay } from './relay-connection'
 import { readThemePreference, writeThemePreference } from './preferences'
@@ -402,6 +403,15 @@ app.on('window-all-closed', () => {
 })
 
 function registerSharing(service: Sharing): void {
+  handle('sharing:create-link', (input) => service.createLink(input))
+  handle('sharing:preview-link', (link) => service.previewLink(link))
+  handle('sharing:import-link', (input) => service.importLink(input))
+  handle('sharing:verify-link-receipt', (input) => service.verifyLinkReceipt(input))
+  handle('sharing:link-state', () => service.getLinkState())
+  handle('sharing:copy-text', (text) => {
+    if (typeof text !== 'string' || text.length > linkLimit) throw new Error('Copy text must contain at most 16,384 characters.')
+    clipboard.writeText(text)
+  })
   handle('sharing:state', () => service.state())
   handle('sharing:device-card', async () => sendToNearbyMac(await service.deviceCardFile()))
   handle('sharing:copy-pairing-link', async () => clipboard.writeText(encodePairingLink(await service.deviceCard())))

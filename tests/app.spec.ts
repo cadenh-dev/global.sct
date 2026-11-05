@@ -41,11 +41,11 @@ test('adds existing folders offline and restores projects after restart', async 
     expect(await page.evaluate(() => ({ process: 'process' in window, require: 'require' in window })))
       .toEqual({ process: false, require: false })
     expect(await page.evaluate(() => Object.keys(window.sct).sort()))
-      .toEqual(['acceptRelayTransfer', 'addProject', 'addSecret', 'chooseVaultLocation', 'confirmRelayPair', 'confirmSharingPeer', 'createMockCard',
-        'deleteProject', 'deleteSecret', 'dismissTransfer', 'forgetDevice', 'getAgentRequests', 'getRelayState', 'getSharingState',
-        'getThemePreference', 'getVaultLocation', 'getVaultStatus', 'hideAllRelayActivity', 'hideRelayActivity', 'importTransfer', 'listProjects', 'listSecrets', 'lockVault', 'onAgentChanged', 'onRelayChanged',
-        'onSharingChanged', 'onThemeChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'platform', 'queueRelayTask', 'queueRelayTransfer', 'removeRelayPair', 'renameProject',
-        'requestRelayPair', 'respondRelayTask', 'respondToAgent', 'setThemePreference', 'shareDeviceCard', 'shareMockCard', 'shareSecrets', 'theme', 'unlockVault', 'updateSecret'])
+      .toEqual(['acceptRelayTransfer', 'addProject', 'addSecret', 'chooseVaultLocation', 'confirmRelayPair', 'confirmSharingPeer', 'copyPairingLink', 'copyText', 'createLink', 'createMockCard',
+        'deleteProject', 'deleteSecret', 'dismissTransfer', 'forgetDevice', 'getAgentRequests', 'getLinkState', 'getRelayState', 'getSharingState',
+        'getThemePreference', 'getVaultLocation', 'getVaultStatus', 'hideAllRelayActivity', 'hideRelayActivity', 'importLink', 'importTransfer', 'listProjects', 'listSecrets', 'lockVault', 'onAgentChanged', 'onRelayChanged',
+        'onSharingChanged', 'onThemeChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'platform', 'previewLink', 'previewPairingLink', 'queueRelayTask', 'queueRelayTransfer', 'removeRelayPair', 'renameProject',
+        'requestRelayPair', 'respondRelayTask', 'respondToAgent', 'saveDeviceCard', 'setThemePreference', 'shareDeviceCard', 'shareMockCard', 'shareSecrets', 'theme', 'unlockVault', 'updateSecret', 'verifyLinkReceipt'])
 
     await page.getByRole('button', { name: 'Add a project', exact: true }).click()
     await application.evaluate(({ dialog }) => {

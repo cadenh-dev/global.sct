@@ -33,6 +33,14 @@ The AirDrop sharing flow encrypts selected secrets for one verified device and s
 Device pairing uses a device card link or file, so it works on macOS, Windows, and Linux.
 See [sharing](sharing.md). Relay sharing below is the second transport. The **Relay** tab of **Sharing** uses it.
 
+## Link sharing
+
+Link mode encrypts selected secrets for one verified device and encodes the envelope and its wrapped key as an
+`sct://import/...` string. The recipient imports the link and returns an `sct://receipt/...` string.
+The main process keeps the link records in the vault sharing folder.
+The renderer receives the ciphertext links and metadata only.
+See [sharing](sharing.md#link-mode).
+
 ## Mock Wallet cards
 
 The main process sends fake card fields to walletmcppass.com and downloads the signed pass.

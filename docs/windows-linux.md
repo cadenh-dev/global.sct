@@ -10,12 +10,13 @@
 | `sct run` and `sct _env` | Yes | Yes | Yes |
 | Agent Access | Yes | Yes | Yes |
 | Device pairing by link or file | Yes | Yes | Yes |
+| Link sharing | Yes | Yes | Yes |
 | Relay sharing | Yes | Yes | Yes, with libsecret |
 | AirDrop sharing | Yes | No | No |
 | Wallet cards | Yes | No | No |
 | Caller signature check | Apple code signature | Authenticode signer | No code signature. The caller is unverified |
 
-On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** tabs. Use **Verify devices** to pair devices without the relay. Use **Relay** to pair, send, and receive through the relay.
+On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** tabs. Use **Verify devices** to pair devices without the relay. Use **Link** to send without a relay, or **Relay** to send through the relay.
 
 ## Requirements
 

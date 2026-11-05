@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { z } from 'zod/v4'
 import { createIdentity, decodeIdentity, decryptTransfer, describeDevice, encodeIdentity, encryptTransfer,
   pairingCode, readDeviceCard, readEnvelope, readObject, readPairingLink, transferLimit } from './transfer'
 import type { DeviceCard, DeviceIdentity, TransferEnvelope } from './transfer'
@@ -11,6 +12,8 @@ import type { RelayMessageContents, RelayTransfer } from '../shared/envelope'
 import type { Vault } from './vault'
 import type { RelayTransferInput } from '../shared/relay'
 import type { DeliveryMode, EnvelopeTransferInput, TransferReceipt } from '../shared/transport'
+import type { LinkImportResult, LinkPreview, LinkRecord, LinkSendInput, LinkState } from '../shared/transport'
+import { decodeReceiptLink, decodeTransferLink, encodeReceiptLink, encodeTransferLink, readLinkRecords } from './transport-link'
 import type { PairingPreview, SharingDevice, SharingState, TransferPreview } from '../shared/sharing'
 import type { SecretMetadata } from '../shared/secrets'
 
@@ -116,11 +119,11 @@ export class Sharing {
 
   // Link and Direct modes use the relay envelope without the relay. The device ID is the envelope identity,
   // and the verified peers in peers.json are the only accepted senders and recipients.
-  prepareEnvelope(input: EnvelopeTransferInput): Promise<SealedTransfer> {
+  prepareEnvelope(input: EnvelopeTransferInput): Promise<SealedTransfer & Pick<LinkRecord, 'projectName' | 'secretNames'>> {
     return this.serialize(async () => {
       const self = await this.deviceSelf()
       const recipient = deviceKeys(requirePeer(await this.readPeers(), input.recipientId, 'Verify the recipient device before sharing secrets.'))
-      return this.vault.withSelectedSecrets(input.projectId, input.secretIds, async (project, secrets) => sealTransfer(
+      return this.vault.withSelectedSecrets(input.projectId, input.secretIds, async (project, secrets) => ({ ...sealTransfer(
         self,
         [recipient],
         {
@@ -129,7 +132,7 @@ export class Sharing {
           grant: { accessExpiresAt: input.accessExpiresAt, injectionOnly: input.injectionOnly }
         },
         input.deliverBy
-      ))
+      ), projectName: project.name, secretNames: secrets.map((secret) => secret.name) }))
     })
   }
 
@@ -172,6 +175,67 @@ export class Sharing {
     return this.serialize(async () => {
       const recipient = deviceKeys(requirePeer(await this.readPeers(), recipientId, 'This receipt comes from a device that is not verified.'))
       return verifyTransferReceipt(await this.deviceSelf(), recipient, transferId, receipt, mode)
+    })
+  }
+
+  async createLink(input: unknown): Promise<LinkRecord> {
+    const request = requireLinkSend(input)
+    const sealed = await this.prepareEnvelope({ ...request, deliverBy: Date.now() + 24 * 60 * 60 * 1000 })
+    const wrappedKey = sealed.wrappedKeys[0]
+    if (!wrappedKey || sealed.wrappedKeys.length !== 1) throw new Error('Select one verified recipient for the link.')
+    const transfer = readTransfer(sealed.payload)
+    const record: LinkRecord = {
+      transferId: sealed.id, recipientId: request.recipientId, projectName: sealed.projectName,
+      secretNames: sealed.secretNames, deliverBy: transfer.deliverBy, createdAt: transfer.createdAt,
+      link: encodeTransferLink(sealed.payload, wrappedKey.wrappedKey), state: { state: 'manual' }
+    }
+    return this.serialize(async () => {
+      await this.writeJson('links.json', { links: [...await this.readLinks(), record] })
+      return record
+    })
+  }
+
+  async previewLink(link: unknown): Promise<LinkPreview> {
+    const { payload, wrappedKey } = decodeTransferLink(link)
+    const preview = await this.previewEnvelope(payload, wrappedKey)
+    return linkPreview(preview, describeDevice((await this.envelopeSender(payload)).card))
+  }
+
+  async importLink(input: unknown): Promise<LinkImportResult> {
+    const { link, projectId } = requireLinkImport(input)
+    const { payload, wrappedKey } = decodeTransferLink(link)
+    const sender = describeDevice((await this.envelopeSender(payload)).card)
+    const imported = await this.acceptEnvelope(payload, wrappedKey, projectId, async () => undefined)
+    return { ...linkPreview(imported, sender), secrets: imported.secrets, receiptLink: encodeReceiptLink(imported.receipt) }
+  }
+
+  async verifyLinkReceipt(input: unknown): Promise<TransferReceipt> {
+    const { transferId, link } = requireLinkReceipt(input)
+    const record = (await this.getLinkState()).find((entry) => entry.transferId === transferId)
+    if (!record) throw new Error('The sent link record does not exist on this device.')
+    const receipt = await this.verifyEnvelopeReceipt(record.recipientId, transferId, decodeReceiptLink(link), 'link')
+    return this.serialize(async () => {
+      const links = await this.readLinks()
+      const saved = links.find((entry) => entry.transferId === transferId)
+      if (!saved) throw new Error('The sent link record does not exist on this device.')
+      saved.state = { state: 'received', receipt }
+      await this.writeJson('links.json', { links })
+      return receipt
+    })
+  }
+
+  getLinkState(): Promise<LinkState> {
+    return this.serialize(async () => {
+      const links = await this.readLinks()
+      let changed = false
+      for (const record of links) {
+        if (record.state.state === 'manual' && record.deliverBy <= Date.now()) {
+          record.state = { state: 'expired' }
+          changed = true
+        }
+      }
+      if (changed) await this.writeJson('links.json', { links })
+      return links
     })
   }
 
@@ -385,6 +449,10 @@ export class Sharing {
     return data.peers.map((card: unknown) => readDeviceCard(Buffer.from(JSON.stringify(card))))
   }
 
+  private async readLinks(): Promise<LinkState> {
+    return readLinkRecords(await this.readJson('links.json') ?? { links: [] })
+  }
+
   private async readReceipts(): Promise<Receipt[]> {
     const data = await this.readJson('receipts.json')
     if (!data) return []
@@ -420,6 +488,34 @@ export class Sharing {
     this.pending = next.then(() => undefined, () => undefined)
     return next
   }
+}
+
+function linkPreview(preview: RelayTransferPreview, sender: SharingDevice): LinkPreview {
+  return {
+    transferId: preview.messageId, sender, projectName: preview.projectName, secretNames: preview.secretNames,
+    deliverBy: preview.deliverBy, accessExpiresAt: preview.accessExpiresAt, injectionOnly: preview.injectionOnly
+  }
+}
+
+function requireLinkSend(input: unknown): LinkSendInput {
+  const parsed = z.strictObject({
+    projectId: z.string().min(1), secretIds: z.array(z.string().min(1)).min(1).max(1000),
+    recipientId: z.string().regex(/^[0-9a-f]{64}$/), accessExpiresAt: z.number().int().nonnegative().nullable(), injectionOnly: z.boolean()
+  }).safeParse(input)
+  if (!parsed.success) throw new Error('Select a project, secrets, a verified recipient, and valid access settings.')
+  return parsed.data
+}
+
+function requireLinkImport(input: unknown): { link: string; projectId: string } {
+  const parsed = z.strictObject({ link: z.string(), projectId: z.string().min(1) }).safeParse(input)
+  if (!parsed.success) throw new Error('Paste an import link and select a destination project.')
+  return parsed.data
+}
+
+function requireLinkReceipt(input: unknown): { transferId: string; link: string } {
+  const parsed = z.strictObject({ transferId: z.uuidv4(), link: z.string() }).safeParse(input)
+  if (!parsed.success) throw new Error('Select a sent link and paste its receipt link.')
+  return parsed.data
 }
 
 function relayPreview(opened: ReturnType<typeof openRelayEnvelope>): RelayTransferPreview {

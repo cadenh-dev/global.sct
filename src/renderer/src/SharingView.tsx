@@ -10,6 +10,8 @@ import { errorText, StatusLine, useOperation } from './operation'
 import { HandoffModal, Scramble } from './SharingMotion'
 import type { HandoffStage } from './SharingMotion'
 import type { Loaded, Run, SharingTab, UpdateProjects, UpdateSecrets } from './types'
+import { LinkSharing } from './LinkSharing'
+import { SecretSelection } from './SecretSelection'
 
 interface SharingViewProps {
   projectId?: string
@@ -65,7 +67,7 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
       <div className="page-heading">
         <div>
           <h1>Sharing</h1>
-          <p className="description">{isMac ? 'Send encrypted secrets by AirDrop or relay.' : 'Send encrypted secrets by relay.'} Received values stay in the main process.</p>
+          <p className="description">{isMac ? 'Send encrypted secrets by link, AirDrop, or relay.' : 'Send encrypted secrets by link or relay.'} Received values stay in the main process.</p>
         </div>
       </div>
 
@@ -84,6 +86,10 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
         setSharing={setSharing} updateProjects={updateProjects} updateSecrets={updateSecrets} />
         : <RelayAndPairing sharing={sharing.value} setSharing={setSharing} activeTab={activeTab} projectId={projectId} projects={projects} secrets={secrets}
           operation={operation} updateProjects={updateProjects} updateSecrets={updateSecrets} />)}
+      {sharing.state === 'ready' && <div hidden={activeTab !== 'link'}>
+        <LinkSharing projectId={projectId} active={activeTab === 'link'} projects={projects} secrets={secrets}
+          peers={sharing.value.peers} busy={operation.busy} run={operation.run} updateSecrets={updateSecrets} />
+      </div>}
     </>
   )
 }
@@ -154,6 +160,7 @@ interface Receipt {
 
 // A waiting transfer or a new receipt opens the Receive tab unless the route names another tab.
 function activeSharingTab(sharing: Loaded<SharingState>, received: boolean, tab: SharingTab | undefined, isMac: boolean): SharingTab {
+  if (tab === 'link') return 'link'
   if (!isMac) return tab === 'devices' ? 'devices' : 'relay'
   if (tab === 'relay') return 'relay'
   if (tab === 'receive') return 'receive'
@@ -207,6 +214,8 @@ function SharingTabs({ activeTab, projectId, canShare, isMac }: {
         ) : <span aria-disabled="true" aria-describedby="sharing-verification-required">Send secrets</span>)}
         {isMac && <a href={sharingRoute('receive', projectId)} aria-current={activeTab === 'receive' ? 'page' : undefined}>Receive secrets</a>}
         <a href={sharingRoute('relay', projectId)} aria-current={activeTab === 'relay' ? 'page' : undefined}>Relay</a>
+        <a href={sharingRoute('link', projectId)} aria-current={activeTab === 'link' ? 'page' : undefined}
+          aria-label="Link sharing">Link</a>
       </nav>
       {isMac && !canShare && activeTab !== 'relay' && <p id="sharing-verification-required" className="field-help sharing-tab-help">
         Verify a device before you can send secrets.
@@ -882,37 +891,6 @@ function SendSecrets({ projectId, active, projects, secrets, peers, busy, run }:
           detail: <Scramble text={handoff.names.join(' ')} mode="encrypt" />
         }} />}
     </section>
-  )
-}
-
-function SecretSelection({ secrets, source, selected, onChange }: {
-  secrets: Loaded<SecretMetadata[]>
-  source: string
-  selected: Set<string>
-  onChange: (selected: Set<string>) => void
-}) {
-  if (secrets.state === 'loading') return <p role="status">Loading secrets…</p>
-  if (secrets.state !== 'ready' || !source) return null
-  const projectSecrets = secrets.value.filter((secret) => secret.projectId === source)
-  if (projectSecrets.length === 0) return <p className="field-help">This project has no secrets to send.</p>
-
-  return (
-    <fieldset className="sharing-selection">
-      <legend>Secrets to send</legend>
-      <label className="check-field">
-        <input type="checkbox" checked={projectSecrets.every((secret) => selected.has(secret.id))}
-          onChange={(event) => onChange(event.target.checked ? new Set(projectSecrets.map((secret) => secret.id)) : new Set())} />
-        Select all secrets
-      </label>
-      {projectSecrets.map((secret) => (
-        <label className="check-field" key={secret.id}>
-          <input type="checkbox" checked={selected.has(secret.id)} onChange={(event) => {
-            onChange(event.target.checked ? new Set([...selected, secret.id]) : new Set([...selected].filter((id) => id !== secret.id)))
-          }} />
-          {secret.name}
-        </label>
-      ))}
-    </fieldset>
   )
 }
 

@@ -1,6 +1,11 @@
 // One envelope and one receipt contract for every delivery mode (C8d).
 // AirDrop is not a delivery mode, because macOS reports no delivery and a receipt is not possible.
 
+import type { SecretMetadata } from './secrets'
+import type { SharingDevice } from './sharing'
+
+export const linkLimit = 16_384
+
 export type DeliveryMode = 'direct' | 'mailbox' | 'link'
 export type TransportName = 'hyperswarm' | 'webrtc' | 'relay' | 'link'
 
@@ -43,4 +48,44 @@ export interface EnvelopeTransferInput {
   deliverBy: number
   accessExpiresAt: number | null
   injectionOnly: boolean
+}
+
+export type LinkSendInput = Omit<EnvelopeTransferInput, 'deliverBy'>
+
+export interface LinkRecord {
+  transferId: string
+  recipientId: string
+  projectName: string
+  secretNames: string[]
+  deliverBy: number
+  createdAt: number
+  link: string
+  state: Extract<ReceiptState, { state: 'manual' | 'received' | 'expired' }>
+}
+
+export type LinkState = LinkRecord[]
+
+export interface LinkPreview {
+  transferId: string
+  sender: SharingDevice
+  projectName: string
+  secretNames: string[]
+  deliverBy: number
+  accessExpiresAt: number | null
+  injectionOnly: boolean
+}
+
+export interface LinkImportInput {
+  link: string
+  projectId: string
+}
+
+export interface LinkImportResult extends LinkPreview {
+  secrets: SecretMetadata[]
+  receiptLink: string
+}
+
+export interface LinkReceiptInput {
+  transferId: string
+  link: string
 }

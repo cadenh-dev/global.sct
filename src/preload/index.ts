@@ -7,6 +7,7 @@ import type { PairingPreview, SharingDevice, SharingState, TransferPreview } fro
 import type { ConfirmRelayPairInput, RelayAcceptInput, RelayActivityKey, RelayQueueInput, RelayState, RelayTaskDecision } from '../shared/relay'
 import type { AgentRequestView } from '../shared/agent'
 import type { UnlockInput, VaultStatus } from '../shared/vault'
+import type { LinkImportResult, LinkPreview, LinkRecord, LinkState, TransferReceipt } from '../shared/transport'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   const reply: Reply<T> = await ipcRenderer.invoke(channel, ...args)
@@ -50,6 +51,12 @@ const api: SctAPI = {
   lockVault: () => invoke<VaultStatus>('vault:lock'),
   forgetDevice: () => invoke<VaultStatus>('vault:forget'),
   getSharingState: () => invoke<SharingState>('sharing:state'),
+  createLink: (input) => invoke<LinkRecord>('sharing:create-link', input),
+  previewLink: (link) => invoke<LinkPreview>('sharing:preview-link', link),
+  importLink: (input) => invoke<LinkImportResult>('sharing:import-link', input),
+  verifyLinkReceipt: (input) => invoke<TransferReceipt>('sharing:verify-link-receipt', input),
+  getLinkState: () => invoke<LinkState>('sharing:link-state'),
+  copyText: (text) => invoke<void>('sharing:copy-text', text),
   shareDeviceCard: () => invoke<void>('sharing:device-card'),
   copyPairingLink: () => invoke<void>('sharing:copy-pairing-link'),
   saveDeviceCard: () => invoke<boolean>('sharing:save-device-card'),
