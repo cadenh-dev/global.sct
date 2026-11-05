@@ -106,6 +106,7 @@ The full-window screenshots are 1200 × 800 on Windows. The Links image is a pan
 | Sharing | ![Cream sharing](media/themes/cream/sharing.png) | ![Terminal sharing](media/themes/terminal/sharing.png) |
 | Send | ![Cream send](media/themes/cream/send.png) | ![Terminal send](media/themes/terminal/send.png) |
 | WebRTC | ![Cream WebRTC](media/themes/cream/webrtc.png) | ![Terminal WebRTC](media/themes/terminal/webrtc.png) |
+| Connection link review | ![Cream connection link](media/themes/cream/connection-link.png) | ![Terminal connection link](media/themes/terminal/connection-link.png) |
 | Link receipt | ![Cream link receipt](media/themes/cream/link-receipt.png) | ![Terminal link receipt](media/themes/terminal/link-receipt.png) |
 | Share confirmation | ![Cream share confirmation](media/themes/cream/share-gate.png) | ![Terminal share confirmation](media/themes/terminal/share-gate.png) |
 | Links registration (development) | ![Cream links](media/themes/cream/links.png) | ![Terminal links](media/themes/terminal/links.png) |
