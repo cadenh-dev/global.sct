@@ -4,6 +4,7 @@ import { decodeBase64, describeDevice, exportPublic, publicKey, readObject, requ
 import type { DeviceCard, DeviceIdentity } from './transfer'
 import type { RelayExpiryContents, RelayExpiryNotice, RelayGrant, RelayMessageContents, RelayMessageKind, RelayReceipt,
   RelayReceiptContents, RelayResultContents, RelayTaskContents, RelayTransfer, RelayTransferContents, RelayWrappedKey } from '../shared/envelope'
+import type { DeliveryMode, TransferReceipt } from '../shared/transport'
 
 // The relay rejects a delivery deadline that is later than this limit.
 export const deliveryLimit = 7 * 24 * 60 * 60 * 1000
@@ -189,6 +190,15 @@ export function openReceipt(self: RelaySelf, recipient: RelayPeerKeys, transferI
   } finally {
     key.fill(0)
   }
+}
+
+// The wire receipt has no mode field. The caller supplies the mode of the transport that returned the receipt.
+export function verifyTransferReceipt(self: RelaySelf, recipient: RelayPeerKeys, transferId: string, bytes: Buffer,
+  mode: DeliveryMode, now = Date.now()): TransferReceipt {
+  const contents = openReceipt(self, recipient, transferId, bytes, now)
+  const receipt = readReceipt(bytes)
+  return { transferId: receipt.correlationId, recipientDeviceId: receipt.senderDevice, mode, receivedAt: contents.receivedAt,
+    signature: receipt.signature }
 }
 
 // The recipient reports local grant cleanup to the original sender. Only that sender can read the notice.

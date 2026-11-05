@@ -20,8 +20,8 @@ The existing test suite supplied the repeatable security checks:
 - Expired delivery and access deadlines failed.
 - Duplicate delivery returned the saved receipt and did not import the secret again.
 - Restart recovery kept the original destination and did not duplicate an import.
-- Offline vault operations used encrypted files and macOS Keychain.
-- Expired grant cleanup removed the vault entry and its Keychain key.
+- Offline vault operations used encrypted files and the vault master key.
+- Expired grant cleanup removed the vault entry.
 
 The full suite passed 38 tests.
 

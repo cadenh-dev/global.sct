@@ -30,7 +30,7 @@ export async function runMcp(args: string[], submit: AgentSubmit, skills: string
         const outcome = await submit({ operation, input }, context.mcpReq.signal)
         return { isError: outcome.status !== 'completed', content: [{ type: 'text', text: JSON.stringify(outcome) }] }
       } catch {
-        return { isError: true, content: [{ type: 'text', text: 'The local request could not start. Check the project, storage, and Keychain.' }] }
+        return { isError: true, content: [{ type: 'text', text: 'The local request could not start. Check the project, vault, and storage.' }] }
       }
     })
     const instructions = () => readFile(join(skills, `sct-${operation.replaceAll('_', '-')}`, 'SKILL.md'), 'utf8')

@@ -8,7 +8,7 @@
     "framework": "Electron, React, and TypeScript"
   },
   "preserve": [
-    "Terminal theme",
+    "Terminal theme (Terminal and Cream variants)",
     "Martian Mono",
     "OKLCH role tokens",
     "square surfaces",

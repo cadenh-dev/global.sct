@@ -6,7 +6,32 @@ import type { AgentAPI } from './agent'
 import type { CardsAPI } from './cards'
 import type { UnlockInput, VaultStatus } from './vault'
 
+export type SctPlatform =
+  | 'aix'
+  | 'android'
+  | 'cygwin'
+  | 'darwin'
+  | 'freebsd'
+  | 'haiku'
+  | 'linux'
+  | 'netbsd'
+  | 'openbsd'
+  | 'sunos'
+  | 'win32'
+
+// The user's choice. `system` follows the OS light or dark setting.
+export type ThemePreference = 'light' | 'dark' | 'system'
+
+// The variant on screen: Cream for light, Terminal for dark.
+export type ThemeVariant = 'cream' | 'terminal'
+
 export interface SctAPI extends SharingAPI, RelayAPI, AgentAPI, CardsAPI {
+  platform: SctPlatform
+  // The variant at window creation. onThemeChanged reports later changes.
+  theme: ThemeVariant
+  getThemePreference: () => Promise<ThemePreference>
+  setThemePreference: (preference: ThemePreference) => Promise<ThemeVariant>
+  onThemeChanged: (listener: (variant: ThemeVariant) => void) => () => void
   listProjects: () => Promise<Project[]>
   pickDirectory: () => Promise<string | null>
   addProject: (input: ProjectInput) => Promise<Project>

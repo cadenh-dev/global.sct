@@ -84,7 +84,7 @@ Correct the record before you plan work.
 | C7 | Windows and Linux builds | macOS DMG only | Add, signed from the repository | High | Signing credentials, new install paths, new UI tests |
 | C8a | Hyperswarm transport | SpacetimeDB relay | Add | High | NAT failures, both peers online, new dependency |
 | C8b | WebRTC transport | SpacetimeDB relay | Add | High | Needs signalling, both peers online, renderer only |
-| C8c | `age` link transport | None | Add | Medium | One-way, no automatic receipt |
+| C8c | sct link transport | None | Add. Q7 is closed: use the current X25519 envelope, not `age` | Medium | One-way, manual receipt link |
 | C8d | Shared receipt contract for every transport | Relay receipt only | Add with C8a to C8c | Medium | A receipt needs a return path |
 | C10 | Encrypted vault in GitHub Variables | None | Drop | Low | Adds a GitHub account and a token to the local path |
 | C11 | VS Code extension | Electron window | Build on, as a client of the app | High | Two approval paths and two vault paths |
@@ -167,6 +167,12 @@ Two profiles are possible:
 | 2026-11-04 | Break the current file formats | No migration code. Old vault and transfer files are ignored |
 | 2026-11-03 | Provide all three transports | C8a, C8b, and C8c enter scope. Every transport needs a receipt |
 | 2026-11-03 | Add a user gate to sharing | C16 enters scope |
+| 2026-11-04 | Use a standalone fork | D17 is closed. The release target is this repository |
+| 2026-11-04 | Use versioned Git tags and unsigned beta releases until signing is available | D13 is closed. D12 is deferred |
+| 2026-11-04 | Close Q7, D6, D7, D8, D14, D15, and the C12 form | The link uses the current envelope. The transport order is Link, Hyperswarm, WebRTC. The extension uses the CLI only. The theme has two variants. See [docs/implementation-plan.md](implementation-plan.md#7-cross-phase-decision-summary) |
+| 2026-11-04 | Theme setting: Light (Cream), Dark (Terminal), or System. Cream is the default | Q12 is closed. The setting is an Appearance section on the Storage page. AGENTS.md lists both variants |
+| 2026-11-04 | Cream uses the colors of the user's reference screenshot, with a dark forest green accent | Q13 is closed. Both variants use the same selected-tab style. See [docs/theme.md](theme.md) |
+| 2026-11-04 | Add `sct run --interactive` for shells | Q11 is closed. The VS Code terminal uses `sct run --interactive -- <shell>` |
 | 2026-11-03 | Keep Wallet cards on macOS only | C17 enters scope |
 | 2026-11-03 | Change the color theme later | C18 enters scope, after the other work |
 | 2026-11-03 | The fork is a new build of `sct`. It is not a second app | Keep the name `sct`, the CLI `sct`, `@sct/env`, and the app identity. The build replaces the upstream app on a machine that has it |
@@ -180,18 +186,18 @@ Two profiles are possible:
 | D3 | The key derivation function | Decided: `scrypt` from `node:crypto` | Phase 0 | No new dependency |
 | D4 | The existing vaults | Decided: clean break | Phase 0 | Old vault files are not read. Users re-enter secrets |
 | D5 | The application identity | Decided: keep `com.omavashia2005.sct` | Phase 0 | The build replaces the upstream app. A later change needs a migration |
-| D6 | The order of the transports | Link, then Hyperswarm, then WebRTC, or another order | Phase 2 | The link transport has no network dependency |
-| D7 | The WebRTC signalling path | Manual token exchange, or a small stateless broker | Phase 2 | A broker is a server, but it stores nothing |
-| D8 | Pairing without the relay | One-time code in the transfer file, a QR code, or a DHT topic | Phase 2 | The relay identity check goes away |
+| D6 | The order of the transports | Decided: Link, then Hyperswarm, then WebRTC | Phase 2 | The link transport has no network dependency. It tests the receipt contract first |
+| D7 | The WebRTC signalling path | Decided: manual token exchange with signed and sealed `sct://connect` links | Phase 2 | It adds no server. The signature binds the DTLS fingerprint to the verified peer |
+| D8 | Pairing without the relay | Decided: the device card as an `sct://pair/v1/<card>` link or a file, with the current pairing code | Phase 2 | It uses `previewPeer`, `confirmPeer`, and `pairingCode`. It works on all platforms |
 | D9 | The receipt when the peer is offline | Decided: the mailbox returns the receipt on pickup | Phase 2 | The direct and link modes use C8d |
 | D10 | The relay code | Decided: keep it | Phase 2 | It is the mailbox implementation |
 | D11 | The gate factors | Password only, or a password plus WebAuthn | Phase 4 | Linux has no platform authenticator in most distributions |
-| D12 | The signing credentials | Apple membership, a Windows certificate, Azure Trusted Signing | Phase 1 | No certificate means no signed build |
-| D13 | The CI runners and the release channel | Three runners, or macOS only. A `latest` build on each push, or versioned releases | Phase 1 | The current workflow replaces `latest` on each push |
-| D14 | The VS Code extension scope and link | CLI only, a local endpoint in the app, or the MCP path | Phase 3 | The extension needs a channel to the app |
-| D15 | The color theme | Keep the Terminal theme, or a new palette | Phase 4 | Needs a full token pass |
+| D12 | The signing credentials | Decided: deferred. Unsigned beta releases until signing is available | Phase 1 | No certificate means no signed build |
+| D13 | The CI runners and the release channel | Decided: three runners. Versioned beta tags until signing | Phase 1 | The old workflow replaced `latest` on each push |
+| D14 | The VS Code extension scope and link | Decided: CLI only (`sct agent` and `sct run`) | Phase 3 | It adds no socket or pipe (C3). It uses the current caller check and approval window |
+| D15 | The color theme | Decided: two variants of the Terminal theme, Terminal (dark) and Cream (light). AGENTS.md changes to allow them | Before the new sharing UI | Each new screen gets one check in both variants |
 | D16 | Backward compatibility | Decided: break the format | Phase 0 | The new build reads no old vault or transfer file |
-| D17 | The release target | A pull request to the upstream repository, or a standalone fork | Phase 1 | It selects the repository, the runner names, and the release channel |
+| D17 | The release target | Decided: a standalone fork | Phase 1 | The release target is this repository |
 | D18 | The SpacetimeDB database | Decided: keep it | Phase 2 | Maincloud holds the current relay data |
 | D19 | The product names | Decided: keep `sct`, `@sct/env`, and the MCP name `sct` | Phase 1 | One install of `sct` per `PATH` |
 
@@ -225,10 +231,10 @@ Do not start a phase before you approve its items.
 **Phase 2: sharing**
 
 1. C8d: define the receipt contract.
-2. C8c: add the `age` link transport. It needs no server.
+2. C8c: add the sct link transport. It needs no server.
 3. C8a: add the Hyperswarm transport.
 4. C8b: add the WebRTC transport.
-5. C13: remove the relay after the three transports pass.
+5. C13: keep the relay as the optional mailbox (D10, D18, and Q8).
 
 **Phase 3: editor client**
 
@@ -238,7 +244,7 @@ Do not start a phase before you approve its items.
 **Phase 4: access and looks**
 
 1. C16: add the user gate.
-2. C18: change the color theme.
+2. C18: the Cream variant moves before the new sharing UI (D15). The final screenshot pass stays here.
 
 ## Constraints
 

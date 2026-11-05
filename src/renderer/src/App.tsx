@@ -16,7 +16,8 @@ import type { VaultStatus } from '../../shared/vault'
 type Route = { view: 'projects' } | { view: 'project'; id: string } | { view: 'secrets' } | { view: 'storage' } | { view: 'sharing'; projectId?: string; tab?: SharingTab } | { view: 'cards' } | { view: 'agent' }
 
 export function App() {
-  const route = parseRoute(useSyncExternalStore(subscribeToHash, () => window.location.hash))
+  const isMac = window.sct.platform === 'darwin'
+  const route = parseRoute(useSyncExternalStore(subscribeToHash, () => window.location.hash), isMac)
   const [status, setStatus] = useState<Loaded<VaultStatus>>({ state: 'loading' })
 
   useEffect(() => {
@@ -36,12 +37,12 @@ export function App() {
     return <div className="app"><main><p className="error" role="alert">{status.error}</p></main></div>
   }
   if (status.value.locked) {
-    return <UnlockView status={status.value} onUnlocked={() => window.location.reload()} />
+    return <UnlockView status={status.value} onUnlocked={(value) => setStatus({ state: 'ready', value })} />
   }
-  return route.view === 'agent' ? <AgentAccessView /> : <DesktopApp route={route} />
+  return route.view === 'agent' ? <AgentAccessView /> : <DesktopApp route={route} isMac={isMac} />
 }
 
-function DesktopApp({ route }: { route: Exclude<Route, { view: 'agent' }> }) {
+function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>; isMac: boolean }) {
   const [projects, setProjects] = useState<Loaded<Project[]>>({ state: 'loading' })
   const [secrets, setSecrets] = useState<Loaded<SecretMetadata[]>>({ state: 'loading' })
 
@@ -78,11 +79,11 @@ function DesktopApp({ route }: { route: Exclude<Route, { view: 'agent' }> }) {
             <a href="#/" aria-current={route.view === 'projects' || route.view === 'project' ? 'page' : undefined}>Projects</a>
             <a href="#/secrets" aria-current={route.view === 'secrets' ? 'page' : undefined}>All secrets</a>
             <a href="#/sharing" aria-current={route.view === 'sharing' ? 'page' : undefined}>Sharing</a>
-            <a href="#/cards" aria-current={route.view === 'cards' ? 'page' : undefined}>Cards</a>
+            {isMac && <a href="#/cards" aria-current={route.view === 'cards' ? 'page' : undefined}>Cards</a>}
             <a href="#/storage" aria-current={route.view === 'storage' ? 'page' : undefined}>Storage</a>
           </nav>
         </div>
-        <span className="local-label">On this Mac</span>
+        <span className="local-label">On this device</span>
       </header>
       <main>
         {route.view === 'projects' && (
@@ -108,12 +109,12 @@ function subscribeToHash(onChange: () => void): () => void {
   return () => window.removeEventListener('hashchange', onChange)
 }
 
-function parseRoute(hash: string): Route {
+function parseRoute(hash: string, isMac: boolean): Route {
   const [view, id, projectId] = hash.replace(/^#\/?/, '').split('/')
   if (view === 'projects' && id) return { view: 'project', id: decodeURIComponent(id) }
   if (view === 'secrets') return { view: 'secrets' }
   if (view === 'storage') return { view: 'storage' }
-  if (view === 'cards') return { view: 'cards' }
+  if (view === 'cards' && isMac) return { view: 'cards' }
   if (view === 'agent') return { view: 'agent' }
   if (view === 'sharing') {
     if (id === 'devices' || id === 'secrets' || id === 'receive' || id === 'relay') {

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import type { Project } from '../../shared/projects'
 import type { SecretMetadata } from '../../shared/secrets'
 import type { PairingPreview, SharingDevice, SharingState, TransferPreview } from '../../shared/sharing'
+import { pairingLinkLimit } from '../../shared/sharing'
 import { relayInboxFinished, relaySentFinished, relayTaskFinished } from '../../shared/relay'
 import type { RelayActivityKey, RelayInboxItem, RelayPeer, RelaySentItem, RelayState, RelayTaskDecision, RelayTaskItem } from '../../shared/relay'
 import { errorText, StatusLine, useOperation } from './operation'
@@ -19,12 +20,31 @@ interface SharingViewProps {
   updateSecrets: UpdateSecrets
 }
 
+type SharingValue = SharingState & { location: string }
+type SharingOperation = ReturnType<typeof useOperation>
+type SetSharing = (update: (current: Loaded<SharingValue>) => Loaded<SharingValue>) => void
+
+interface ReadySharingProps {
+  sharing: SharingValue
+  activeTab: SharingTab
+  projectId?: string
+  projects: Loaded<Project[]>
+  secrets: Loaded<SecretMetadata[]>
+  receipt: Receipt | null
+  setReceipt: (receipt: Receipt) => void
+  operation: SharingOperation
+  setSharing: SetSharing
+  updateProjects: UpdateProjects
+  updateSecrets: UpdateSecrets
+}
+
 export function SharingView({ projectId, tab, projects, secrets, updateProjects, updateSecrets }: SharingViewProps) {
   const [sharing, setSharing] = useState<Loaded<SharingState & { location: string }>>({ state: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const operation = useOperation()
-  const activeTab = activeSharingTab(sharing, receipt !== null, tab)
+  const isMac = window.sct.platform === 'darwin'
+  const activeTab = activeSharingTab(sharing, receipt !== null, tab, isMac)
 
   useEffect(() => {
     let active = true
@@ -32,7 +52,7 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
       Promise.all([window.sct.getSharingState(), window.sct.getVaultLocation()]).then(([value, location]) => {
         if (active) setSharing({ state: 'ready', value: { ...value, location } })
       }).catch((cause: unknown) => {
-        if (active) setSharing({ state: 'error', error: errorText(cause, 'Cannot load sharing. Unlock Keychain and retry.') })
+        if (active) setSharing({ state: 'error', error: errorText(cause, 'Cannot load sharing. Unlock the vault and retry.') })
       })
     }
     refresh()
@@ -45,7 +65,7 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
       <div className="page-heading">
         <div>
           <h1>Sharing</h1>
-          <p className="description">Send encrypted secrets by AirDrop or relay. Received values stay in the main process.</p>
+          <p className="description">{isMac ? 'Send encrypted secrets by AirDrop or relay.' : 'Send encrypted secrets by relay.'} Received values stay in the main process.</p>
         </div>
       </div>
 
@@ -59,39 +79,68 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
       {projects.state === 'error' && <p className="error" role="alert">{projects.error}</p>}
       {secrets.state === 'error' && <p className="error" role="alert">{secrets.error}</p>}
 
-      {sharing.state === 'ready' && (
-        <>
-          {activeTab !== 'receive' && sharing.value.incoming.length > 0 && <p className="sharing-waiting">
-            <a href={sharingRoute('receive', projectId)}>
-              {sharing.value.incoming.length === 1 ? 'A received transfer is waiting.' : `${sharing.value.incoming.length} received transfers are waiting.`}
-            </a>
-          </p>}
-          <SharingTabs activeTab={activeTab} projectId={projectId} canShare={sharing.value.peers.length > 0} />
-          {sharing.value.peers.length > 0 && <div hidden={activeTab !== 'secrets'}>
-            <SendSecrets projectId={projectId} active={activeTab === 'secrets'} projects={projects} secrets={secrets}
-              peers={sharing.value.peers} busy={operation.busy} run={operation.run} />
-          </div>}
-          <div hidden={activeTab !== 'receive'}>
-            <ReceiveSecrets device={sharing.value.device} incoming={sharing.value.incoming} canImport={sharing.value.peers.length > 0}
-              receipt={receipt} projects={projects} location={sharing.value.location} busy={operation.busy} run={operation.run}
-              updateSecrets={updateSecrets} setReceipt={setReceipt}
-              update={(incoming) => setSharing((current) => current.state === 'ready' ? {
-                state: 'ready', value: { ...current.value, incoming: incoming(current.value.incoming) }
-              } : current)} />
-          </div>
-          <div hidden={activeTab !== 'devices'}>
-            <DeviceVerification projectId={projectId} device={sharing.value.device} peers={sharing.value.peers}
-              busy={operation.busy} run={operation.run}
-              onVerified={(device) => setSharing((current) => current.state === 'ready' ? {
-                state: 'ready', value: { ...current.value, peers: [...current.value.peers.filter((peer) => peer.id !== device.id), device] }
-              } : current)} />
-          </div>
-          <div hidden={activeTab !== 'relay'}>
-            <RelaySharing projectId={projectId} active={activeTab === 'relay'} projects={projects} secrets={secrets}
-              busy={operation.busy} run={operation.run} updateProjects={updateProjects} updateSecrets={updateSecrets} />
-          </div>
-        </>
-      )}
+      {sharing.state === 'ready' && (isMac ? <MacSharing sharing={sharing.value} activeTab={activeTab} projectId={projectId}
+        projects={projects} secrets={secrets} receipt={receipt} setReceipt={setReceipt} operation={operation}
+        setSharing={setSharing} updateProjects={updateProjects} updateSecrets={updateSecrets} />
+        : <RelayAndPairing sharing={sharing.value} setSharing={setSharing} activeTab={activeTab} projectId={projectId} projects={projects} secrets={secrets}
+          operation={operation} updateProjects={updateProjects} updateSecrets={updateSecrets} />)}
+    </>
+  )
+}
+
+function MacSharing({ sharing, activeTab, projectId, projects, secrets, receipt, setReceipt, operation, setSharing,
+  updateProjects, updateSecrets }: ReadySharingProps) {
+  return (
+    <>
+      {activeTab !== 'receive' && sharing.incoming.length > 0 && <p className="sharing-waiting">
+        <a href={sharingRoute('receive', projectId)}>
+          {sharing.incoming.length === 1 ? 'A received transfer is waiting.' : `${sharing.incoming.length} received transfers are waiting.`}
+        </a>
+      </p>}
+      <SharingTabs activeTab={activeTab} projectId={projectId} canShare={sharing.peers.length > 0} isMac />
+      {sharing.peers.length > 0 && <div hidden={activeTab !== 'secrets'}>
+        <SendSecrets projectId={projectId} active={activeTab === 'secrets'} projects={projects} secrets={secrets}
+          peers={sharing.peers} busy={operation.busy} run={operation.run} />
+      </div>}
+      <div hidden={activeTab !== 'receive'}>
+        <ReceiveSecrets device={sharing.device} incoming={sharing.incoming} canImport={sharing.peers.length > 0}
+          receipt={receipt} projects={projects} location={sharing.location} busy={operation.busy} run={operation.run}
+          updateSecrets={updateSecrets} setReceipt={setReceipt}
+          update={(incoming) => setSharing((current) => current.state === 'ready' ? {
+            state: 'ready', value: { ...current.value, incoming: incoming(current.value.incoming) }
+          } : current)} />
+      </div>
+      <div hidden={activeTab !== 'devices'}>
+        <DeviceVerification projectId={projectId} device={sharing.device} peers={sharing.peers}
+          busy={operation.busy} run={operation.run} isMac
+          onVerified={(device) => setSharing((current) => current.state === 'ready' ? {
+            state: 'ready', value: { ...current.value, peers: [...current.value.peers.filter((peer) => peer.id !== device.id), device] }
+          } : current)} />
+      </div>
+      <div hidden={activeTab !== 'relay'}>
+        <RelaySharing projectId={projectId} active={activeTab === 'relay'} projects={projects} secrets={secrets}
+          busy={operation.busy} run={operation.run} updateProjects={updateProjects} updateSecrets={updateSecrets} />
+      </div>
+    </>
+  )
+}
+
+function RelayAndPairing({ sharing, setSharing, activeTab, projectId, projects, secrets, operation, updateProjects, updateSecrets }: Pick<ReadySharingProps,
+  'sharing' | 'setSharing' | 'activeTab' | 'projectId' | 'projects' | 'secrets' | 'operation' | 'updateProjects' | 'updateSecrets'>) {
+  return (
+    <>
+      <SharingTabs activeTab={activeTab} projectId={projectId} canShare={false} isMac={false} />
+      <div hidden={activeTab !== 'devices'}>
+        <DeviceVerification projectId={projectId} device={sharing.device} peers={sharing.peers}
+          busy={operation.busy} run={operation.run} isMac={false}
+          onVerified={(device) => setSharing((current) => current.state === 'ready' ? {
+            state: 'ready', value: { ...current.value, peers: [...current.value.peers.filter((peer) => peer.id !== device.id), device] }
+          } : current)} />
+      </div>
+      <div hidden={activeTab !== 'relay'}>
+        <RelaySharing projectId={projectId} active={activeTab === 'relay'} projects={projects} secrets={secrets}
+          busy={operation.busy} run={operation.run} updateProjects={updateProjects} updateSecrets={updateSecrets} />
+      </div>
     </>
   )
 }
@@ -104,7 +153,8 @@ interface Receipt {
 }
 
 // A waiting transfer or a new receipt opens the Receive tab unless the route names another tab.
-function activeSharingTab(sharing: Loaded<SharingState>, received: boolean, tab?: SharingTab): SharingTab {
+function activeSharingTab(sharing: Loaded<SharingState>, received: boolean, tab: SharingTab | undefined, isMac: boolean): SharingTab {
+  if (!isMac) return tab === 'devices' ? 'devices' : 'relay'
   if (tab === 'relay') return 'relay'
   if (tab === 'receive') return 'receive'
   if (sharing.state !== 'ready') return 'devices'
@@ -124,7 +174,12 @@ function sharingRoute(tab: SharingTab, projectId?: string): string {
   return `#/sharing/${tab}${projectId ? `/${encodeURIComponent(projectId)}` : ''}`
 }
 
-function SharingTabs({ activeTab, projectId, canShare }: { activeTab: SharingTab; projectId?: string; canShare: boolean }) {
+function SharingTabs({ activeTab, projectId, canShare, isMac }: {
+  activeTab: SharingTab
+  projectId?: string
+  canShare: boolean
+  isMac: boolean
+}) {
   const navigation = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -147,13 +202,13 @@ function SharingTabs({ activeTab, projectId, canShare }: { activeTab: SharingTab
     <>
       <nav ref={navigation} className="sharing-tabs" aria-label="Sharing">
         <a href={sharingRoute('devices', projectId)} aria-current={activeTab === 'devices' ? 'page' : undefined}>Verify devices</a>
-        {canShare ? (
+        {isMac && (canShare ? (
           <a href={sharingRoute('secrets', projectId)} aria-current={activeTab === 'secrets' ? 'page' : undefined}>Send secrets</a>
-        ) : <span aria-disabled="true" aria-describedby="sharing-verification-required">Send secrets</span>}
-        <a href={sharingRoute('receive', projectId)} aria-current={activeTab === 'receive' ? 'page' : undefined}>Receive secrets</a>
+        ) : <span aria-disabled="true" aria-describedby="sharing-verification-required">Send secrets</span>)}
+        {isMac && <a href={sharingRoute('receive', projectId)} aria-current={activeTab === 'receive' ? 'page' : undefined}>Receive secrets</a>}
         <a href={sharingRoute('relay', projectId)} aria-current={activeTab === 'relay' ? 'page' : undefined}>Relay</a>
       </nav>
-      {!canShare && activeTab !== 'relay' && <p id="sharing-verification-required" className="field-help sharing-tab-help">
+      {isMac && !canShare && activeTab !== 'relay' && <p id="sharing-verification-required" className="field-help sharing-tab-help">
         Verify a device before you can send secrets.
       </p>}
     </>
@@ -198,11 +253,11 @@ function RelaySharing({ projectId, active, projects, secrets, busy, run, updateP
   // A dialog inside the hidden tab cannot show, so a new arrival waits until the Relay tab is open.
   const arrival = active && seen ? relay.value.inbox.find((item) => !seen.has(item.messageId)) : undefined
   const sender = arrival ? peerName(relay.value, arrival.sender) : ''
-  // Only a transfer that this Mac can open and has not imported asks for a project.
+  // Only a transfer that this device can open and has not imported asks for a project.
   const destination = active ? relay.value.inbox.find((item) => item.messageId === asking && item.state === 'pending') : undefined
   return (
     <>
-      {arrival && <HandoffModal key={arrival.messageId} heading={`Receiving from ${sender}`} via="relay" from={sender} to="This Mac"
+      {arrival && <HandoffModal key={arrival.messageId} heading={`Receiving from ${sender}`} via="relay" from={sender} to="This device"
         stage="received" object={{ shape: 'key', title: 'Encrypted transfer', detail: shortId(arrival.messageId) }}
         onDone={() => {
           setSeen((current) => new Set([...(current ?? []), arrival.messageId]))
@@ -259,7 +314,7 @@ function RelayImportDialog({ item, sender, projects, updateProjects, updateSecre
       onCancel={(event) => { if (operation.busy) event.preventDefault() }} onClose={onClose}>
       <h2 id="import-heading">Save secrets from {sender}</h2>
       <p>{item.projectName}: {item.secretNames.join(', ')}</p>
-      <p className="field-help">Choose a project on this Mac or make a new one. The transfer stays pending until you import it.</p>
+      <p className="field-help">Choose a project on this device or make a new one. The transfer stays pending until you import it.</p>
       <StatusLine status={operation.status} />
       <RelayImportForm item={item} sender={sender} projects={projects} busy={operation.busy} run={operation.run}
         updateProjects={updateProjects} updateSecrets={updateSecrets} onImported={onImported}
@@ -289,9 +344,9 @@ function RelayConnection({ state }: { state: RelayState }) {
 
 function relayConnectionText(state: RelayState): string {
   if (state.connection === 'connected') return state.registered
-    ? 'This Mac is connected. Relay updates appear without a page reload.'
-    : 'This Mac is connected but is not registered yet.'
-  if (state.connection === 'connecting') return 'This Mac is connecting. Saved activity remains available.'
+    ? 'This device is connected. Relay updates appear without a page reload.'
+    : 'This device is connected but is not registered yet.'
+  if (state.connection === 'connecting') return 'This device is connecting. Saved activity remains available.'
   if (state.connection === 'offline') return 'The relay is offline. Saved activity can be out of date.'
   return 'The relay is off. Set SCT_RELAY to connect this app.'
 }
@@ -312,7 +367,7 @@ function RelayPairing({ state, busy, run }: { state: RelayState; busy: boolean; 
   return (
     <section className="panel" aria-labelledby="relay-pair-heading">
       <h2 id="relay-pair-heading">Pair relay devices</h2>
-      <p>Enter the relay ID from the other Mac. Compare the code on both screens before confirmation.</p>
+      <p>Enter the relay ID from the other device. Compare the code on both screens before confirmation.</p>
       <form onSubmit={(event) => { void requestPair(event) }}>
         <fieldset disabled={busy || state.connection !== 'connected'}>
           <label htmlFor="relay-peer-identity">Other device’s relay ID</label>
@@ -346,7 +401,7 @@ function RelayPairing({ state, busy, run }: { state: RelayState; busy: boolean; 
                   else next.delete(peer.pairId)
                   return next
                 })} />
-                I compared this code on both Macs
+                I compared this code on both devices
               </label>
               <button type="button" disabled={busy || !compared.has(peer.pairId)} onClick={() => {
                 void run('Saving the verified relay device…', async () => {
@@ -402,7 +457,7 @@ function RelaySend({ projectId, projects, secrets, state, busy, run }: {
       })
       setHandoff({ stage: 'wait', messageId, ...sent })
       setSelected(new Set())
-      return 'The encrypted transfer is queued on this Mac.'
+      return 'The encrypted transfer is queued on this device.'
     })
     if (!queued) setHandoff(null)
   }
@@ -436,7 +491,7 @@ function RelaySend({ projectId, projects, secrets, state, busy, run }: {
             <input type="checkbox" checked={injectionOnly} onChange={(event) => setInjectionOnly(event.target.checked)} />
             Allow command injection only. Block reveal, copy, and reshare.
           </label>
-          <p className="field-help">Queued transfers stay encrypted on this Mac. Secret values never enter this screen.</p>
+          <p className="field-help">Queued transfers stay encrypted on this device. Secret values never enter this screen.</p>
           <div className="form-actions">
             <button type="submit" disabled={busy || !source || !recipient || selected.size === 0}>Queue encrypted transfer</button>
           </div>
@@ -458,7 +513,7 @@ function RelayHandoff({ handoff, sent, onDone }: { handoff: RelayHandoffState; s
   const delivery = sent.find((item) => item.messageId === handoff.messageId)?.state
   if (delivery === 'failed' || delivery === 'expired') return null
   return (
-    <HandoffModal heading={`Sending secrets to ${handoff.recipient}`} via="relay" from="This Mac" to={handoff.recipient}
+    <HandoffModal heading={`Sending secrets to ${handoff.recipient}`} via="relay" from="This device" to={handoff.recipient}
       stage={delivery === 'received' ? 'delivered' : handoff.stage} onDone={onDone} object={{
         shape: 'key',
         title: secretCount(handoff.names.length),
@@ -491,7 +546,7 @@ function RelayActivity({ state, projects, busy, run, updateProjects, updateSecre
         }}>Delete all</button>}
       </div>
       {empty ? (
-        <div className="empty-state compact"><p>No relay delivery activity is saved on this Mac.</p></div>
+        <div className="empty-state compact"><p>No relay delivery activity is saved on this device.</p></div>
       ) : <>
         {state.sent.length > 0 && <table>
           <caption>Sent transfers</caption>
@@ -660,7 +715,7 @@ function grantText(item: RelayInboxItem): string {
   return item.accessExpiresAt ? `${use} Access expires ${formatTime(item.accessExpiresAt)}.` : `${use} Access does not expire.`
 }
 
-// The recipient approves or refuses on its own Mac. Only this window can send that decision.
+// The recipient approves or refuses on its own device. Only this window can send that decision.
 function RelayTask({ task, state, busy, run }: { task: RelayTaskItem; state: RelayState; busy: boolean; run: Run }) {
   const peer = peerName(state, task.peer)
   const decide = (decision: RelayTaskDecision['decision'], pending: string, done: string) => {
@@ -705,7 +760,7 @@ function RelayTask({ task, state, busy, run }: { task: RelayTaskItem; state: Rel
 function relayTaskText(task: RelayTaskItem): string {
   const outcome = task.exitCode === null ? '' : ` Exit code ${task.exitCode}. SCT_DEMO_TOKEN ${task.secretPresent ? 'was' : 'was not'} present.`
   if (task.direction === 'sent') {
-    if (task.state === 'delivered') return `The other Mac saved the task. Approval is due by ${formatTime(task.approveBy)}.`
+    if (task.state === 'delivered') return `The other device saved the task. Approval is due by ${formatTime(task.approveBy)}.`
     return task.finishedAt ? `Result from ${formatTime(task.finishedAt)}.${outcome}` : `Approval is due by ${formatTime(task.approveBy)}.`
   }
   if (task.state === 'awaiting-approval') return `Approve by ${formatTime(task.approveBy)}. The run injects only these grant secrets and returns no output.`
@@ -727,7 +782,7 @@ function RelayActivityRow({ item, state, busy, run }: { item: RelaySentItem; sta
     <td>{usable ? <button type="button" className="secondary" disabled={busy || state.connection !== 'connected'} onClick={() => {
       void run('Encrypting and saving the task…', async () => {
         await window.sct.queueRelayTask(item.messageId)
-        return `The task is queued. ${peerName(state, item.recipient)} must approve it on that Mac.`
+        return `The task is queued. ${peerName(state, item.recipient)} must approve it on that device.`
       })
     }}>Request run</button> : 'Not available'}</td>
     <td>{relaySentFinished(item) && <DeleteActivity activity={{ kind: 'sent', messageId: item.messageId, peer: item.recipient }}
@@ -777,7 +832,7 @@ function SendSecrets({ projectId, active, projects, secrets, peers, busy, run }:
     else projectField.current?.focus()
   }, [active, projectId])
 
-  const recipientName = peers.find((peer) => peer.id === recipient)?.name ?? 'their Mac'
+  const recipientName = peers.find((peer) => peer.id === recipient)?.name ?? 'their device'
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -811,7 +866,7 @@ function SendSecrets({ projectId, active, projects, secrets, peers, busy, run }:
               {peers.map((peer) => <option key={peer.id} value={peer.id}>{peer.name}</option>)}
             </select>
             <SecretSelection secrets={secrets} source={source} selected={selected} onChange={setSelected} />
-            <p className="field-help">Choose the same Mac in the picker. Only that Mac can open the secrets and choose a destination project.</p>
+            <p className="field-help">Choose the same device in the picker. Only that device can open the secrets and choose a destination project.</p>
             <div className="form-actions">
               <button type="submit" disabled={!source || !recipient || selected.size === 0}>
                 {busy ? 'Please wait…' : 'Send to…'}
@@ -820,7 +875,7 @@ function SendSecrets({ projectId, active, projects, secrets, peers, busy, run }:
           </fieldset>
         </form>
       )}
-      {handoff && <HandoffModal heading={`Sending secrets to ${handoff.recipient}`} from="This Mac" to={handoff.recipient}
+      {handoff && <HandoffModal heading={`Sending secrets to ${handoff.recipient}`} from="This device" to={handoff.recipient}
         stage={handoff.stage} onDone={() => setHandoff(null)} object={{
           shape: 'key',
           title: secretCount(handoff.names.length),
@@ -861,16 +916,18 @@ function SecretSelection({ secrets, source, selected, onChange }: {
   )
 }
 
-function DeviceVerification({ projectId, device, peers, busy, run, onVerified }: {
+function DeviceVerification({ projectId, device, peers, busy, run, isMac, onVerified }: {
   projectId?: string
   device: SharingDevice
   peers: SharingDevice[]
   busy: boolean
   run: Run
+  isMac: boolean
   onVerified: (device: SharingDevice) => void
 }) {
   const [pairing, setPairing] = useState<PairingPreview | null>(null)
   const [compared, setCompared] = useState(false)
+  const [link, setLink] = useState('')
   const [cardStage, setCardStage] = useState<HandoffStage | null>(null)
   const importButton = useRef<HTMLButtonElement>(null)
   const comparisonHeading = useRef<HTMLHeadingElement>(null)
@@ -896,6 +953,15 @@ function DeviceVerification({ projectId, device, peers, busy, run, onVerified }:
     })
   }
 
+  async function pastePeer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await run('Reading the pairing link…', async () => {
+      setPairing(await window.sct.previewPairingLink(link))
+      setCompared(false)
+      return ''
+    })
+  }
+
   async function confirmPeer() {
     if (!pairing) return
     await run('Saving the verified device…', async () => {
@@ -903,7 +969,7 @@ function DeviceVerification({ projectId, device, peers, busy, run, onVerified }:
       onVerified(verified)
       setPairing(null)
       setCompared(false)
-      return `${verified.name} is verified on this Mac.`
+      return `${verified.name} is verified on this device.`
     })
   }
 
@@ -912,7 +978,7 @@ function DeviceVerification({ projectId, device, peers, busy, run, onVerified }:
       {peers.length > 0 && <section className="sharing-verified" aria-labelledby="verified-heading">
         <div className="group-heading">
           <h2 id="verified-heading">Verified devices</h2>
-          <a className="button-link" href={sharingRoute('secrets', projectId)}>Continue to Send secrets</a>
+          {isMac && <a className="button-link" href={sharingRoute('secrets', projectId)}>Continue to Send secrets</a>}
         </div>
         <ul className="sharing-peers" aria-label="Verified devices">
           {peers.map((peer) => <li key={peer.id}>
@@ -925,19 +991,41 @@ function DeviceVerification({ projectId, device, peers, busy, run, onVerified }:
       </section>}
       <section className="panel" aria-labelledby="devices-heading">
       <h2 id="devices-heading">{peers.length === 0 ? 'Verify your first device' : 'Verify another device'}</h2>
-      <p>Set up both Macs once. Send your public device card, and ask them to send theirs back.</p>
+      <p>Exchange public device cards by link or file. Pairing needs no relay.</p>
       <ol className="sharing-setup">
         <li>
           <h3>Send your device card</h3>
-          <p>Choose their Mac in the picker. Your card contains public keys only.</p>
-          <button type="button" className={pairing || peers.length > 0 ? 'secondary' : undefined} disabled={busy}
-            onClick={() => { void shareCard() }}>Send my card to…</button>
-          {cardStage && <HandoffModal heading="Sending your device card" from="This Mac" to="Their Mac" stage={cardStage}
+          <p>Your card contains public keys only. Send the link or saved file to the other device.</p>
+          <div className="form-actions">
+            <button type="button" disabled={busy} onClick={() => {
+              void run('Copying the pairing link…', async () => {
+                await window.sct.copyPairingLink()
+                return 'Pairing link copied. Send it to the other device.'
+              })
+            }}>Copy pairing link</button>
+            <button type="button" className="secondary" disabled={busy} onClick={() => {
+              void run('Choose where to save your device card.', async () =>
+                await window.sct.saveDeviceCard() ? 'Device card saved. Send it to the other device.' : '')
+            }}>Save device card…</button>
+            {isMac && <button type="button" className="secondary" disabled={busy}
+              onClick={() => { void shareCard() }}>Send my card to…</button>}
+          </div>
+          {cardStage && <HandoffModal heading="Sending your device card" from="This device" to="Their Mac" stage={cardStage}
             onDone={() => setCardStage(null)} object={{ shape: 'device', name: device.name, fingerprint: device.fingerprint }} />}
         </li>
         <li>
           <h3>Import their device card</h3>
-          <p>They send you their card from .sct. macOS saves it in Downloads. Choose their .sct-device file.</p>
+          <form onSubmit={(event) => { void pastePeer(event) }}>
+            <fieldset disabled={busy}>
+              <label htmlFor="pairing-link">Paste pairing link</label>
+              <input id="pairing-link" value={link} maxLength={pairingLinkLimit} required spellCheck={false}
+                autoComplete="off" onChange={(event) => setLink(event.target.value)} />
+              <div className="form-actions">
+                <button type="submit" className="secondary" disabled={!link}>Review pairing link</button>
+              </div>
+            </fieldset>
+          </form>
+          <p>Or choose their .sct-device file.</p>
           <button ref={importButton} type="button" className="secondary" disabled={busy}
             onClick={() => { void addPeer() }}>Import .sct-device file…</button>
         </li>
@@ -946,10 +1034,10 @@ function DeviceVerification({ projectId, device, peers, busy, run, onVerified }:
         <div className="pairing-review" aria-labelledby="pairing-heading">
           <h3 ref={comparisonHeading} tabIndex={-1} id="pairing-heading">Compare codes with {pairing.device.name}</h3>
           <p className="pairing-code" aria-label="Pairing code">{pairing.code}</p>
-          <p className="field-help">Have them import your card too. Both Macs must show this exact code before either person confirms.</p>
+          <p className="field-help">Have them import your card too. Both devices must show this exact code before either person confirms.</p>
           <label className="check-field">
             <input type="checkbox" checked={compared} disabled={busy} onChange={(event) => setCompared(event.target.checked)} />
-            I compared this code on both Macs
+            I compared this code on both devices
           </label>
           <div className="form-actions">
             <button type="button" className="secondary" disabled={busy} onClick={() => {
@@ -961,12 +1049,12 @@ function DeviceVerification({ projectId, device, peers, busy, run, onVerified }:
           </div>
         </div>
       )}
-      <details className="sharing-details">
+      {isMac && <details className="sharing-details">
         <summary>Their Mac is not in the picker?</summary>
         <p>On both Macs, turn on Wi-Fi and Bluetooth. In Finder, open AirDrop and allow discovery by Everyone.</p>
-      </details>
+      </details>}
       <details className="sharing-details">
-        <summary>This Mac’s device details</summary>
+        <summary>This device’s details</summary>
         <p>{device.name}</p>
         <p className="path sharing-fingerprint">{device.fingerprint}</p>
       </details>
@@ -1027,12 +1115,12 @@ function ReceiveSecrets({ device, incoming, canImport, receipt, projects, locati
         {!canImport && <p className="field-help">Verify the sender’s device before you import their secrets.</p>}
         <ol className="sharing-setup">
           <li>
-            <h3>Ask them to send to this Mac</h3>
-            <p>They choose {device.name} in the picker. Accept the file when macOS asks.</p>
+            <h3>Ask them to send to this device</h3>
+            <p>They choose {device.name} in the picker. Accept the file when the system asks.</p>
           </li>
           <li>
             <h3>Open the received file</h3>
-            <p>macOS saves it in Downloads. Its name ends in .sct-transfer.</p>
+            <p>The file name ends in .sct-transfer.</p>
             <button type="button" className={incoming.length > 0 ? 'secondary' : undefined} disabled={busy}
               onClick={() => { void chooseFile() }}>Choose received file…</button>
           </li>

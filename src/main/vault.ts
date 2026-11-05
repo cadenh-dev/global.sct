@@ -1,5 +1,5 @@
-import { randomBytes, randomUUID } from 'node:crypto'
-import { cp, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { cp, link, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { isProjectName } from './projects.ts'
 import type { ProjectStore } from './projects.ts'
@@ -16,10 +16,12 @@ import type { SecretStore } from './key-store.ts'
 // secrets.sct layout: magic | IV | GCM tag | ciphertext. The ciphertext holds names and individually sealed values.
 const magic = Buffer.from('SCT2')
 const cleanupMagic = Buffer.from('SCG2')
+const internalMagic = Buffer.from('SCI2')
 const vaultDirectoryName = '.sct'
 const secretsFileName = 'secrets.sct'
 const headerFileName = 'vault.json'
 const cleanupFileName = 'grant-cleanup.sct'
+const internalDirectoryName = '.internal'
 const cleanupData = Buffer.from('grant-cleanup')
 const minimumPassphraseLength = 8
 
@@ -460,6 +462,87 @@ export class Vault {
     return this.serialize(() => this.readGrantCleanupOutcomes())
   }
 
+  // Internal values, such as the sharing identity and relay tokens, live under the master key.
+  // A system with no OS secret service can still create the sharing identity and store the relay token.
+  readInternal(name: string): Promise<Buffer | null> {
+    return this.serialize(async () => {
+      requireInternalName(name)
+      this.requireKey()
+      this.root = await this.readRoot()
+      let contents: Buffer
+      try {
+        contents = await readFile(this.internalFile(name))
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+        throw new Error('Cannot read the encrypted internal secret.', { cause: error })
+      }
+      const sealed = decodeFile(internalMagic, contents)
+      if (!sealed) throw new Error('The internal secret file is invalid.')
+      return this.openInternalContents(sealed, name)
+    })
+  }
+
+  // Creates the value only if no file exists. Returns the existing value when another process won the race.
+  writeInternalIfAbsent(name: string, value: Buffer): Promise<Buffer | null> {
+    return this.serialize(async () => {
+      requireInternalName(name)
+      this.requireKey()
+      this.root = await this.readRoot()
+      const file = this.internalFile(name)
+      const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
+      try {
+        await mkdir(dirname(file), { recursive: true, mode: 0o700 })
+        await writeFile(temporary, encodeFile(internalMagic, seal(this.requireKey(), value, internalData(name))), { mode: 0o600 })
+        try {
+          // A hard link exposes only the complete temporary file and fails if the target exists.
+          await link(temporary, file)
+          return null
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+          return await this.readInternalFile(file, name)
+        }
+      } catch (error) {
+        throw new Error('Cannot create the encrypted internal secret.', { cause: error })
+      } finally {
+        await rm(temporary, { force: true }).catch(() => undefined)
+      }
+    })
+  }
+
+  writeInternal(name: string, value: Buffer): Promise<void> {
+    return this.serialize(async () => {
+      requireInternalName(name)
+      this.requireKey()
+      this.root = await this.readRoot()
+      const file = this.internalFile(name)
+      // Each write uses its own temporary file, so two processes cannot rename a partial file.
+      const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
+      try {
+        await mkdir(dirname(file), { recursive: true, mode: 0o700 })
+        await writeFile(temporary, encodeFile(internalMagic, seal(this.requireKey(), value, internalData(name))), { mode: 0o600 })
+        await rename(temporary, file)
+      } catch (error) {
+        await rm(temporary, { force: true }).catch(() => undefined)
+        throw new Error('Cannot save the encrypted internal secret.', { cause: error })
+      }
+    })
+  }
+
+  private async readInternalFile(file: string, name: string): Promise<Buffer> {
+    const contents = await readFile(file)
+    const sealed = decodeFile(internalMagic, contents)
+    if (!sealed) throw new Error('The internal secret file is invalid.')
+    return this.openInternalContents(sealed, name)
+  }
+
+  private openInternalContents(sealed: { iv: Buffer; tag: Buffer; ciphertext: Buffer }, name: string): Buffer {
+    try {
+      return open(this.requireKey(), sealed, internalData(name))
+    } catch (error) {
+      throw new Error('Cannot open the encrypted internal secret.', { cause: error })
+    }
+  }
+
   private requireKey(): Buffer {
     if (!this.masterKey) throw new Error('The vault is locked. Unlock it with your passphrase.')
     return this.masterKey
@@ -616,6 +699,10 @@ export class Vault {
     }
   }
 
+  private internalFile(name: string): string {
+    return join(this.location(), internalDirectoryName, `${createHash('sha256').update(name).digest('hex')}.sct`)
+  }
+
   private async readGrantCleanupOutcomes(): Promise<GrantCleanupOutcome[]> {
     try {
       const contents = await readFile(this.cleanupFile())
@@ -670,6 +757,16 @@ export function requireExternalVault(project: Project, location: string): void {
   const storage = relative(project.directory, location)
   if (!isAbsolute(storage) && storage !== '..' && !storage.startsWith(`..${sep}`)) {
     throw new Error('Move vault storage outside the project folder before launch.')
+  }
+}
+
+function internalData(name: string): Buffer {
+  return Buffer.from(`internal/${name}`)
+}
+
+function requireInternalName(name: unknown): asserts name is string {
+  if (typeof name !== 'string' || !/^[a-z][a-z0-9/_-]{0,200}$/.test(name)) {
+    throw new Error('The internal secret name is invalid.')
   }
 }
 

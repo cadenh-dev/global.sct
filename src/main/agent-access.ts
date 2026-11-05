@@ -92,7 +92,7 @@ export class AgentAccess {
     const request = this.requests.get(response.data.id)
     if (!request || request.view.status !== 'pending') throw new Error('This request is no longer awaiting approval.')
     if (!response.data.approved) return this.cancel(response.data.id, 'refused')
-    if (request.view.pairing && !response.data.comparedCode) throw new Error('Compare the pairing code on both Macs before approval.')
+    if (request.view.pairing && !response.data.comparedCode) throw new Error('Compare the pairing code on both devices before approval.')
     if (!request.view.caller.verified && !response.data.startedByMe) throw new Error('Confirm that you started this request before approval.')
     requireActive(request)
     clearTimeout(request.timer)
@@ -104,7 +104,7 @@ export class AgentAccess {
     } catch {
       if (!request.controller.signal.aborted) {
         request.finish({ requestId: request.view.id, status: Date.now() >= Date.parse(request.view.expiresAt) ? 'expired' : 'failed',
-          error: 'The approved operation could not complete. Check the local project, storage, and Keychain.' })
+          error: 'The approved operation could not complete. Check the local project, vault, and storage.' })
       }
     }
   }
@@ -136,11 +136,12 @@ export class AgentAccess {
     if (submission.operation === 'pair_device') {
       if (submission.input.action === 'export') {
         if (submission.input.path) throw new Error('Export accepts no input path.')
-        return { view: { secrets: [], detail: 'Send this Mac’s public device card to a nearby Mac.' } }
+        if (process.platform !== 'darwin') throw new Error('Device-card sharing requires macOS. Use the relay to pair devices.')
+        return { view: { secrets: [], detail: 'Send this device’s public device card to a nearby device.' } }
       }
       if (!submission.input.path) throw new Error('A device card path is required.')
       const preview = await (await this.services.sharing()).previewPeer(submission.input.path)
-      return { pairingToken: preview.token, view: { secrets: [], detail: 'Verify the other Mac after comparing the pairing code.',
+      return { pairingToken: preview.token, view: { secrets: [], detail: 'Verify the other device after comparing the pairing code.',
         pairing: { name: preview.device.name, fingerprint: preview.device.fingerprint, code: preview.code } } }
     }
     if (submission.operation === 'request_remote_demo') {
@@ -148,7 +149,7 @@ export class AgentAccess {
       const grant = state.sent.find((item) => item.messageId === submission.input.grantId && item.state === 'received')
       if (!grant) throw new Error('Select a relay transfer that the recipient imported.')
       const peer = state.peers.find((item) => item.identity === grant.recipient)?.name ?? grant.recipient.slice(0, 12)
-      return { view: { secrets: [], detail: `Ask ${peer} to run the fixed environment demo with the secrets of relay transfer ${grant.messageId}. That Mac must also approve. The .sct app sends the request. The result can arrive later.` } }
+      return { view: { secrets: [], detail: `Ask ${peer} to run the fixed environment demo with the secrets of relay transfer ${grant.messageId}. That device must also approve. The .sct app sends the request. The result can arrive later.` } }
     }
     if (submission.operation === 'sharing_state' || submission.operation === 'relay_status') {
       return { view: { secrets: [], detail: submission.operation === 'sharing_state'
@@ -166,9 +167,10 @@ export class AgentAccess {
     if (submission.operation === 'run_demo' && (ids.length === 1) === (stdinValue !== undefined)) throw new Error('Choose exactly one input source.')
     let detail: string
     if (submission.operation === 'send_secrets_to') {
+      if (process.platform !== 'darwin') throw new Error('AirDrop sharing requires macOS. Use the relay to send secrets.')
       const recipient = (await (await this.services.sharing()).state()).peers.find((peer) => peer.id === submission.input.recipientId)
       if (!recipient) throw new Error('Verify the recipient first.')
-      detail = `Encrypt the selected secrets for ${recipient.name} (${recipient.fingerprint}). Choose that Mac in the picker. Delivery remains unconfirmed.`
+      detail = `Encrypt the selected secrets for ${recipient.name} (${recipient.fingerprint}). Choose that device in the picker. Delivery remains unconfirmed.`
     } else if (submission.operation === 'run_demo') {
       detail = `Run the fixed environment demo with ${stdinValue !== undefined ? 'a value from stdin' : 'the selected saved secret'}. The child can read its input. Return no process logs.`
     } else detail = submission.operation === 'delete_secret' ? 'Permanently delete this saved secret.' : 'Read this secret’s metadata. Return no value.'

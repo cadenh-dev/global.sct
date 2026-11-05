@@ -1,30 +1,38 @@
-# Sharing between Macs
+# Sharing between devices
 
-.sct sends encrypted copies of secrets to a verified Mac through AirDrop.
-The flow needs no relay, no agent, and no network connection other than AirDrop.
-The **Sharing** screen has four tabs: **Verify devices**, **Send secrets**, **Receive secrets**, and **Relay**.
-This page describes the first three tabs. See [relay setup](relay.md) for the **Relay** tab.
+Device pairing works on macOS, Windows, and Linux.
+The pairing link and the `.sct-device` file contain public keys only.
+AirDrop sending is macOS-only.
+On Windows and Linux, use the **Relay** tab to send and receive.
+
+.sct sends encrypted copies of secrets to a verified device.
+The AirDrop flow needs no relay, no agent, and no network connection other than AirDrop.
+On macOS, the **Sharing** screen has four tabs: **Verify devices**, **Send secrets**, **Receive secrets**, and **Relay**.
+On Windows and Linux, it has two tabs: **Verify devices** and **Relay**.
+This page describes pairing and the macOS AirDrop tabs. See [relay setup](relay.md) for the **Relay** tab.
+See [Windows and Linux](windows-linux.md) for the platform limits.
 
 Build the signed app with `bun run package:mac`. Then macOS opens `.sct-transfer` files in .sct.
 The development window registers no file type.
 
 ## Verify a device one time
 
-When you open **Sharing** for the first time, .sct creates a sharing identity in macOS Keychain.
-Do these steps on both Macs:
+When you open **Sharing** for the first time, .sct creates a sharing identity in the vault.
+Do these steps on both devices:
 
 1. Open **Sharing**, then open the **Verify devices** tab.
-2. Select **Send my card to…**.
-3. In the picker, choose the other Mac. The device card contains public keys only.
-4. Ask the other person to send their card to you.
-5. Select **Import .sct-device file…**. The file picker opens in Downloads.
-6. Choose their card.
-7. Compare the full pairing code on both Macs. Use a trusted conversation, for example in person or on a call.
-8. If both codes are the same, select **I compared this code on both Macs**. Then select **Confirm recipient**.
-9. If the codes are different, select **Cancel verification**.
+2. Select **Copy pairing link**, or select **Save device card…** to write a `.sct-device` file.
+3. Send the link or the file to the other device.
+4. Ask the other person to send their link or file back.
+5. Paste the link and select **Review pairing link**. Or select **Import .sct-device file…** and choose their card.
+6. Compare the full pairing code on both devices. Use a trusted conversation, for example in person or on a call.
+7. If both codes are the same, select **I compared this code on both devices**. Then select **Confirm recipient**.
+8. If the codes are different, select **Cancel verification**.
 
-If the keys of one Mac change, verify that device again.
+On macOS, you can also select **Send my card to…** and choose the other Mac in the AirDrop picker.
+If the keys of one device change, verify that device again.
 The **Send secrets** tab stays unavailable until you verify one device.
+On Windows and Linux, sending waits for the Link or Direct transport.
 
 ## Send
 

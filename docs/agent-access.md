@@ -78,19 +78,20 @@ Keep vault storage outside source folders. No operation creates an `.env` file o
 
 .sct identifies the calling program before it checks the request.
 It reads the parent processes up to the first process with a listed agent name.
-Then `codesign` checks that running process against the agent's signing requirement.
+Then the platform signature check tests that running process against the agent's requirement.
 
-| Agent | Executable name | Signing requirement |
-|---|---|---|
-| Claude Code | `claude` | Identifier `com.anthropic.claude-code`, Apple Developer ID, Team ID `Q6L2SF6YDW` |
+| Agent | Executable name | macOS | Windows | Linux |
+|---|---|---|---|---|
+| Claude Code | `claude`, `claude.exe` | Identifier `com.anthropic.claude-code`, Apple Developer ID, Team ID `Q6L2SF6YDW` | Authenticode signature with an `Anthropic` subject | No code signature. The caller is unverified |
 
 `src/main/caller.ts` contains this list.
 The MCP client is usually the direct parent of `sct mcp`.
 A shell tool usually starts `sct agent`, so the agent is a more distant ancestor.
 
 - A listed agent that passes its check becomes a verified caller. The approval window shows its name.
-- A process with a listed agent name that fails the check is an impostor. .sct rejects each request before local approval.
+- A process with a listed agent name that fails the macOS or Windows check is an impostor. .sct rejects each request before local approval.
   The result has status `failed` and names the failed signature check.
+- On Linux, a listed agent name gives an unverified caller. Linux has no code signature to check.
 - If no listed agent is among the ancestors, the approval window labels the caller as unverified.
   Before approval, the user must also select **I started this request myself**.
 
@@ -127,6 +128,19 @@ Configure an MCP client with the installed executable:
 ```
 
 Replace the command path with your installed CLI path. Claude Code also accepts `${HOME}/.local/bin/sct`.
+On Windows, a direct MCP client cannot start the `sct.cmd` shim. Use the full `sct.exe` path, or start the shim through `cmd`:
+
+```json
+{
+  "mcpServers": {
+    "sct": {
+      "command": "cmd",
+      "args": ["/c", "sct", "mcp"]
+    }
+  }
+}
+```
+
 This configuration contains no credentials and needs no environment settings for local operations.
 The client must connect stdin and stdout through private pipes.
 Stdout carries MCP messages only. Fixed diagnostics use stderr without submitted contents.

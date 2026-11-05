@@ -7,18 +7,18 @@ The OS secret store is optional. A passphrase always opens the vault.
 
 ## Set up one time
 
-1. Build the signed app: `bun run package:mac`. If the build reports a missing identity, do the [local signing setup](macos-signing.md).
+1. Build the app for your platform: `bun run package:mac`, `bun run package:win`, or `bun run package:linux`.
+   On macOS, if the build reports a missing identity, do the [local signing setup](macos-signing.md).
 2. Install the `sct` command: `bun run install:cli`.
-3. If the installer tells you that `~/.local/bin` is not in `PATH`, add this line to `~/.zshrc`:
-
-   ```sh
-   export PATH="$HOME/.local/bin:$PATH"
-   ```
-
-4. Open a new terminal.
-5. Open `dist/sct-darwin-arm64/sct.app`. On an Intel Mac, use `sct-darwin-x64`.
-6. Register your existing project folder.
-7. Save the variables of the project under **Open secrets**.
+3. If the installer tells you that the command folder is not in `PATH`, add it, then open a new terminal.
+   - macOS and Linux: `export PATH="$HOME/.local/bin:$PATH"` in `~/.zshrc` or `~/.profile`.
+   - Windows: add `%LOCALAPPDATA%\Programs\sct\bin` to the user `PATH`.
+4. Open the app from `dist/`:
+   - macOS: `dist/sct-darwin-arm64/sct.app` on Apple Silicon, or `sct-darwin-x64` on Intel.
+   - Windows: `dist/sct-win32-<arch>/sct.exe`.
+   - Linux: `dist/sct-linux-<arch>/sct`.
+5. Register your existing project folder.
+6. Save the variables of the project under **Open secrets**.
 
 Keep the vault outside the source folder. The project needs no `.sct` configuration file.
 The desktop window can be open or closed during injection.
@@ -34,12 +34,15 @@ Each CLI path needs an unlocked vault.
 
 ### The `sct` command script
 
-The installer writes `~/.local/bin/sct` as a shell script. The script runs the signed executable with `exec`.
+On macOS and Linux, the installer writes `~/.local/bin/sct` as a shell script. The script runs the signed executable with `exec`.
+On Windows, the installer writes `%LOCALAPPDATA%\Programs\sct\bin\sct.cmd` and `sct.json`.
 Electron finds its helper apps only from the real executable path. Thus the command is not a symbolic link.
 
 - The installer replaces an earlier .sct symbolic link to the same executable.
 - The installer keeps other commands. It rejects a script or a link for another application.
 - After a rebuild, the script uses the same app location. If you move the app, install the command again.
+- A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
+- The `@sct/env` SDK reads `sct.json` on Windows. Set `SCT_CLI` to use another executable path.
 
 ## CLI: one command in your project
 
@@ -79,7 +82,29 @@ Use this behavior only for development commands whose restart side effects you a
 2. .sct waits a maximum of two seconds for the group to stop. Then it stops the remaining members.
 3. .sct starts the command again.
 
+Windows has no process groups. .sct uses `taskkill /T` and then `taskkill /T /F` after the grace period.
+A Windows command cannot always exit cleanly after Ctrl+C.
 A process that moves to another session stays under the control of the program that started it.
+
+### Interactive shells
+
+A restart ends a shell session. A command in a new process group also loses job control in its terminal.
+Use `--interactive` for a shell:
+
+```sh
+sct run --interactive -- zsh
+sct run --interactive "My project" -- pwsh.exe
+```
+
+With `--interactive`, these rules apply:
+
+- The shell stays in the terminal of `sct`. On POSIX, it is not in a new session. On Windows, it uses the same console window.
+- .sct does not restart the shell. When a saved key changes, .sct writes "Secrets changed. Open a new terminal." one time. The shell keeps its start values.
+- The terminal sends Ctrl+C and hang-up to the shell. .sct ignores these signals and forwards nothing.
+- `SIGTERM` to `sct` stops the shell, so no shell with secrets stays after `sct` exits.
+- The exit code is the exit code of the shell.
+
+On Windows, give the executable of the shell, for example `pwsh.exe` or `cmd.exe`. .sct starts no shell for you, so a `.cmd` or `.bat` file cannot start.
 
 ### Input, signals, and exit codes
 
@@ -103,7 +128,8 @@ It keeps `process.env` current without a restart.
 
 - Build the SDK with `bun run build:sdk`.
 - Install it with `bun add /absolute/path/to/.sct/packages/env`.
-- It needs macOS, Node.js 22.18 or later or Bun, and the installed `sct` command on `PATH`.
+- It needs macOS, Windows, or Linux, Node.js 22.18 or later or Bun, and the installed `sct` command.
+  On Windows, the SDK reads `sct.json` from the install folder. Set `SCT_CLI` to use another executable path.
 
 The SDK starts a signed helper through private stdin and stdout pipes. It receives only the values of the selected project.
 It opens no local server and uses no network service.
@@ -150,7 +176,7 @@ The #32 Python checks do not apply to the TypeScript SDK. The SDK has no Python 
 - Vault files stay encrypted in the external `.sct/[project-name]/secrets.sct` folder.
 - The vault clears decrypted Buffers and copied value keys after use. It deletes temporary environment references after use.
 - `sct run` and the SDK make no plaintext secret file, project manifest, copied key, symbolic link, or FIFO in the project.
-- The `sct` command script is in `~/.local/bin`, outside the project.
+- The `sct` command script is outside the project: `~/.local/bin` on macOS and Linux, or `%LOCALAPPDATA%\Programs\sct\bin` on Windows.
 - The renderer API returns metadata only.
 
 A program and its descendants can copy, print, save, or send their environment. Run only code that you trust.

@@ -63,10 +63,10 @@ export function CardsView() {
         {handoff && <HandoffModal heading="Sending a mock card" from="This Mac" to="iPhone" toDevice="phone" stage={handoff.stage}
           object={{ shape: 'card', label: 'Not a payment card', title: handoff.cardholder, detail: handoff.label, back: cardNotice }}
           onDone={() => setHandoff(null)} />}
-        <details className="sharing-details">
+        {window.sct.platform === 'darwin' && <details className="sharing-details">
           <summary>The iPhone is not in the picker?</summary>
           <p>On the iPhone, open Control Center and set AirDrop to Everyone for 10 Minutes. Turn on Wi-Fi and Bluetooth on both devices.</p>
-        </details>
+        </details>}
       </section>
     </>
   )

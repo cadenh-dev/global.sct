@@ -13,7 +13,7 @@ import type { RelayTransferPreview, Sharing } from './sharing'
 import { readDeviceCard, relayPairingCode } from './transfer'
 import type { DeviceCard } from './transfer'
 import type { SecretMetadata } from '../shared/secrets'
-import type { GrantCleanupOutcome } from './vault'
+import type { GrantCleanupOutcome, Vault } from './vault'
 import type { RelayMessageKind, RelayTaskOutcome } from '../shared/envelope'
 import { relayInboxFinished, relaySentFinished, relayTaskFinished } from '../shared/relay'
 import type { RelayAcceptInput, RelayActivityKey, RelayConnection, RelayDeliveryState, RelayInboxItem, RelayPeer, RelayQueueInput,
@@ -241,6 +241,7 @@ export class Relay {
   constructor(private readonly server: RelayServer | undefined, private readonly directory: string,
     private readonly crypto: () => Promise<RelayCrypto>,
     private readonly changed: () => void,
+    private readonly vault: Vault,
     private readonly writer?: RelayWriter,
     private readonly service = '.sct-relay') {
     this.status = server ? 'connecting' : 'off'
@@ -372,7 +373,7 @@ export class Relay {
     })
   }
 
-  // Only a decision from this Mac's window reaches this method. The digest ties the decision to one exact task.
+  // Only a decision from this device's window reaches this method. The digest ties the decision to one exact task.
   async respondTask(value: unknown): Promise<void> {
     const writer = this.requireWriter()
     const input = requireTaskDecision(value)
@@ -383,7 +384,7 @@ export class Relay {
       outcome = { state: 'completed', ...await writer.runTask(claim.projectId, claim.task.grantId), reason: null }
     } catch {
       outcome = { state: 'failed', exitCode: null, secretPresent: null,
-        reason: 'The fixed demo could not run. Check the project, storage, and Keychain.' }
+        reason: 'The fixed demo could not run. Check the project, vault, and storage.' }
     }
     await this.serialize(() => this.updateTask(claim.task.messageId, { ...outcome, finishedAt: Date.now() }))
   }
@@ -398,7 +399,7 @@ export class Relay {
     }
     if (task.state !== 'awaiting-approval') throw new Error('This task is no longer awaiting approval.')
     if (input.decision === 'refuse') {
-      await this.updateTask(task.messageId, { state: 'refused', finishedAt: Date.now(), reason: 'The user refused this task on this Mac.' })
+      await this.updateTask(task.messageId, { state: 'refused', finishedAt: Date.now(), reason: 'The user refused this task on this device.' })
       return null
     }
     if (this.tasks.some((item) => item.state === 'uncertain' && !item.reviewed)) {
@@ -440,10 +441,10 @@ export class Relay {
     return request.id
   }
 
-  // A task can use only a grant that this Mac sent to that recipient and that the recipient imported.
+  // A task can use only a grant that this device sent to that recipient and that the recipient imported.
   private async grantRecipient(grantId: string): Promise<RelayPeerKeys> {
     const grant = this.outbox.find((item) => item.kind === 'transfer' && item.messageId === grantId)
-    if (!grant) throw new Error('Select a relay transfer that this Mac sent.')
+    if (!grant) throw new Error('Select a relay transfer that this device sent.')
     if (!this.cache.sent.some((item) => item.messageId === grantId && item.recipient === grant.recipient && item.status === 'Received')) {
       throw new Error('The recipient has not imported this transfer yet.')
     }
@@ -621,12 +622,15 @@ export class Relay {
     this.error = null
     this.cache = { ...this.cache, identity: identity.toHexString() }
     this.update('connected')
-    if (token !== savedToken) {
+    if (this.writer && token !== savedToken) {
+      const bytes = Buffer.from(token)
       try {
-        await this.entry(`token/${this.serverName()}`).setPassword(token)
+        await this.vault.writeInternal(this.tokenName(), bytes)
       } catch (error) {
         this.error = `Cannot save the relay token. This device gets a new relay identity at the next start. ${message(error)}`
         this.changed()
+      } finally {
+        bytes.fill(0)
       }
     }
     await this.register(connection)
@@ -945,7 +949,7 @@ export class Relay {
     const opened = await crypto.openRelayMessage(identity, sender, 'result', Buffer.from(incoming.payload, 'base64'),
       Buffer.from(incoming.wrappedKey, 'base64'))
     if (!this.outbox.some((item) => item.kind === 'task' && item.messageId === opened.contents.taskId && item.recipient === sender.identity)) {
-      throw new Error('This result answers no task that this Mac sent to that device.')
+      throw new Error('This result answers no task that this device sent to that device.')
     }
     return {
       messageId: incoming.messageId, digest: opened.digest, sender: sender.identity, deliverBy: opened.transfer.deliverBy,
@@ -1230,7 +1234,9 @@ export class Relay {
   }
 
   private async readToken(): Promise<string | undefined> {
-    return (await this.entry(`token/${this.serverName()}`).getPassword()) ?? undefined
+    const saved = await this.vault.readInternal(this.tokenName())
+    if (saved === null) return undefined
+    try { return saved.toString('utf8') } finally { saved.fill(0) }
   }
 
   // An unreadable file returns the empty value. The cache refills from the next subscription.
@@ -1276,6 +1282,11 @@ export class Relay {
   private serverName(): string {
     const server = requireServer(this.server)
     return `${server.uri}/${server.database}`
+  }
+
+  // The token name stays inside the internal-name grammar. The hash selects one token for each relay server.
+  private tokenName(): string {
+    return `relay/token/${createHash('sha256').update(this.serverName()).digest('hex')}`
   }
 
   private entry(account: string): AsyncEntry {

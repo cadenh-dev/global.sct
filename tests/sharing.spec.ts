@@ -4,6 +4,9 @@ import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { unlock } from './ui'
+
+const passphrase = 'test passphrase for the vault'
 
 test('shares selected secrets into the recipient project without exposing values', async () => {
   test.setTimeout(90_000)
@@ -25,6 +28,8 @@ test('shares selected secrets into the recipient project without exposing values
     if (!sender || !recipient) throw new Error('Both .sct windows must start.')
     const source = await sender.app.firstWindow()
     const destination = await recipient.app.firstWindow()
+    await unlock(source, passphrase)
+    await unlock(destination, passphrase)
     const errors: string[] = []
     for (const { app } of applications) {
       await app.evaluate(() => {
@@ -55,7 +60,7 @@ test('shares selected secrets into the recipient project without exposing values
       await expect(page.getByText('The relay is off. Set SCT_RELAY to connect this app.')).toBeVisible()
       await expect(page.getByLabel('Other device’s relay ID')).toBeDisabled()
       await expect(page.getByRole('heading', { name: 'Delivery activity', exact: true })).toBeVisible()
-      await expect(page.getByText('No relay delivery activity is saved on this Mac.')).toBeVisible()
+      await expect(page.getByText('No relay delivery activity is saved on this device.')).toBeVisible()
       if (page === source) {
         await page.setViewportSize({ width: 1440, height: 900 })
         await page.screenshot({ path: test.info().outputPath('relay-desktop.png'), fullPage: true })
@@ -84,7 +89,7 @@ test('shares selected secrets into the recipient project without exposing values
     await expect(destination.getByRole('button', { name: 'Confirm recipient' })).toBeDisabled()
     await expect(source.getByLabel('Pairing code')).toHaveText(await destination.getByLabel('Pairing code').innerText())
     for (const page of [source, destination]) {
-      await page.getByLabel('I compared this code on both Macs').check()
+      await page.getByLabel('I compared this code on both devices').check()
       await page.getByRole('button', { name: 'Confirm recipient' }).click()
       await expect(page.getByRole('list', { name: 'Verified devices' })).toBeVisible()
       await expect(page.getByRole('navigation', { name: 'Sharing', exact: true })

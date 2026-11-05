@@ -1,11 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerMonitor } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, powerMonitor } from 'electron'
 import type { IpcMainInvokeEvent, OpenDialogOptions } from 'electron'
 import { execFile } from 'node:child_process'
 import { homedir, hostname } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { rmSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
+import { readdir, writeFile } from 'node:fs/promises'
 import { ProjectStore } from './projects'
 import { Vault } from './vault'
 import { createSecretStore } from './key-store'
@@ -15,17 +15,22 @@ import { AgentAccess } from './agent-access'
 import { identifyCaller } from './caller'
 import { streamEnvironment } from './runtime'
 import { Sharing } from './sharing'
+import { encodePairingLink } from './transfer'
 import { Cards } from './cards'
 import type { Relay } from './relay-connection'
-import type { Reply } from '../shared/api'
+import { readThemePreference, writeThemePreference } from './preferences'
+import type { Reply, ThemePreference, ThemeVariant } from '../shared/api'
 
 let mainWindow: BrowserWindow | null = null
 const launchArguments = process.argv.slice(process.defaultApp ? 2 : 1)
+const cliLaunch = ['run', '_env', 'agent', 'mcp', 'skills', '--version'].includes(launchArguments[0])
+const desktopMode = !cliLaunch
 const incomingFiles: string[] = []
 let sharing: Sharing | undefined
 let openingFiles = false
 let pendingUnlock: (() => void) | undefined
 let desktopStarted: Promise<void> | undefined
+let themePreference: Promise<ThemePreference> | undefined
 
 // macOS can deliver a document before the app and its renderer are ready.
 app.on('open-file', (event, path) => {
@@ -60,16 +65,60 @@ function rendererPage(): string {
   return join(__dirname, '../renderer/index.html')
 }
 
+// The window shows this color before the renderer paints. Each value is the --color-paper token of its variant in styles.css.
+const windowBackground: Record<ThemeVariant, string> = { terminal: '#040805', cream: '#f3ead9' }
+
+// themeSource also sets the native dialogs, the scrollbars, and prefers-color-scheme.
+function loadTheme(): Promise<ThemePreference> {
+  themePreference ??= readThemePreference(preferencesFile()).then((preference) => {
+    nativeTheme.themeSource = preference
+    return preference
+  })
+  return themePreference
+}
+
+// For `system`, Electron resolves the OS setting into shouldUseDarkColors.
+function themeVariant(): ThemeVariant {
+  return nativeTheme.shouldUseDarkColors ? 'terminal' : 'cream'
+}
+
+function preferencesFile(): string {
+  return join(app.getPath('userData'), 'preferences.json')
+}
+
+function registerThemeHandlers(): void {
+  handle('preferences:get-theme', () => loadTheme())
+  handle('preferences:set-theme', async (input) => {
+    const preference = await writeThemePreference(preferencesFile(), input)
+    themePreference = Promise.resolve(preference)
+    nativeTheme.themeSource = preference
+    themeChanged()
+    return themeVariant()
+  })
+  // The OS setting can change while the app is open. Only `system` follows it, because themeSource fixes the other values.
+  nativeTheme.on('updated', themeChanged)
+}
+
+function themeChanged(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  const variant = themeVariant()
+  mainWindow.setBackgroundColor(windowBackground[variant])
+  mainWindow.webContents.send('theme:changed', variant)
+}
+
 async function createWindow(hash = incomingFiles.length ? '/sharing' : undefined): Promise<BrowserWindow> {
+  await loadTheme()
+  const variant = themeVariant()
   const window = new BrowserWindow({
     title: '.sct',
     width: 1000,
     height: 720,
     minWidth: 640,
     minHeight: 520,
-    backgroundColor: '#040805',
+    backgroundColor: windowBackground[variant],
     show: false,
     webPreferences: {
+      additionalArguments: [`--sct-theme=${variant}`],
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       sandbox: true,
@@ -113,14 +162,20 @@ function reportStartupError(error: unknown): void {
 }
 
 app.setName('.sct')
-nativeTheme.themeSource = 'dark'
 app.whenReady().then(async () => {
+  if (launchArguments[0] === '--version') {
+    if (launchArguments.length !== 1) throw new Error('Usage: sct --version. Return the .sct version.')
+    await writeCliOutput(app.getVersion())
+    app.exit(0)
+    return
+  }
   if (launchArguments[0] === 'skills') {
     if (launchArguments.length !== 1) throw new Error('Usage: sct skills. Return the bundled skill directory and names.')
     await writeCliOutput(JSON.stringify({ directory: skillsDirectory(), skills: (await readdir(skillsDirectory())).filter((name) => name.startsWith('sct-')) }))
     app.exit(0)
     return
   }
+  registerThemeHandlers()
   const projects = new ProjectStore(join(app.getPath('userData'), 'projects.json'))
   const store = await createSecretStore('.sct')
   const vault = new Vault(projects, join(app.getPath('userData'), 'settings.json'), homedir(), store)
@@ -149,7 +204,7 @@ app.whenReady().then(async () => {
   }
   await createWindow('/unlock')
 }).catch((error: unknown) => {
-  if (['run', '_env', 'agent', 'mcp', 'skills'].includes(launchArguments[0])) {
+  if (['run', '_env', 'agent', 'mcp', 'skills', '--version'].includes(launchArguments[0])) {
     console.error(error instanceof Error ? error.message : 'The project command could not start.')
     app.exit(1)
   } else {
@@ -214,7 +269,7 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   const { Relay, relayServer } = await import('./relay-connection')
   // Only this process writes relay files and runs remote tasks. Agent sessions open a passive relay.
   const relay = new Relay(relayServer(), join(app.getPath('userData'), 'relay'), async () => service,
-    () => mainWindow?.webContents.send('relay:changed'), {
+    () => mainWindow?.webContents.send('relay:changed'), vault, {
       runTask: async (projectId, grantId) => demoOutcome(await vault.withGrantSecrets(projectId, grantId,
         (project, values) => startFixedDemo(project, values, process.execPath, demoFile()))),
       cleanupGrants: () => vault.cleanupExpiredGrants()
@@ -283,7 +338,7 @@ async function runAgentSession(projects: ProjectStore, vault: Vault): Promise<nu
   // The agent session relay is passive. It reads relay rows and files, and writes only new task requests.
   const getRelay = () => relay ??= (async () => {
     const { Relay, relayServer } = await import('./relay-connection')
-    const service = new Relay(relayServer(), join(app.getPath('userData'), 'relay'), getSharing, () => undefined)
+    const service = new Relay(relayServer(), join(app.getPath('userData'), 'relay'), getSharing, () => undefined, vault)
     await service.start()
     return service
   })()
@@ -342,12 +397,26 @@ function skillsDirectory(): string {
 }
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // A CLI session closes its unlock window and must keep running. Only the desktop window ends the app.
+  if (process.platform !== 'darwin' && desktopMode) app.quit()
 })
 
 function registerSharing(service: Sharing): void {
   handle('sharing:state', () => service.state())
   handle('sharing:device-card', async () => sendToNearbyMac(await service.deviceCardFile()))
+  handle('sharing:copy-pairing-link', async () => clipboard.writeText(encodePairingLink(await service.deviceCard())))
+  handle('sharing:save-device-card', async () => {
+    if (!mainWindow) throw new Error('The .sct window is unavailable.')
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save your device card',
+      defaultPath: join(app.getPath('downloads'), 'device.sct-device'),
+      filters: [{ name: '.sct device card', extensions: ['sct-device'] }]
+    })
+    if (result.canceled || !result.filePath) return false
+    await writeFile(result.filePath, JSON.stringify(await service.deviceCard()), { mode: 0o600 })
+    return true
+  })
+  handle('sharing:preview-pairing-link', (link) => service.previewPeer({ link }))
   handle('sharing:pick-peer', async () => {
     const path = await pickDirectory({ title: 'Verify a recipient device', properties: ['openFile'], defaultPath: app.getPath('downloads'),
       filters: [{ name: '.sct device card', extensions: ['sct-device'] }] })

@@ -6,6 +6,5 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist/index.js", "dist/index.d.ts", "README.md"],
   "engines": { "node": ">=22.18.0" },
-  "os": ["darwin"],
   "license": "UNLICENSED"
 }

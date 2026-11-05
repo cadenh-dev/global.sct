@@ -31,7 +31,7 @@ test('invalid paths, files, and duplicate folders do not change saved projects',
     await assert.rejects(store.add(input))
   }
   await assert.rejects(store.add({ name: 'Duplicate', directory: root }), /already/)
-  await symlink(root, join(root, 'alias'))
+  await symlink(root, join(root, 'alias'), process.platform === 'win32' ? 'junction' : 'dir')
   await assert.rejects(store.add({ name: 'Alias', directory: join(root, 'alias') }), /already/)
   assert.deepEqual(await store.list(), [project])
 })

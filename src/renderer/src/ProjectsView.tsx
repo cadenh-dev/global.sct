@@ -30,7 +30,7 @@ export function ProjectsView({ projects, secrets, updateProjects, updateSecrets 
       const selected = await window.sct.pickDirectory()
       if (!selected) return ''
       setDirectory(selected)
-      if (!name.trim()) setName(selected.split('/').filter(Boolean).at(-1) ?? 'Project')
+      if (!name.trim()) setName(selected.split(/[\\/]/).filter(Boolean).at(-1) ?? 'Project')
       return ''
     })
   }
@@ -72,7 +72,7 @@ export function ProjectsView({ projects, secrets, updateProjects, updateSecrets 
       {adding && (
         <section className="panel" aria-labelledby="add-heading">
           <h2 id="add-heading">Add a project</h2>
-          <p>Choose an existing folder on your Mac. Your files stay where they are.</p>
+          <p>Choose an existing folder on this device. Your files stay where they are.</p>
           <form onSubmit={(event) => { void save(event) }}>
             <fieldset disabled={operation.busy}>
               <label htmlFor="project-name">Project name</label>
@@ -81,7 +81,7 @@ export function ProjectsView({ projects, secrets, updateProjects, updateSecrets 
               <label htmlFor="project-directory">Folder path</label>
               <div className="folder-field">
                 <input id="project-directory" value={directory} maxLength={4096} required
-                  placeholder="/Users/you/projects/my-project" aria-describedby="folder-help"
+                  placeholder="~/projects/my-project" aria-describedby="folder-help"
                   onChange={(event) => setDirectory(event.target.value)} />
                 <button type="button" className="secondary" onClick={() => { void browse() }}>Choose folder…</button>
               </div>
@@ -109,10 +109,10 @@ export function ProjectsView({ projects, secrets, updateProjects, updateSecrets 
         <section className="empty-state" aria-labelledby="empty-heading">
           <h2 id="empty-heading">Your projects start here</h2>
           <p>Add an existing folder to get started.</p>
-          <p className="empty-note">Your files stay on this Mac.</p>
+          <p className="empty-note">Your files stay on this device.</p>
         </section>
       )}
-      <footer>Project names and folder paths are saved on this Mac.</footer>
+      <footer>Project names and folder paths are saved on this device.</footer>
     </>
   )
 }
@@ -180,7 +180,7 @@ function ProjectRow({ project, secretCount, busy, run, updateProjects, updateSec
       <li>
         <form className="inline-form" aria-label={`Delete ${project.name}`} onSubmit={(event) => { void remove(event) }}>
           <fieldset disabled={busy}>
-            <p>Delete {project.name} and all of its secrets? .sct removes the vault folder and Keychain keys of this project. The project folder does not change.</p>
+            <p>Delete {project.name} and all of its secrets? .sct removes the vault folder and encrypted entries of this project. The project folder does not change.</p>
             <label htmlFor={`delete-${project.id}`}>Type {project.name} to confirm</label>
             <div className="inline-field">
               <input ref={field} id={`delete-${project.id}`} value={confirmation} autoComplete="off"

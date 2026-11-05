@@ -1,0 +1,23 @@
+{
+  "name": "sct-vscode",
+  "displayName": ".sct",
+  "description": "Show .sct secret metadata and open a terminal with project secrets.",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": { "vscode": "^1.145.0" },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "sct.showStatus", "title": "Show .sct status" },
+      { "command": "sct.refreshSecrets", "title": "Refresh .sct secrets", "icon": "$(refresh)" },
+      { "command": "sct.openTerminal", "title": "Open terminal with .sct secrets" }
+    ],
+    "views": {
+      "explorer": [{ "id": "sct.secrets", "name": ".sct secrets" }]
+    },
+    "menus": {
+      "view/title": [{ "command": "sct.refreshSecrets", "when": "view == sct.secrets", "group": "navigation" }]
+    }
+  }
+}

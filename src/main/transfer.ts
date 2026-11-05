@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, createPrivateKey, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, randomUUID, sign, verify } from 'node:crypto'
 import type { KeyObject } from 'node:crypto'
 import type { SharingDevice } from '../shared/sharing'
+import { pairingLinkLimit } from '../shared/sharing'
 
 export const transferLimit = 8 * 1024 * 1024
 export const transferLifetime = 24 * 60 * 60 * 1000
@@ -72,7 +73,37 @@ export function decodeIdentity(contents: Buffer): DeviceIdentity {
 }
 
 export function readDeviceCard(contents: Buffer): DeviceCard {
+  if (contents.length > 4096) throw invalid()
   return requireCard(readObject(contents))
+}
+
+export function encodePairingLink(card: DeviceCard): string {
+  const contents = Buffer.from(JSON.stringify(card))
+  readDeviceCard(contents)
+  return `sct://pair/v1/${contents.toString('base64url')}`
+}
+
+export function readPairingLink(input: unknown): DeviceCard {
+  const encoded = requirePairingLink(input)
+  const contents = Buffer.from(encoded, 'base64url')
+  if (contents.toString('base64url') !== encoded) throw invalidPairingLink()
+  return readDeviceCard(contents)
+}
+
+function requirePairingLink(input: unknown): string {
+  // Check the link and encoded card limits before allocating the decoded bytes.
+  if (typeof input !== 'string' || input.length > pairingLinkLimit || !input.startsWith('sct://pair/v1/')) {
+    throw invalidPairingLink()
+  }
+  const encoded = input.slice('sct://pair/v1/'.length)
+  if (!encoded || encoded.length > Math.ceil(4096 * 4 / 3) || encoded.length % 4 === 1 || /[^A-Za-z0-9_-]/.test(encoded)) {
+    throw invalidPairingLink()
+  }
+  return encoded
+}
+
+function invalidPairingLink(): Error {
+  return new Error('The pairing link is invalid. Paste an sct://pair/v1/ link from the other device.')
 }
 
 export function describeDevice(card: DeviceCard): SharingDevice {
@@ -160,7 +191,7 @@ export function decryptTransfer(identity: DeviceIdentity, sender: DeviceCard, en
 }
 
 function requireCard(data: Record<string, unknown>): DeviceCard {
-  if (data.format !== 'sct-device' || data.version !== 1 || typeof data.name !== 'string' ||
+  if (Object.keys(data).length !== 5 || data.format !== 'sct-device' || data.version !== 1 || typeof data.name !== 'string' ||
     !data.name.trim() || data.name.length > 100 || /\p{Cc}/u.test(data.name)) throw invalid()
   publicKey(data.encryptionKey, 'x25519')
   publicKey(data.signingKey, 'ed25519')

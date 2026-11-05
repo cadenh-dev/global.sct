@@ -1,7 +1,7 @@
 import { access, lstat, mkdir, readFile, readlink, rename, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 
 const marker = '# .sct command launcher'
 
@@ -9,10 +9,10 @@ const marker = '# .sct command launcher'
 // `exec` replaces the shell, so the caller stays the parent process of .sct.
 export async function installCli(executable: string, destination: string): Promise<void> {
   await access(executable, constants.X_OK)
-  const command = `exec '${executable.replaceAll("'", `'\\''`)}' "$@"`
+  const { command, contents } = launcher(executable)
   if (await isInstalled(destination, executable, command)) return
   await mkdir(dirname(destination), { recursive: true })
-  await writeFile(`${destination}.tmp`, `#!/bin/sh\n${marker}\n${command}\n`, { mode: 0o755 })
+  await writeFile(`${destination}.tmp`, contents, { mode: 0o755 })
   await rename(`${destination}.tmp`, destination)
 }
 
@@ -33,12 +33,45 @@ async function isInstalled(destination: string, executable: string, command: str
   }
 }
 
+function launcher(executable: string): { command: string; contents: string } {
+  if (process.platform === 'win32') {
+    const command = `"${executable}" %*`
+    return { command, contents: `@echo off\nREM ${marker}\n${command}\nexit /b %ERRORLEVEL%\n` }
+  }
+  const command = `exec '${executable.replaceAll("'", `'\\''`)}' "$@"`
+  return { command, contents: `#!/bin/sh\n${marker}\n${command}\n` }
+}
+
 if (import.meta.main) {
-  const destination = join(homedir(), '.local', 'bin', 'sct')
-  await installCli(resolve(`dist/sct-darwin-${process.arch}/sct.app/Contents/MacOS/sct`), destination)
+  const target = cliTarget()
+  const destination = resolve(target.destination)
+  const executable = resolve(target.executable)
+  await installCli(executable, destination)
+  if (process.platform === 'win32') {
+    // The SDK cannot start a .cmd file without a shell. It reads this file to start the executable directly.
+    await writeFile(join(dirname(destination), 'sct.json'), JSON.stringify({ executable }), { mode: 0o600 })
+  }
   console.log(`Installed ${destination}`)
-  if (!(process.env.PATH ?? '').split(':').includes(dirname(destination))) {
-    console.log('Add this line to ~/.zshrc, then open a new terminal:')
-    console.log('export PATH="$HOME/.local/bin:$PATH"')
+  if (!(process.env.PATH ?? '').split(delimiter).includes(dirname(destination))) console.log(target.pathHint)
+}
+
+function cliTarget() {
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA
+    if (!localAppData) throw new Error('Cannot find LOCALAPPDATA. Set it before you install the sct command.')
+    const folder = join(localAppData, 'Programs', 'sct', 'bin')
+    return {
+      destination: join(folder, 'sct.cmd'),
+      executable: `dist/sct-win32-${process.arch}/sct.exe`,
+      pathHint: `Add this folder to PATH, then open a new terminal:\n${folder}`
+    }
+  }
+  const destination = join(homedir(), '.local', 'bin', 'sct')
+  return {
+    destination,
+    executable: process.platform === 'darwin'
+      ? `dist/sct-darwin-${process.arch}/sct.app/Contents/MacOS/sct`
+      : `dist/sct-linux-${process.arch}/sct`,
+    pathHint: `Add this line to ${process.platform === 'darwin' ? '~/.zshrc' : '~/.profile'}, then open a new terminal:\nexport PATH="$HOME/.local/bin:$PATH"`
   }
 }

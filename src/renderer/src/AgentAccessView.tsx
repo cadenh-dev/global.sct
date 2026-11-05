@@ -82,7 +82,8 @@ function CallerReview({ request, confirmed, disabled, onConfirm }: {
   disabled: boolean
   onConfirm: (confirmed: boolean) => void
 }) {
-  if (request.caller.verified) return <p>Caller: {request.caller.name}. macOS verified its code signature.</p>
+  if (request.caller.verified) return <p>Caller: {request.caller.name}. {window.sct.platform === 'win32'
+    ? 'Windows verified its Authenticode signature.' : 'macOS verified its code signature.'}</p>
   return (
     <>
       <p>Caller: Unverified. .sct cannot identify the program that sent this request.</p>
@@ -106,7 +107,7 @@ function PairingReview({ pairing, compared, disabled, onCompare }: {
       <p className="sharing-fingerprint">{pairing.fingerprint}</p>
       <p className="pairing-code" aria-label="Pairing code">{pairing.code}</p>
       <label className="check-field"><input type="checkbox" checked={compared} disabled={disabled}
-        onChange={(event) => onCompare(event.target.checked)} />I compared this code on both Macs</label>
+        onChange={(event) => onCompare(event.target.checked)} />I compared this code on both devices</label>
     </div>
   )
 }

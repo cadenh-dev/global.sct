@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { errorText, StatusLine, useOperation } from './operation'
 import type { Loaded } from './types'
+import type { ThemePreference } from '../../shared/api'
+
+const themeLabels: Record<ThemePreference, string> = { light: 'Light (Cream)', dark: 'Dark (Terminal)', system: 'System' }
 
 export function StorageView() {
   const [location, setLocation] = useState<Loaded<string>>({ state: 'loading' })
+  const [theme, setTheme] = useState<Loaded<ThemePreference>>({ state: 'loading' })
   const operation = useOperation()
 
   useEffect(() => {
@@ -12,6 +16,11 @@ export function StorageView() {
       if (active) setLocation({ state: 'ready', value })
     }).catch((cause: unknown) => {
       if (active) setLocation({ state: 'error', error: errorText(cause, 'Cannot read the storage location.') })
+    })
+    window.sct.getThemePreference().then((value) => {
+      if (active) setTheme({ state: 'ready', value })
+    }).catch((cause: unknown) => {
+      if (active) setTheme({ state: 'error', error: errorText(cause, 'Cannot read the appearance setting.') })
     })
     return () => { active = false }
   }, [])
@@ -25,12 +34,21 @@ export function StorageView() {
     })
   }
 
+  async function changeTheme(value: string) {
+    if (!isThemePreference(value)) return
+    await operation.run('Saving the appearance…', async () => {
+      await window.sct.setThemePreference(value)
+      setTheme({ state: 'ready', value })
+      return `The appearance is now ${themeLabels[value]}.`
+    })
+  }
+
   return (
     <>
       <div className="page-heading">
         <div>
           <h1>Storage</h1>
-          <p className="description">Where .sct keeps encrypted secrets on this Mac.</p>
+          <p className="description">Where .sct keeps encrypted secrets on this device, and how the window looks.</p>
         </div>
       </div>
 
@@ -41,13 +59,28 @@ export function StorageView() {
         {location.state === 'loading' && <p role="status">Loading the storage location…</p>}
         {location.state === 'error' && <p className="error" role="alert">{location.error}</p>}
         {location.state === 'ready' && <p className="path">{location.value}</p>}
-        <p className="field-help">Select a folder. .sct moves its .sct folder and all project secrets into it. Keychain keys do not move.</p>
+        <p className="field-help">Select a folder. .sct moves its .sct folder and all project secrets into it. The vault keys move with the folder.</p>
         <div className="form-actions">
           <button type="button" disabled={location.state !== 'ready' || operation.busy} onClick={() => { void change() }}>
             {operation.busy ? 'Please wait…' : 'Change location…'}
           </button>
         </div>
       </section>
+
+      <section className="appearance" aria-labelledby="appearance-heading">
+        <h2 id="appearance-heading">Appearance</h2>
+        {theme.state === 'error' && <p className="error" role="alert">{theme.error}</p>}
+        <label htmlFor="theme-select">Theme</label>
+        <select id="theme-select" value={theme.state === 'ready' ? theme.value : 'light'} disabled={theme.state !== 'ready' || operation.busy}
+          onChange={(event) => { void changeTheme(event.target.value) }}>
+          {Object.entries(themeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <p className="field-help">System follows the light or dark setting of this computer.</p>
+      </section>
     </>
   )
+}
+
+function isThemePreference(value: string): value is ThemePreference {
+  return Object.hasOwn(themeLabels, value)
 }

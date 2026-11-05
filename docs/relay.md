@@ -95,7 +95,7 @@ It does not use the deployment login and does not send secrets or private keys.
 
 Each demo device uses its own relay identity.
 When the app connects for the first time without a token, SpacetimeDB creates an identity and returns a token.
-The app keeps this token in the macOS Keychain and uses it again for later connections.
+The app keeps this token in the vault under `.internal/` and uses it again for later connections.
 
 The app never uses the deployment login.
 Device private keys and secret values never go to the relay.
@@ -105,7 +105,7 @@ Device private keys and secret values never go to the relay.
 The desktop app connects to the relay when it starts. A command-line process does not connect. The exceptions are approved `relay_status` and `request_remote_demo` requests.
 An agent session uses a passive relay. It reads the relay rows and the local files again for each state. It publishes nothing, acknowledges nothing, and writes no relay file except a task request.
 
-- The Keychain service `.sct-relay` holds the relay token in `token/<server>/<database>`.
+- The vault holds the relay token in `.internal/` under `relay/token/<server hash>`.
 - After each connection, the app registers the public keys of its AirDrop device card with `registerDevice`.
   The same device keys serve AirDrop and the relay.
 - The app subscribes to `my_inbox`, `my_sent`, and `my_peers`.
@@ -157,7 +157,7 @@ Do these steps on the **Relay** tab of **Sharing**:
 4. The users compare the codes, for example in person or on a call.
    Device B shows the code for a pending request even when it saved the keys of device A before.
    For example, this can occur after a relay data reset.
-5. If the codes are the same, each user selects **I compared this code on both Macs**, then **Confirm relay device**.
+5. If the codes are the same, each user selects **I compared this code on both devices**, then **Confirm relay device**.
    Each app saves the public keys of the other device.
    The app of device B also calls `confirmPair`. On the relay, only the device that did not send the request can accept the pair.
 6. If the codes are different, a user selects **Remove**. The app calls `removePair` and deletes its saved keys of that device.
@@ -226,8 +226,8 @@ An injection-only secret can enter an approved process environment, but .sct can
 An expired grant blocks new local use.
 
 .sct checks access deadlines before import and before each local read.
-It also deletes expired grants at startup, each minute, and after the Mac resumes.
-Cleanup deletes the encrypted vault entry and its Keychain key.
+It also deletes expired grants at startup, each minute, and after the device resumes.
+Cleanup deletes the encrypted vault entry.
 The app saves each cleanup result in an encrypted local history.
 
 After successful cleanup, the recipient queues a signed and encrypted expiry notice for the original sender.

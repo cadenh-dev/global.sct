@@ -9,13 +9,13 @@ The docs use some words with one fixed meaning:
 
 ## Local
 
-**.sct** — The Electron, React, and TypeScript app in this repository. It manages local secrets and encrypted handoffs between Macs.
+**.sct** — The Electron, React, and TypeScript app in this repository. It manages local secrets and encrypted handoffs between devices.
 
 **Signing identity** — The `.sct Development` certificate and private key in Keychain. A stable signature keeps Keychain access after rebuilds. See [macOS signing](macos-signing.md).
 
-**Keychain** — The macOS service that protects value keys, file keys, device private keys, and the relay token.
+**OS secret store** — The optional system store for the remembered master key and relay cache keys. It is macOS Keychain, Windows Credential Manager, or Linux libsecret.
 
-**Local vault** — The encrypted `secrets.sct` files and their Keychain keys. It works offline. See [vault storage](storage.md).
+**Local vault** — The encrypted `secrets.sct` files, `vault.json`, and `.internal/` values. It works offline. See [vault storage](storage.md).
 
 **Electron main process** — The trusted process for vault access, encryption, child process starts, sharing, relay connections, and Agent Access. .sct runs no separate daemon.
 
@@ -35,9 +35,9 @@ The docs use some words with one fixed meaning:
 
 **Agent Access** — Local operations that an agent requests through the CLI or MCP. Each request needs local approval. It has no relay dependency.
 
-**MCP** — Model Context Protocol. `sct mcp` exposes the nine operations as tools, prompts, and skill resources.
+**MCP** — Model Context Protocol. `sct mcp` exposes the ten operations as tools, prompts, and skill resources.
 
-**Caller authentication** — .sct finds the first listed agent among the parent processes and checks its code signature. .sct rejects an impostor. An unverified caller needs an extra statement from the user in the approval window.
+**Caller authentication** — .sct finds the first listed agent among the parent processes and checks its platform signature. macOS uses `codesign`, Windows uses Authenticode, and Linux has no code signature. .sct rejects an impostor. An unverified caller needs an extra statement from the user in the approval window.
 
 **Local approval** — The user's decision in the .sct window. It applies to one request. An agent or relay message cannot approve its own request.
 
@@ -45,7 +45,7 @@ The docs use some words with one fixed meaning:
 
 ## Sharing
 
-**Device identity** — A Mac's X25519 encryption key and Ed25519 signing key. The private keys stay in Keychain.
+**Device identity** — A device's X25519 encryption key and Ed25519 signing key. The private keys stay in the vault.
 
 **Device card** — A `.sct-device` file with a device's public keys. It contains no secret.
 
@@ -53,7 +53,7 @@ The docs use some words with one fixed meaning:
 
 **Transfer package** — A `.sct-transfer` file. It holds selected secrets, encrypted and signed for one verified device. It expires after 24 hours.
 
-**AirDrop** — The macOS transport for transfer packages, device cards, and mock Wallet cards. .sct opens only the AirDrop picker.
+**AirDrop** — The macOS-only transport for transfer packages, device cards, and mock Wallet cards. .sct opens only the AirDrop picker.
 
 **Relay** — Cloud-hosted SpacetimeDB that persists and routes ciphertext. It never receives the keys that decrypt payloads. See [relay setup](relay.md).
 

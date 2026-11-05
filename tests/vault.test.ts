@@ -91,6 +91,54 @@ test('a locked vault refuses every secret operation', async (t) => {
   await assert.rejects(locked.addSecret({ projectId: project.id, name: 'OTHER', value: 'x' }), /locked/)
 })
 
+test('internal values survive concurrent writes from two vault processes', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'sct-internal-')))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const store = new InMemorySecretStore()
+  const open = async () => {
+    const vault = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
+      join(root, 'app-data', 'settings.json'), root, store)
+    await vault.start()
+    if (vault.isLocked()) await vault.unlock({ passphrase, remember: false })
+    return vault
+  }
+  const left = await open()
+  const right = await open()
+  for (let index = 0; index < 25; index += 1) {
+    await Promise.all([
+      left.writeInternal('sharing/identity', Buffer.from(`identity-${index}`)),
+      right.writeInternal('relay/token/abc', Buffer.from(`token-${index}`))
+    ])
+  }
+  assert.equal((await left.readInternal('sharing/identity'))?.toString(), 'identity-24')
+  assert.equal((await right.readInternal('sharing/identity'))?.toString(), 'identity-24')
+  assert.equal((await left.readInternal('relay/token/abc'))?.toString(), 'token-24')
+  assert.equal((await right.readInternal('relay/token/abc'))?.toString(), 'token-24')
+
+  const [first, second] = await Promise.all([
+    left.writeInternalIfAbsent('sharing/first', Buffer.from('left')),
+    right.writeInternalIfAbsent('sharing/first', Buffer.from('right'))
+  ])
+  assert.equal([first, second].filter((value) => value === null).length, 1)
+  const existing = first ?? second
+  assert.ok(existing)
+  try { assert.ok(['left', 'right'].includes(existing.toString())) } finally { existing.fill(0) }
+
+  const files = await readdir(join(root, '.sct', '.internal'))
+  assert.equal(files.length, 3)
+  assert.ok(files.every((name) => /^[0-9a-f]{64}\.sct$/.test(name)))
+  for (const name of files) {
+    const contents = await readFile(join(root, '.sct', '.internal', name))
+    assert.equal(contents.subarray(0, 4).toString(), 'SCI2')
+    assert.ok(!contents.includes('identity-') && !contents.includes('token-'))
+  }
+
+  const identityFile = join(root, '.sct', '.internal',
+    `${createHash('sha256').update('sharing/identity').digest('hex')}.sct`)
+  await writeFile(identityFile, 'broken')
+  await assert.rejects(left.readInternal('sharing/identity'), /internal secret file is invalid/)
+})
+
 test('a wrong passphrase does not open the vault', async (t) => {
   const { root, store } = await setup(t)
   const first = new Vault(new ProjectStore(join(root, 'app-data', 'projects.json')),
@@ -265,7 +313,7 @@ test('launches resolve renamed projects and moved storage, and preserve command 
   assert.equal(await runProject(projects, await open(), ['run', 'Renamed', '--', 'node', '-e',
     "require('node:assert/strict').equal(process.env.EMPTY, ''); process.exit(23)"]), 23)
   assert.equal(await runProject(projects, await open(), ['run', 'Renamed', '--', 'node', '-e',
-    "process.kill(process.pid, 'SIGTERM')"]), 143)
+    "process.kill(process.pid, 'SIGTERM')"]), process.platform === 'win32' ? 1 : 143)
   await assert.rejects(runProject(projects, vault, ['run', 'Demo', '--', 'node']), /not in your project list/)
   await assert.rejects(runProject(projects, vault, ['run', 'Renamed']), /Usage:/)
 })
@@ -286,6 +334,10 @@ test('launches fail before execution when the vault, command, or source folder i
 })
 
 test('the terminal entrypoint forwards interruption and termination to the command', { timeout: 15_000 }, async (t) => {
+  if (process.platform === 'win32') {
+    t.skip('Windows cannot forward POSIX signals to a child process.')
+    return
+  }
   const { root, open, folder } = await setup(t)
   const vault = await open()
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })

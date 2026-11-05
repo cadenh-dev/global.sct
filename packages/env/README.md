@@ -2,7 +2,8 @@
 
 Load a registered project's `.sct` secrets into `process.env` and keep them current.
 This package has no runtime dependencies. It supports server-side TypeScript on macOS with Node.js 22.18 or later and Bun.
-It requires the installed `sct` command. Keychain access and decryption stay in the signed Electron main process.
+It requires the installed `sct` command. Vault access and decryption stay in the signed Electron main process.
+On Windows, the installer writes `sct.json` next to `sct.cmd`. The SDK reads the executable path from that file. Set `SCT_CLI` to use another executable path.
 
 ## Install from this repository
 

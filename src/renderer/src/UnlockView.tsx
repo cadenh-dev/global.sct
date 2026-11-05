@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import type { VaultStatus } from '../../shared/vault'
 import { errorText } from './operation'
 
-export function UnlockView({ status, onUnlocked }: { status: VaultStatus; onUnlocked: () => void }) {
+export function UnlockView({ status, onUnlocked }: { status: VaultStatus; onUnlocked: (status: VaultStatus) => void }) {
   const creating = !status.initialized
   const [passphrase, setPassphrase] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -21,10 +21,10 @@ export function UnlockView({ status, onUnlocked }: { status: VaultStatus; onUnlo
     setBusy(true)
     setError(null)
     try {
-      await window.sct.unlockVault({ passphrase, remember })
+      const unlocked = await window.sct.unlockVault({ passphrase, remember })
       setPassphrase('')
       setConfirmation('')
-      onUnlocked()
+      onUnlocked(unlocked)
     } catch (cause) {
       setError(errorText(cause, 'The vault did not open.'))
     } finally {

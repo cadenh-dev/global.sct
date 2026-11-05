@@ -50,7 +50,7 @@ export async function streamEnvironment(projects: ProjectStore, vault: Vault, na
     () => vault.withProjectSecrets(project.id, (_project, values) => {
       process.stdout.write(`${JSON.stringify({ values } satisfies EnvironmentMessage)}\n`)
     }),
-    async () => { process.stdout.write(`${JSON.stringify({ error: 'Cannot refresh .sct secrets. Check the project, storage, and Keychain.' })}\n`) }
+    async () => { process.stdout.write(`${JSON.stringify({ error: 'Cannot refresh .sct secrets. Check the project, vault, and storage.' })}\n`) }
   )
   try {
     process.stdin.resume()

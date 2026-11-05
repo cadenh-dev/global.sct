@@ -30,6 +30,7 @@ See [Agent Access](agent-access.md).
 ## AirDrop sharing
 
 The AirDrop sharing flow encrypts selected secrets for one verified device and sends the file through AirDrop.
+Device pairing uses a device card link or file, so it works on macOS, Windows, and Linux.
 See [sharing](sharing.md). Relay sharing below is the second transport. The **Relay** tab of **Sharing** uses it.
 
 ## Mock Wallet cards
@@ -103,7 +104,7 @@ No step starts a process or needs an agent.
 
 ## Relay keys and authorization
 
-Device private keys and relay client tokens stay in macOS Keychain. Relay deployment credentials stay outside Git and desktop builds.
+Device private keys and relay client tokens are sealed in the vault under the master key. Relay deployment credentials stay outside Git and desktop builds.
 
 The TypeScript relay module defines authenticated devices, verified pairs, encrypted envelopes, grants, and delivery status.
 Issue #11 defines the schema and communication contract.
@@ -202,9 +203,9 @@ Received injection-only grants deny reveal, copy, and reshare from the time of i
 These restrictions belong to Phase 2 and do not depend on agent approval.
 
 Check grant expiry before import and access, at startup, after resume, and during scheduled cleanup.
-Delete expired recipient Keychain entries and the applicable encrypted files.
+Delete expired recipient vault entries and the applicable encrypted files.
 Persist cleanup outcomes and queue an encrypted expiry notification for the sender.
-Cleanup cannot run while the app does not run or the Mac sleeps.
+Cleanup cannot run while the app does not run or the device sleeps.
 Cleanup must finish before new access after startup or resume.
 External copies can retain delivered credentials.
 

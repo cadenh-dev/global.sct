@@ -6,6 +6,9 @@ import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
+import { unlock } from './ui'
+
+const passphrase = 'test passphrase for the vault'
 
 test('adds existing folders offline and restores projects after restart', async () => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sct-ui-')))
@@ -20,6 +23,7 @@ test('adds existing folders offline and restores projects after restart', async 
 
   try {
     const page = await application.firstWindow()
+    await unlock(page, passphrase)
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     page.on('console', (message) => {
@@ -38,10 +42,10 @@ test('adds existing folders offline and restores projects after restart', async 
       .toEqual({ process: false, require: false })
     expect(await page.evaluate(() => Object.keys(window.sct).sort()))
       .toEqual(['acceptRelayTransfer', 'addProject', 'addSecret', 'chooseVaultLocation', 'confirmRelayPair', 'confirmSharingPeer', 'createMockCard',
-        'deleteProject', 'deleteSecret', 'dismissTransfer', 'getAgentRequests', 'getRelayState', 'getSharingState',
-        'getVaultLocation', 'hideAllRelayActivity', 'hideRelayActivity', 'importTransfer', 'listProjects', 'listSecrets', 'onAgentChanged', 'onRelayChanged',
-        'onSharingChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'queueRelayTask', 'queueRelayTransfer', 'removeRelayPair', 'renameProject',
-        'requestRelayPair', 'respondRelayTask', 'respondToAgent', 'shareDeviceCard', 'shareMockCard', 'shareSecrets', 'updateSecret'])
+        'deleteProject', 'deleteSecret', 'dismissTransfer', 'forgetDevice', 'getAgentRequests', 'getRelayState', 'getSharingState',
+        'getThemePreference', 'getVaultLocation', 'getVaultStatus', 'hideAllRelayActivity', 'hideRelayActivity', 'importTransfer', 'listProjects', 'listSecrets', 'lockVault', 'onAgentChanged', 'onRelayChanged',
+        'onSharingChanged', 'onThemeChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'platform', 'queueRelayTask', 'queueRelayTransfer', 'removeRelayPair', 'renameProject',
+        'requestRelayPair', 'respondRelayTask', 'respondToAgent', 'setThemePreference', 'shareDeviceCard', 'shareMockCard', 'shareSecrets', 'theme', 'unlockVault', 'updateSecret'])
 
     await page.getByRole('button', { name: 'Add a project', exact: true }).click()
     await application.evaluate(({ dialog }) => {
@@ -78,6 +82,7 @@ test('adds existing folders offline and restores projects after restart', async 
     await application.close()
     application = await launch()
     const restored = await application.firstWindow()
+    await unlock(restored, passphrase)
     await expect(restored.getByRole('list', { name: 'Projects' })).toContainText('Example project')
     await expect(restored.getByRole('listitem')).toHaveCount(1)
   } finally {
@@ -104,13 +109,14 @@ test('manages secrets per project without rendering stored values', async () => 
 
   try {
     let page = await application.firstWindow()
+    await unlock(page, passphrase)
     watch(page)
     await page.getByRole('button', { name: 'Add a project', exact: true }).click()
     await page.getByLabel('Project name').fill('Demo')
     await page.getByLabel('Folder path').fill(folder)
     await page.getByRole('button', { name: 'Add project', exact: true }).click()
     await expect(page.getByRole('list', { name: 'Projects' })).toContainText('0 secrets')
-    expect(await readdir(join(root, '.sct'))).toEqual(['Demo'])
+    expect((await readdir(join(root, '.sct'))).sort()).toEqual(['Demo', 'vault.json'])
 
     await page.getByRole('link', { name: 'Open secrets' }).click()
     await expect(page.getByRole('heading', { name: 'Demo', exact: true })).toBeVisible()
@@ -161,12 +167,13 @@ test('manages secrets per project without rendering stored values', async () => 
     await expect(page.getByText(join(root, '.sct'), { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Change location…' }).click()
     await expect(page.getByRole('status').first()).toHaveText(`The vault moved to ${join(root, 'moved', '.sct')}.`)
-    expect(await readdir(join(root, 'moved', '.sct'))).toEqual(['Demo'])
+    expect((await readdir(join(root, 'moved', '.sct'))).sort()).toEqual(['Demo', 'vault.json'])
     await page.screenshot({ path: test.info().outputPath('storage.png') })
 
     await application.close()
     application = await launch()
     page = await application.firstWindow()
+    await unlock(page, passphrase)
     watch(page)
     await page.getByRole('link', { name: 'All secrets' }).click()
     await expect(page.getByRole('heading', { name: 'All secrets', exact: true })).toBeVisible()
@@ -177,7 +184,7 @@ test('manages secrets per project without rendering stored values', async () => 
     await page.getByLabel('New name for Demo').fill('Renamed')
     await page.getByRole('button', { name: 'Save name' }).click()
     await expect(page.getByRole('list', { name: 'Projects' })).toContainText('Renamed')
-    expect(await readdir(join(root, 'moved', '.sct'))).toEqual(['Renamed'])
+    expect((await readdir(join(root, 'moved', '.sct'))).sort()).toEqual(['Renamed', 'vault.json'])
 
     const cli = spawn(application.process().spawnfile, [join(__dirname, 'electron-entry.cjs'), userData,
       'run', 'Renamed', '--', process.execPath, '-e', `
@@ -262,7 +269,7 @@ test('manages secrets per project without rendering stored values', async () => 
     await page.getByLabel('Type Renamed to confirm').fill('Renamed')
     await page.getByRole('button', { name: 'Delete project' }).click()
     await expect(page.getByRole('heading', { name: 'Your projects start here' })).toBeVisible()
-    expect(await readdir(join(root, 'moved', '.sct'))).toEqual([])
+    expect((await readdir(join(root, 'moved', '.sct'))).sort()).toEqual(['vault.json'])
     expect(messages.filter((message) => message.startsWith('error') || message.includes(value))).toEqual([])
   } finally {
     // The app deletes its own Keychain items. Keychain reads from this test process wait for a macOS access prompt.

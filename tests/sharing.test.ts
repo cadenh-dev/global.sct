@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AsyncEntry } from '@napi-rs/keyring'
 import { Sharing } from '../src/main/sharing.ts'
 import { ProjectStore } from '../src/main/projects.ts'
 import { Vault } from '../src/main/vault.ts'
@@ -72,12 +71,10 @@ test('untrusted packages reject malformed data, invalid names, duplicate names, 
 
 async function devices(t: TestContext) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sct-sharing-')))
-  const service = `.sct-transfer-test-${randomUUID()}`
   const instances: { root: string; vault: Vault; sharing: Sharing; projects: ProjectStore }[] = []
   t.after(async () => {
     for (const device of instances) {
       for (const project of await device.projects.list()) await device.vault.deleteProject(project.id)
-      await new AsyncEntry(service, join(device.root, 'sharing')).deleteCredential()
     }
     await rm(root, { recursive: true, force: true })
   })
@@ -88,7 +85,7 @@ async function devices(t: TestContext) {
     const vault = new Vault(projects, join(directory, 'settings.json'), directory, new InMemorySecretStore())
     await vault.start()
     await vault.unlock({ passphrase: 'test passphrase for the vault', remember: false })
-    instances.push({ root: directory, vault, projects, sharing: new Sharing(join(directory, 'sharing'), vault, name, service) })
+    instances.push({ root: directory, vault, projects, sharing: new Sharing(join(directory, 'sharing'), vault, name) })
   }
   const sender = instances[0]
   const recipient = instances[1]
@@ -99,11 +96,11 @@ async function devices(t: TestContext) {
   await assert.rejects(sender.sharing.confirmPeer('wrong token'))
   await sender.sharing.confirmPeer(alice.token)
   await recipient.sharing.confirmPeer(bob.token)
-  return { sender, recipient, service }
+  return { sender, recipient }
 }
 
 test('selected secrets enter only the chosen project with fresh local keys and a durable replay record', async (t) => {
-  const { sender, recipient, service } = await devices(t)
+  const { sender, recipient } = await devices(t)
   const source = await sender.vault.addProject({ name: 'Backend', directory: join(sender.root, 'source') })
   const target = await recipient.vault.addProject({ name: 'API', directory: join(recipient.root, 'source') })
   await mkdir(join(recipient.root, 'other'))
@@ -132,7 +129,7 @@ test('selected secrets enter only the chosen project with fresh local keys and a
   assert.ok(!encrypted.includes('TOKEN') && !encrypted.includes('private'))
   assert.equal((await recipient.sharing.state()).incoming.length, 0)
   assert.deepEqual(await readdir(join(recipient.root, 'sharing', 'inbox')), [])
-  const reopened = new Sharing(join(recipient.root, 'sharing'), recipient.vault, 'recipient', service)
+  const reopened = new Sharing(join(recipient.root, 'sharing'), recipient.vault, 'recipient')
   await assert.rejects(reopened.openTransfer(file), /already imported/)
   assert.equal((await recipient.vault.listSecrets()).length, 1)
   await assert.rejects(reopened.dismissTransfer('../escape'), /invalid/)
@@ -146,8 +143,8 @@ test('relay delivery imports once, preserves grant rules, and returns a verified
   const senderIdentity = '11'.repeat(32)
   const recipientIdentity = '22'.repeat(32)
   const recipientCard = await recipient.sharing.deviceCard()
-  const senderCard = await sender.sharing.deviceCard()
-  const sealed = await sender.sharing.prepareRelayTransfer(senderIdentity,
+  // A fresh instance must not depend on the identity cached during pairing.
+  const sealed = await new Sharing(join(sender.root, 'sharing'), sender.vault, 'sender').prepareRelayTransfer(senderIdentity,
     { identity: recipientIdentity, card: recipientCard }, {
       projectId: source.id,
       secretIds: [secret.id],
@@ -156,6 +153,7 @@ test('relay delivery imports once, preserves grant rules, and returns a verified
       accessExpiresAt: Date.now() + 120_000,
       injectionOnly: true
     })
+  const senderCard = await sender.sharing.deviceCard()
   const wrappedKey = sealed.wrappedKeys[0]?.wrappedKey
   assert.ok(wrappedKey)
   const peer = { identity: senderIdentity, card: senderCard }
@@ -202,7 +200,7 @@ test('batch conflicts leave all existing secrets intact and permit another desti
 })
 
 test('recovery after a vault commit reuses the original destination and does not duplicate imports', async (t) => {
-  const { sender, recipient, service } = await devices(t)
+  const { sender, recipient } = await devices(t)
   const source = await sender.vault.addProject({ name: 'Source', directory: join(sender.root, 'source') })
   const target = await recipient.vault.addProject({ name: 'Target', directory: join(recipient.root, 'source') })
   const secret = await sender.vault.addSecret({ projectId: source.id, name: 'TOKEN', value: 'secret' })
@@ -214,7 +212,7 @@ test('recovery after a vault commit reuses the original destination and does not
   const receipts = JSON.parse(await readFile(receiptFile, 'utf8')) as { receipts: { complete: boolean }[] }
   for (const entry of receipts.receipts) entry.complete = false
   await writeFile(receiptFile, JSON.stringify(receipts))
-  const reopened = new Sharing(join(recipient.root, 'sharing'), recipient.vault, 'recipient', service)
+  const reopened = new Sharing(join(recipient.root, 'sharing'), recipient.vault, 'recipient')
   await reopened.openTransfer(file)
   await assert.rejects(reopened.importTransfer({ transferId: preview.id, projectId: 'different' }), /original destination/)
   assert.deepEqual(await reopened.importTransfer({ transferId: preview.id, projectId: target.id }), first)

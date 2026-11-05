@@ -11,8 +11,8 @@ const holdAfterEnd = 1500
 // prepare: the main process makes the file. wait: the object waits at the AirDrop picker or in the relay queue.
 // handed: the picker closed. macOS reports no delivery, so the object goes into the AirDrop rings and never lands.
 // delivered: the relay reported that the recipient received the transfer, so the object lands on the recipient.
-// received: an encrypted relay transfer reached this Mac. It is not imported yet.
-// arrived: this Mac imported a transfer, so the object lands in the destination project.
+// received: an encrypted relay transfer reached this device. It is not imported yet.
+// arrived: this device imported a transfer, so the object lands in the destination project.
 export type HandoffStage = 'prepare' | 'wait' | 'handed' | 'delivered' | 'received' | 'arrived'
 
 export type HandoffRoute = 'airdrop' | 'relay'
@@ -173,7 +173,7 @@ function caption(stage: HandoffStage, via: HandoffRoute, to: string): string {
   if (stage === 'wait') return via === 'relay' ? `Queued for ${to}. The relay sends it when ${to} connects.` : `Choose ${to} in the AirDrop picker.`
   if (stage === 'handed') return `Sent if you chose ${to}. macOS does not confirm delivery.`
   if (stage === 'delivered') return `${to} received the transfer.`
-  if (stage === 'received') return 'The encrypted transfer reached this Mac.'
+  if (stage === 'received') return 'The encrypted transfer reached this device.'
   return `Imported into ${to}.`
 }
 

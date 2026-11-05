@@ -41,6 +41,7 @@ It reads no old transfer file.
 It ignores the old secret-store items under the `.sct` service.
 The demo data does not move.
 The user adds secrets again after the first unlock.
+The old sharing identity and relay token are not read. The device gets a new device card and a new relay identity. The user verifies the sharing devices again and pairs the relay devices again.
 
 ## 2. On-disk vault file layout
 
@@ -56,6 +57,7 @@ On macOS the `userData` folder is usually `~/Library/Application Support/.sct`.
 |---|---|---|
 | `vault.json` | `~/.sct/vault.json` | The header. The KDF params, the salt, the verification tag, and the wrapped master key. |
 | `secrets.sct` | `~/.sct/[project-name]/secrets.sct` | The encrypted secrets of one project. |
+| `.internal/` | `~/.sct/internal/` | One sealed file for the sharing identity and each relay token. The master key seals each file. |
 | `settings.json` | `userData` folder | The vault root path. No secret. |
 
 The per-project file name and path stay the same as today.
@@ -96,6 +98,22 @@ The ciphertext holds a JSON array of stored secrets.
 The vault encrypts this array with the master key.
 The AAD binds the ciphertext to the project, as today.
 The design dropped the project file key. A file key that wraps the array cannot live inside that array.
+
+### The internal folder
+
+`.internal/` holds values that are not project secrets.
+It holds the sharing identity and the relay tokens.
+Each value has its own file.
+The file name is the SHA-256 hash of the value name plus `.sct`.
+The file uses the same binary layout as `secrets.sct`: `magic | IV | GCM tag | ciphertext`.
+The magic value is `SCI2`.
+The ciphertext holds the value bytes.
+The AAD is `internal/<name>`.
+The file mode is `0600`. Each write uses a unique `.tmp` file and a rename.
+
+The name grammar is `^[a-z][a-z0-9/_-]{0,200}$`.
+The names are `sharing/identity` and `relay/token/<sha256-of-server-name>`.
+One file for each name prevents a read-modify-write race between the desktop app and an agent session.
 
 ### Envelope encryption
 
@@ -193,6 +211,23 @@ Set `maxmem` to `256 * 1024 * 1024` to leave headroom.
 
 The exact cost target is an open question. See section 7.
 The parameters live in `vault.json`. A future vault can raise the cost without a format change.
+
+### Measured cost
+
+On 2026-11-04, a Windows test machine with Bun 1.4.4 ran the vault and CLI path.
+The test used 10 secrets and 40 secrets.
+The child command was `bun -e 0`.
+
+| Secrets | "Remember this device" | Median time |
+|---|---|---|
+| 10 | Off | 227 ms |
+| 10 | On | 16 ms |
+| 40 | Off | 221 ms |
+| 40 | On | 16 ms |
+
+The measurement includes the unlock and the child start. It does not include Electron startup.
+The "on" case used an in-memory store, so a read from an OS secret store can add time.
+The result stays below the 1 second target at `N = 2^17`.
 
 ### Deriving the master key
 
@@ -424,7 +459,7 @@ Decisions taken on 2026-11-04:
 | Question | Decision |
 |---|---|
 | Parser | zod. It is already a dependency. |
-| Sharing identity, relay token, grant-cleanup key | Move them under the master key. The grant-cleanup key is done. The sharing identity and relay token are not done yet. |
+| Sharing identity, relay token, grant-cleanup key | Moved under the master key. The sharing identity and the relay token are in `.internal/`. The grant-cleanup data is in `grant-cleanup.sct`. |
 | CLI unlock | Ask the signed executable for one window. |
 | Existing tests | Edit the tests that the format change breaks. |
 | Project file key | Drop it. The master key seals the array. |
@@ -435,4 +470,4 @@ Remaining questions:
 
 1. **Lockout and retry policy.** The vault has no retry limit or delay. Scrypt slows each attempt. Name the threat before adding a lockout.
 2. **Cross-process write ordering.** The app and the CLI can both write. The `.tmp` plus `rename` write is atomic on one disk. Confirm that this is enough, or name the failure that needs a lock file.
-3. **Sharing identity and relay token.** The plan moves them under the master key. They are still in the OS store. A Linux system with no secret service cannot use sharing until this change lands.
+3. **Relay cache keys.** The relay keeps its per-server cache keys in the OS store. A Linux system with no secret service cannot use the relay mailbox until these keys move. Direct and link sharing do not need the relay cache keys.

@@ -1,5 +1,7 @@
 import type { SecretMetadata } from './secrets'
 
+export const pairingLinkLimit = 16_384
+
 export interface SharingDevice {
   id: string
   name: string
@@ -40,6 +42,9 @@ export interface ImportTransferInput {
 export interface SharingAPI {
   getSharingState: () => Promise<SharingState>
   shareDeviceCard: () => Promise<void>
+  copyPairingLink: () => Promise<void>
+  saveDeviceCard: () => Promise<boolean>
+  previewPairingLink: (link: string) => Promise<PairingPreview>
   pickSharingPeer: () => Promise<PairingPreview | null>
   confirmSharingPeer: (token: string) => Promise<SharingDevice>
   shareSecrets: (input: ShareSecretsInput) => Promise<void>

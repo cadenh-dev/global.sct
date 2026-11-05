@@ -29,15 +29,15 @@ export const agentTools = {
     schema: z.strictObject({ projectId, secretId: z.uuid().optional(), expiresAt })
   },
   sharing_state: {
-    description: 'Read this device, verified AirDrop recipients, and pending transfer metadata after local approval. Return no keys or secret values.',
+    description: 'Read this device, verified sharing recipients, and pending transfer metadata after local approval. Return no keys or secret values.',
     schema: z.strictObject({ expiresAt })
   },
   pair_device: {
-    description: 'Export a public device card, or verify another device card through the local pairing screen. The user must compare the code on both Macs.',
+    description: 'Export a public device card on macOS, or verify another device card through the local pairing screen. The user must compare the code on both devices.',
     schema: z.strictObject({ action: z.enum(['export', 'verify']), path: z.string().min(1).optional(), expiresAt })
   },
   send_secrets_to: {
-    description: 'Encrypt selected secrets for a verified AirDrop recipient after local approval. Open the AirDrop picker. This does not confirm delivery.',
+    description: 'Encrypt selected secrets for a verified recipient on macOS after local approval. Open the AirDrop picker. This is unavailable on Windows and Linux; use the relay instead. This does not confirm delivery.',
     schema: z.strictObject({ projectId, secretIds: z.array(z.uuid()).min(1).max(1000), recipientId: z.string().min(1), expiresAt })
   },
   relay_status: {
@@ -45,8 +45,8 @@ export const agentTools = {
     schema: z.strictObject({ expiresAt })
   },
   request_remote_demo: {
-    description: 'Ask the recipient of a received relay transfer to run the fixed environment demo with that grant, after local approval. The recipient must also approve on its Mac. The .sct app sends the request. Read the outcome later with relay_status.',
-    schema: z.strictObject({ grantId: z.uuid().describe('Message ID of a relay transfer that this Mac sent and the recipient imported.'), expiresAt })
+    description: 'Ask the recipient of a received relay transfer to run the fixed environment demo with that grant, after local approval. The recipient must also approve on its device. The .sct app sends the request. Read the outcome later with relay_status.',
+    schema: z.strictObject({ grantId: z.uuid().describe('Message ID of a relay transfer that this device sent and the recipient imported.'), expiresAt })
   }
 } as const
 

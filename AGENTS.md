@@ -84,16 +84,18 @@ function requireConfig(input: unknown) {
 
 ## Design system
 
-- Use Hallmark's Terminal theme from the supplied Burrow reference for all UI changes.
-- Keep the supplied OKLCH palette in the renderer's CSS role tokens. Treat those tokens as the source of truth.
-- Use three near-black paper levels with a green cast, pale phosphor ink, and one bright green accent.
+- Use Hallmark's Terminal theme. It has two variants: Terminal (dark) and Cream (light). Cream is the default.
+  Both variants use the same role tokens, fonts, surfaces, and components.
+- Keep the OKLCH palette in the renderer's CSS role tokens. Treat those tokens as the source of truth.
+- Terminal uses three near-black paper levels with a green cast and pale phosphor ink. Cream uses three cream paper levels and black ink.
+  Each variant uses one green accent: bright green in Terminal, dark forest green in Cream. On a Cream green fill, use black text. This is a deliberate exception to the 4.5:1 text rule.
   Do not introduce other hues, including red error backgrounds.
 - Use Martian Mono for every glyph. Use weight 500 and width 112.5% for headings.
   Use weight 400, width 87.5%, and size 15–16px for body text.
   Use no more than three weights: 400, 500, and 700.
 - Declare all colors and fonts through role tokens. Do not add literal colors or font families outside the token declarations.
-- Use square surfaces with 1px rules. Do not use shadows, rounded corners, pills, or light sections.
-- Use a solid green primary button with dark text. Use an outlined secondary button.
+- Use square surfaces with 1px rules. Do not use shadows, rounded corners, pills, or light sections in the Terminal variant.
+- Use a solid green primary button: dark text in Terminal, black text in Cream. Use an outlined secondary button.
 - Show keyboard focus immediately. Use stepped state changes and respect reduced-motion preferences.
 - Do not add scanlines, glow, simulated terminal or operating-system frames, decorative status dots, eyebrows, or tracked capital labels.
 - Use prompt glyphs only for real commands. Keep familiar forms, project lists, and the native folder picker.

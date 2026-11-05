@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Reply, SctAPI } from '../shared/api'
+import type { IpcRendererEvent } from 'electron'
+import type { Reply, SctAPI, ThemePreference, ThemeVariant } from '../shared/api'
 import type { Project, ProjectInput, ProjectRename } from '../shared/projects'
 import type { SecretInput, SecretMetadata, SecretReference, SecretUpdate } from '../shared/secrets'
 import type { PairingPreview, SharingDevice, SharingState, TransferPreview } from '../shared/sharing'
@@ -14,6 +15,18 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: SctAPI = {
+  platform: process.platform,
+  // The main process adds this argument when it creates the window, so the first paint uses the correct variant.
+  theme: process.argv.includes('--sct-theme=terminal') ? 'terminal' : 'cream',
+  getThemePreference: () => invoke<ThemePreference>('preferences:get-theme'),
+  setThemePreference: (preference) => invoke<ThemeVariant>('preferences:set-theme', preference),
+  onThemeChanged: (listener) => {
+    const changed = (_event: IpcRendererEvent, variant: unknown) => {
+      if (variant === 'cream' || variant === 'terminal') listener(variant)
+    }
+    ipcRenderer.on('theme:changed', changed)
+    return () => { ipcRenderer.removeListener('theme:changed', changed) }
+  },
   getAgentRequests: () => invoke<AgentRequestView[]>('agent:requests'),
   respondToAgent: (input) => invoke<void>('agent:respond', input),
   onAgentChanged: (listener) => {
@@ -38,6 +51,9 @@ const api: SctAPI = {
   forgetDevice: () => invoke<VaultStatus>('vault:forget'),
   getSharingState: () => invoke<SharingState>('sharing:state'),
   shareDeviceCard: () => invoke<void>('sharing:device-card'),
+  copyPairingLink: () => invoke<void>('sharing:copy-pairing-link'),
+  saveDeviceCard: () => invoke<boolean>('sharing:save-device-card'),
+  previewPairingLink: (link) => invoke<PairingPreview>('sharing:preview-pairing-link', link),
   pickSharingPeer: () => invoke<PairingPreview | null>('sharing:pick-peer'),
   confirmSharingPeer: (token) => invoke<SharingDevice>('sharing:confirm-peer', token),
   shareSecrets: (input) => invoke<void>('sharing:send', input),
