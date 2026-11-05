@@ -90,7 +90,7 @@ export async function runProject(projects: ProjectStore, vault: Vault, args: str
     }, async () => {
       restarting = true
       if (child) await stopCommand(child)
-      console.error('Cannot refresh .sct secrets. The command is stopped until the vault is available.')
+      console.error('Cannot refresh global.sct secrets. The command is stopped until the vault is available.')
     })
     return await exited
   } finally {
@@ -141,7 +141,7 @@ async function runInteractive(vault: Vault, project: Project, executable: string
       notified = true
       console.error('Secrets changed. Open a new terminal.')
     }, async () => {
-      console.error('Cannot read the .sct secrets. This terminal keeps its current values. Open a new terminal after you fix the vault.')
+      console.error('Cannot read the global.sct secrets. This terminal keeps its current values. Open a new terminal after you fix the vault.')
     })
     if (!exited) throw new Error('Cannot start the command. Check the executable and project folder.')
     return await exited

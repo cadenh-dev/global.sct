@@ -1,6 +1,6 @@
 # Relay setup
 
-.sct uses SpacetimeDB Maincloud as the cloud-hosted relay.
+global.sct uses SpacetimeDB Maincloud as the cloud-hosted relay.
 The relay stores ciphertext and routing metadata only. See the [architecture](architecture.md#relay-sharing-phase-2).
 
 ## Hosted database
@@ -220,12 +220,12 @@ The renderer receives the project name, secret names, deadlines, and grant restr
 It never receives secret values or private keys.
 Under **Received transfers**, the recipient selects a local destination project and selects **Import and send receipt**.
 
-.sct saves the imported values under local vault protection.
+global.sct saves the imported values under local vault protection.
 It saves the access deadline and the injection-only restriction with each imported secret.
-An injection-only secret can enter an approved process environment, but .sct cannot share it again.
+An injection-only secret can enter an approved process environment, but global.sct cannot share it again.
 An expired grant blocks new local use.
 
-.sct checks access deadlines before import and before each local read.
+global.sct checks access deadlines before import and before each local read.
 It also deletes expired grants at startup, each minute, and after the device resumes.
 Cleanup deletes the encrypted vault entry.
 The app saves each cleanup result in an encrypted local history.
@@ -235,7 +235,7 @@ The app retries the notice with bounded backoff when the relay reconnects.
 The relay keeps each notice for 30 days.
 The sender checks the notice. Then the UI reports the access expiry and successful cleanup.
 
-After the vault import, .sct saves an encrypted signed receipt before it acknowledges the delivery.
+After the vault import, global.sct saves an encrypted signed receipt before it acknowledges the delivery.
 The relay keeps the receipt for an offline sender.
 The sender verifies the receipt before it reports durable delivery.
 The main process maps the verified receipt to the shared `TransferReceipt` with mode `mailbox`.
@@ -248,7 +248,7 @@ Delivery expiry and local access expiry are different states.
 A delivery deadline blocks a later import of that transfer.
 An access deadline blocks later use of an imported copy and starts local cleanup.
 Expiry cannot revoke a credential that a process received already.
-It also cannot remove copies that exist outside .sct.
+It also cannot remove copies that exist outside global.sct.
 The [secure sharing check](secure-sharing-check.md) records the issue #20 result and expiry limits.
 
 ## Client bindings

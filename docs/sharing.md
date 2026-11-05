@@ -5,7 +5,7 @@ The pairing link and the `.sct-device` file contain public keys only.
 Link mode works on all platforms.
 AirDrop sending is macOS-only.
 
-.sct sends encrypted copies of secrets to a verified device.
+global.sct sends encrypted copies of secrets to a verified device.
 The Link flow and the AirDrop flow need no relay and no agent.
 The AirDrop flow also needs no network connection other than AirDrop.
 On macOS, the **Sharing** screen has five tabs: **Verify devices**, **Send secrets**, **Receive secrets**, **Relay**, and **Link**.
@@ -14,12 +14,12 @@ This page describes pairing, Link mode, and the macOS AirDrop tabs.
 See [relay setup](relay.md) for the **Relay** tab.
 See [Windows and Linux](windows-linux.md) for the platform limits.
 
-Build the signed app with `bun run package:mac`. Then macOS opens `.sct-transfer` files in .sct.
+Build the signed app with `bun run package:mac`. Then macOS opens `.sct-transfer` files in global.sct.
 The development window registers no file type.
 
 ## Verify a device one time
 
-When you open **Sharing** for the first time, .sct creates a sharing identity in the vault.
+When you open **Sharing** for the first time, global.sct creates a sharing identity in the vault.
 Do these steps on both devices:
 
 1. Open **Sharing**, then open the **Verify devices** tab.
@@ -38,14 +38,14 @@ On Windows and Linux, use **Link** or **Relay** to send secrets.
 
 ## Send
 
-1. Open the **Send secrets** tab. You can also select **Share secrets** on a project page. Then .sct keeps that project selected.
+1. Open the **Send secrets** tab. You can also select **Share secrets** on a project page. Then global.sct keeps that project selected.
 2. Choose the source project.
 3. Choose a verified recipient.
 4. Choose the secrets.
 5. Select **Send to…**.
 6. In the picker, choose the same Mac.
 
-.sct encrypts the package for that device before it writes the transfer file.
+global.sct encrypts the package for that device before it writes the transfer file.
 The helper `native/airdrop.swift` opens only the AirDrop picker. It does not open the full macOS share menu.
 macOS reports the same result for a sent file and for **Cancel**. Thus the sender gets no delivery confirmation.
 
@@ -58,7 +58,7 @@ macOS reports the same result for a sent file and for **Cancel**. Thus the sende
 4. Select **Import secrets**.
 
 The sender's project name and folder do not select the destination.
-.sct saves the copies in the vault file of the destination project. Each copy gets a new data key.
+global.sct saves the copies in the vault file of the destination project. Each copy gets a new data key.
 If a secret name already exists in the destination, the import fails before any secret changes.
 
 ## Link mode
@@ -105,15 +105,15 @@ After a restart, the saved record and its receipt state stay in the vault sharin
 
 - A package expires after 24 hours. A package holds a maximum of 1000 secrets and 8 MiB.
 - A Link has a maximum of 16,384 characters. An expired Link fails import.
-- Before an import, .sct checks the verified sender, the signature, the recipient, the timestamps, and the message ID.
+- Before an import, global.sct checks the verified sender, the signature, the recipient, the timestamps, and the message ID.
 - Receipt records and encrypted vault markers prevent a second import of the same package.
   The Link and Direct modes use the same vault transfer ID, so one envelope cannot be imported twice across those modes.
   This protection also applies after a restart or after an interrupted import.
   An interrupted import stays bound to its first destination project.
 - An import makes a permanent local copy. Package expiry does not revoke an imported secret.
-- .sct does not send a secret that arrived through the relay with an injection-only grant or an expired grant.
-- .sct keeps outbound ciphertext in its app data until the app stops.
-  After a crash, .sct deletes expired packages when it starts again.
+- global.sct does not send a secret that arrived through the relay with an injection-only grant or an expired grant.
+- global.sct keeps outbound ciphertext in its app data until the app stops.
+  After a crash, global.sct deletes expired packages when it starts again.
 - An import or **Dismiss transfer** deletes the pending copy in the app data.
   The AirDrop file stays in Downloads. You can delete it after the import.
 - Secret values and private keys never go into transfer files, logs, or renderer responses.

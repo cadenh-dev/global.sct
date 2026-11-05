@@ -86,7 +86,7 @@ function CallerReview({ request, confirmed, disabled, onConfirm }: {
     ? 'Windows verified its Authenticode signature.' : 'macOS verified its code signature.'}</p>
   return (
     <>
-      <p>Caller: Unverified. .sct cannot identify the program that sent this request.</p>
+      <p>Caller: Unverified. global.sct cannot identify the program that sent this request.</p>
       {request.status === 'pending' && <label className="check-field">
         <input type="checkbox" checked={confirmed} disabled={disabled} onChange={(event) => onConfirm(event.target.checked)} />
         I started this request myself

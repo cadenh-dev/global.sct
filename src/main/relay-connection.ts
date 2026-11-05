@@ -256,10 +256,10 @@ export class Relay {
     this.cache = normalizeCache(await this.readSealed('cache', emptyCache))
     await this.load()
     if (this.writer) {
-      // The app stopped during these runs, so .sct cannot know whether the process finished. The user must review them.
+      // The app stopped during these runs, so global.sct cannot know whether the process finished. The user must review them.
       if (this.tasks.some((task) => task.state === 'claimed')) {
         await this.saveTasks(this.tasks.map((task) => task.state === 'claimed'
-          ? { ...task, state: 'uncertain', error: 'The app stopped during this run. Review it before .sct sends the result.' } : task))
+          ? { ...task, state: 'uncertain', error: 'The app stopped during this run. Review it before global.sct sends the result.' } : task))
       }
       await this.pruneRetained()
       // Agent sessions add request files while the app runs.
@@ -407,7 +407,7 @@ export class Relay {
       return null
     }
     if (this.tasks.some((item) => item.state === 'uncertain' && !item.reviewed)) {
-      throw new Error('Review the uncertain run first. .sct starts no new run before that review.')
+      throw new Error('Review the uncertain run first. global.sct starts no new run before that review.')
     }
     // Grant cleanup must finish before new access.
     await this.queueExpiryNotices(await writer.cleanupGrants())
@@ -735,7 +735,7 @@ export class Relay {
   }
 
   private requireWriter(): RelayWriter {
-    if (!this.writer) throw new Error('Open the .sct app to change relay data. An agent session can only read it.')
+    if (!this.writer) throw new Error('Open the global.sct app to change relay data. An agent session can only read it.')
     return this.writer
   }
 
@@ -793,7 +793,7 @@ export class Relay {
     }))
     for (const sent of remote.values()) {
       const state: RelayDeliveryState = sent.status === 'Received' ? 'failed' : 'sent'
-      const error = sent.status === 'Received' ? 'The local transfer is unavailable, so .sct cannot verify its receipt.' : null
+      const error = sent.status === 'Received' ? 'The local transfer is unavailable, so global.sct cannot verify its receipt.' : null
       items.push({
         messageId: sent.messageId,
         recipient: sent.recipient,
@@ -820,7 +820,7 @@ export class Relay {
         accessExpiresAt: null,
         accessExpiredAt: expiry.expiredAt,
         error: expiry.error,
-        receiptState: relayReceiptState(state, expiry.error ?? 'The local transfer is unavailable, so .sct cannot verify its receipt.', null)
+        receiptState: relayReceiptState(state, expiry.error ?? 'The local transfer is unavailable, so global.sct cannot verify its receipt.', null)
       }
     })))
     return items.sort((left, right) => (right.createdAt ?? '').localeCompare(left.createdAt ?? ''))
@@ -935,7 +935,7 @@ export class Relay {
     const arrived = opened.flatMap((item): ReceivedResult[] => item && 'result' in item ? [item.result] : [])
     // The first result of a task counts. A later result stays visible with an error.
     const results = arrived.map((result, index) => [...this.results, ...arrived.slice(0, index)].some((saved) => saved.taskId === result.taskId)
-      ? { ...result, error: 'Another result for this task arrived first. .sct shows the first result.' } : result)
+      ? { ...result, error: 'Another result for this task arrived first. global.sct shows the first result.' } : result)
     if (tasks.length) await this.saveTasks([...this.tasks, ...tasks])
     if (results.length) await this.saveResults([...this.results, ...results])
   }

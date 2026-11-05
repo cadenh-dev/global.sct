@@ -1,6 +1,6 @@
 # CLI and TypeScript runtime injection
 
-.sct gives a registered project its secrets without `.env` files or project-local manifests.
+global.sct gives a registered project its secrets without `.env` files or project-local manifests.
 The CLI and the SDK work offline. They need no relay, no MCP server, and no agent.
 In both paths, the signed Electron main process owns the vault key and decryption.
 The OS secret store is optional. A passphrase always opens the vault.
@@ -12,15 +12,15 @@ The OS secret store is optional. A passphrase always opens the vault.
 2. Install the `sct` command: `bun run install:cli`.
 3. If the installer tells you that the command folder is not in `PATH`, add it, then open a new terminal.
    - macOS and Linux: `export PATH="$HOME/.local/bin:$PATH"` in `~/.zshrc` or `~/.profile`.
-   - Windows: add `%LOCALAPPDATA%\Programs\sct\bin` to the user `PATH`.
+   - Windows: add `%LOCALAPPDATA%\Programs\global.sct\bin` to the user `PATH`.
 4. Open the app from `dist/`:
-   - macOS: `dist/sct-darwin-arm64/sct.app` on Apple Silicon, or `sct-darwin-x64` on Intel.
-   - Windows: `dist/sct-win32-<arch>/sct.exe`.
-   - Linux: `dist/sct-linux-<arch>/sct`.
+   - macOS: `dist/global.sct-darwin-arm64/global.sct.app` on Apple Silicon, or `global.sct-darwin-x64` on Intel.
+   - Windows: `dist/global.sct-win32-<arch>/sct.exe`.
+   - Linux: `dist/global.sct-linux-<arch>/sct`.
 5. Register your existing project folder.
 6. Save the variables of the project under **Open secrets**.
 
-Keep the vault outside the source folder. The project needs no `.sct` configuration file.
+Keep the vault outside the source folder. The project needs no configuration file.
 The desktop window can be open or closed during injection.
 
 ### Unlock
@@ -35,10 +35,10 @@ Each CLI path needs an unlocked vault.
 ### The `sct` command script
 
 On macOS and Linux, the installer writes `~/.local/bin/sct` as a shell script. The script runs the signed executable with `exec`.
-On Windows, the installer writes `%LOCALAPPDATA%\Programs\sct\bin\sct.cmd` and `sct.json`.
+On Windows, the installer writes `%LOCALAPPDATA%\Programs\global.sct\bin\sct.cmd` and `sct.json`.
 Electron finds its helper apps only from the real executable path. Thus the command is not a symbolic link.
 
-- The installer replaces an earlier .sct symbolic link to the same executable.
+- The installer replaces an earlier global.sct symbolic link to the same executable.
 - The installer keeps other commands. It rejects a script or a link for another application.
 - After a rebuild, the script uses the same app location. If you move the app, install the command again.
 - A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
@@ -52,7 +52,7 @@ From the registered source folder or a subfolder, run:
 sct run -- bun run dev
 ```
 
-.sct selects the nearest registered parent folder. The command runs in the registered source folder.
+global.sct selects the nearest registered parent folder. The command runs in the registered source folder.
 To select a project by its exact name, run:
 
 ```sh
@@ -68,7 +68,7 @@ The command receives the variables of the project before imports or package scri
 
 ### Restarts
 
-Keep the command running. When you add, update, or delete a saved key, .sct restarts the command with the current environment.
+Keep the command running. When you add, update, or delete a saved key, global.sct restarts the command with the current environment.
 You do not run the command again or copy new values into a shell.
 
 - `sct run` checks the encrypted file metadata every 500 milliseconds. It decrypts only when a revision changes.
@@ -78,11 +78,11 @@ You do not run the command again or copy new values into a shell.
 A restart interrupts the project, and its normal startup code runs again.
 Use this behavior only for development commands whose restart side effects you accept.
 
-1. .sct sends `SIGTERM` to the process group of the command.
-2. .sct waits a maximum of two seconds for the group to stop. Then it stops the remaining members.
-3. .sct starts the command again.
+1. global.sct sends `SIGTERM` to the process group of the command.
+2. global.sct waits a maximum of two seconds for the group to stop. Then it stops the remaining members.
+3. global.sct starts the command again.
 
-Windows has no process groups. .sct uses `taskkill /T` and then `taskkill /T /F` after the grace period.
+Windows has no process groups. global.sct uses `taskkill /T` and then `taskkill /T /F` after the grace period.
 A Windows command cannot always exit cleanly after Ctrl+C.
 A process that moves to another session stays under the control of the program that started it.
 
@@ -99,14 +99,14 @@ sct run --interactive "My project" -- pwsh.exe
 With `--interactive`, these rules apply:
 
 - The shell stays in the terminal of `sct`. On POSIX, it is not in a new session. On Windows, it uses the same console window.
-- .sct does not restart the shell. When a saved key changes, .sct writes "Secrets changed. Open a new terminal." one time. The shell keeps its start values.
-- The terminal sends Ctrl+C and hang-up to the shell. .sct ignores these signals and forwards nothing.
+- global.sct does not restart the shell. When a saved key changes, global.sct writes "Secrets changed. Open a new terminal." one time. The shell keeps its start values.
+- The terminal sends Ctrl+C and hang-up to the shell. global.sct ignores these signals and forwards nothing.
 - `SIGTERM` to `sct` stops the shell, so no shell with secrets stays after `sct` exits.
 - The exit code is the exit code of the shell.
 
-On Windows, give the executable of the shell, for example `pwsh.exe` or `cmd.exe`. .sct starts no shell for you, so a `.cmd` or `.bat` file cannot start.
+On Windows, give the executable of the shell, for example `pwsh.exe` or `cmd.exe`. global.sct starts no shell for you, so a `.cmd` or `.bat` file cannot start.
 
-The VS Code extension uses this form in its **Open terminal with .sct secrets** command.
+The VS Code extension uses this form in its **Open terminal with global.sct secrets** command.
 Only that terminal gets the project secrets.
 See [VS Code extension](vscode.md).
 
@@ -116,13 +116,13 @@ See [VS Code extension](vscode.md).
 - `Ctrl+C`, `SIGTERM`, and `SIGHUP` go to the process group of the command.
 - When the command exits normally, `sct run` exits with the same code.
 - When a signal ends the command, `sct run` returns `128 + signal number`.
-- .sct does not start a command again after a normal exit or a crash.
+- global.sct does not start a command again after a normal exit or a crash.
 
 ### Failures
 
 - If a missing prerequisite stops the first start, `sct run` fails immediately.
-- If a later vault read fails, .sct stops the command and reports a diagnostic without values.
-  .sct continues to check the storage. When the vault is readable again, .sct starts the command again.
+- If a later vault read fails, global.sct stops the command and reports a diagnostic without values.
+  global.sct continues to check the storage. When the vault is readable again, global.sct starts the command again.
 - A new project needs at least one saved secret. The first secret makes the encrypted vault file.
 
 ## TypeScript SDK: load inside your code
@@ -131,7 +131,7 @@ The dependency-free [`@sct/env` SDK](../packages/env/README.md) loads the same v
 It keeps `process.env` current without a restart.
 
 - Build the SDK with `bun run build:sdk`.
-- Install it with `bun add /absolute/path/to/.sct/packages/env`.
+- Install it with `bun add /absolute/path/to/global.sct/packages/env`.
 - It needs macOS, Windows, or Linux, Node.js 22.18 or later or Bun, and the installed `sct` command.
   On Windows, the SDK reads `sct.json` from the install folder. Set `SCT_CLI` to use another executable path.
 
@@ -152,8 +152,8 @@ The SDK guide tells you how to write the bootstrap file, use `onChange` and `onE
 3. Run your normal development command through `sct run`, or use the SDK bootstrap.
 4. Change a saved value in the app. `sct run` restarts the project. The SDK updates the environment of its own process.
 
-.sct does not import, delete, or change an existing `.env` file.
-Move the values into .sct before you delete that file from the project.
+global.sct does not import, delete, or change an existing `.env` file.
+Move the values into global.sct before you delete that file from the project.
 A program that starts without the SDK and without `sct run` gets no values.
 
 ## Loader compatibility
@@ -177,10 +177,10 @@ The #32 Python checks do not apply to the TypeScript SDK. The SDK has no Python 
 
 ## Storage and trust
 
-- Vault files stay encrypted in the external `.sct/[project-name]/secrets.sct` folder.
+- Vault files stay encrypted in the external `global.sct/[project-name]/secrets.sct` folder.
 - The vault clears decrypted Buffers and copied value keys after use. It deletes temporary environment references after use.
 - `sct run` and the SDK make no plaintext secret file, project manifest, copied key, symbolic link, or FIFO in the project.
-- The `sct` command script is outside the project: `~/.local/bin` on macOS and Linux, or `%LOCALAPPDATA%\Programs\sct\bin` on Windows.
+- The `sct` command script is outside the project: `~/.local/bin` on macOS and Linux, or `%LOCALAPPDATA%\Programs\global.sct\bin` on Windows.
 - The renderer API returns metadata only.
 
 A program and its descendants can copy, print, save, or send their environment. Run only code that you trust.

@@ -16,7 +16,7 @@ export async function runMcp(args: string[], submit: AgentSubmit, skills: string
   if (args.length !== 1 || process.stdin.isTTY || process.stdout.isTTY) {
     throw new Error('Usage: sct mcp. The MCP transport requires private process pipes.')
   }
-  const server = new McpServer({ name: '.sct', version })
+  const server = new McpServer({ name: 'global.sct', version })
   for (const [operation, tool] of Object.entries(agentTools)) {
     const schema: ZodType<Record<string, unknown>> = tool.schema
     server.registerTool(operation, { description: tool.description, inputSchema: schema,
@@ -34,7 +34,7 @@ export async function runMcp(args: string[], submit: AgentSubmit, skills: string
       }
     })
     const instructions = () => readFile(join(skills, `sct-${operation.replaceAll('_', '-')}`, 'SKILL.md'), 'utf8')
-    server.registerResource(operation, `sct://skills/${operation}`, { description: tool.description, mimeType: 'text/markdown' },
+    server.registerResource(operation, `global-sct://skills/${operation}`, { description: tool.description, mimeType: 'text/markdown' },
       async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: await instructions() }] }))
     server.registerPrompt(operation, { description: tool.description }, async () => ({
       messages: [{ role: 'user', content: { type: 'text', text: await instructions() } }]

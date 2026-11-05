@@ -46,13 +46,13 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           mkdir dist/dmg
-          ditto dist/sct-darwin-arm64/sct.app dist/dmg/sct.app
+          ditto dist/global.sct-darwin-arm64/global.sct.app dist/dmg/global.sct.app
           ln -s /Applications dist/dmg/Applications
-          hdiutil create -volname sct -srcfolder dist/dmg -format UDZO "dist/sct-macos-arm64-$version.dmg"
+          hdiutil create -volname global.sct -srcfolder dist/dmg -format UDZO "dist/global.sct-macos-arm64-$version.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
-          path: dist/sct-macos-arm64-*.dmg
+          path: dist/global.sct-macos-arm64-*.dmg
           if-no-files-found: error
           retention-days: 1
 
@@ -76,11 +76,11 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.Substring(1)
-          Compress-Archive -Path dist/sct-win32-x64/* -DestinationPath "dist/sct-windows-x64-$version.zip"
+          Compress-Archive -Path dist/global.sct-win32-x64/* -DestinationPath "dist/global.sct-windows-x64-$version.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/sct-windows-x64-*.zip
+          path: dist/global.sct-windows-x64-*.zip
           if-no-files-found: error
           retention-days: 1
 
@@ -103,11 +103,11 @@ jobs:
       - name: Create archive
         run: |
           version="${GITHUB_REF_NAME#v}"
-          tar -czf "dist/sct-linux-x64-$version.tar.gz" -C dist/sct-linux-x64 .
+          tar -czf "dist/global.sct-linux-x64-$version.tar.gz" -C dist/global.sct-linux-x64 .
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: dist/sct-linux-x64-*.tar.gz
+          path: dist/global.sct-linux-x64-*.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -124,7 +124,7 @@ jobs:
           merge-multiple: true
       - name: Create checksums
         working-directory: release
-        run: sha256sum sct-* > SHA256SUMS.txt
+        run: sha256sum global.sct-* > SHA256SUMS.txt
       - name: Write release notes
         run: |
           cat > release-notes.md <<EOF
@@ -134,7 +134,7 @@ jobs:
           Verify each file with SHA256SUMS.txt before you run it.
 
           - Windows: unzip, then run sct.exe. Select More info, then Run anyway if SmartScreen blocks it.
-          - macOS: open the DMG and copy sct.app to Applications. Right-click the app and select Open.
+          - macOS: open the DMG and copy global.sct.app to Applications. Right-click the app and select Open.
           - Linux: extract the archive, then run sct.
 
           The macOS build has an ad-hoc signature and no notarization.

@@ -17,7 +17,7 @@ import type { SecretStore } from './key-store.ts'
 const magic = Buffer.from('SCT2')
 const cleanupMagic = Buffer.from('SCG2')
 const internalMagic = Buffer.from('SCI2')
-const vaultDirectoryName = '.sct'
+const vaultDirectoryName = 'global.sct'
 const secretsFileName = 'secrets.sct'
 const headerFileName = 'vault.json'
 const cleanupFileName = 'grant-cleanup.sct'
@@ -164,8 +164,8 @@ export class Vault {
       const current = this.location()
       const target = join(newRoot, vaultDirectoryName)
       if (target === current) return current
-      if (target.startsWith(`${current}${sep}`)) throw new Error('Select a folder outside the current .sct folder.')
-      if (await exists(target)) throw new Error('The selected folder already contains a .sct folder. Select a different folder.')
+      if (target.startsWith(`${current}${sep}`)) throw new Error('Select a folder outside the current global.sct folder.')
+      if (await exists(target)) throw new Error('The selected folder already contains a global.sct folder. Select a different folder.')
 
       await moveDirectory(current, target)
       try {
@@ -640,11 +640,11 @@ export class Vault {
     try {
       settings = JSON.parse(contents)
     } catch (error) {
-      throw new Error('The storage settings are invalid. .sct did not change them.', { cause: error })
+      throw new Error('The storage settings are invalid. global.sct did not change them.', { cause: error })
     }
     if (typeof settings !== 'object' || settings === null || !('vaultRoot' in settings) ||
       typeof settings.vaultRoot !== 'string' || !isAbsolute(settings.vaultRoot)) {
-      throw new Error('The storage settings are invalid. .sct did not change them.')
+      throw new Error('The storage settings are invalid. global.sct did not change them.')
     }
     return settings.vaultRoot
   }
@@ -670,7 +670,7 @@ export class Vault {
       throw new Error(`Cannot read the secrets of ${project.name}.`, { cause: error })
     }
 
-    const invalid = `The secrets file of ${project.name} is invalid or belongs to a different project. .sct did not change it.`
+    const invalid = `The secrets file of ${project.name} is invalid or belongs to a different project. global.sct did not change it.`
     const sealed = decodeFile(magic, contents)
     if (!sealed) throw new Error(invalid)
     let secrets: unknown
@@ -882,7 +882,7 @@ async function requireDirectory(path: unknown): Promise<string> {
     if (!(await stat(directory)).isDirectory()) throw new Error('Not a directory.')
     return directory
   } catch (error) {
-    throw new Error('Select an existing folder that .sct can access.', { cause: error })
+    throw new Error('Select an existing folder that global.sct can access.', { cause: error })
   }
 }
 

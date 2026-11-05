@@ -1,14 +1,14 @@
 # Local macOS signing
 
-The signed build uses the `.sct Development` identity from your macOS Keychain.
-The bundle identifier is `com.omavashia2005.sct`.
+The signed build uses the `global.sct Development` identity from your macOS Keychain.
+The bundle identifier is `app.global-sct.desktop`.
 Keep both values unchanged between builds.
 
 ## Create the local identity once
 
 1. Open **Keychain Access** through Spotlight.
 2. Select **Keychain Access → Certificate Assistant → Create a Certificate…** in the macOS menu bar.
-3. Enter `.sct Development` as the certificate name.
+3. Enter `global.sct Development` as the certificate name.
 4. Select **Self Signed Root** as the identity type.
 5. Select **Code Signing** as the certificate type.
 6. Create the certificate in your **login** Keychain.
@@ -27,7 +27,7 @@ Check that macOS recognizes the identity:
 security find-identity -v -p codesigning
 ```
 
-The output must contain exactly one valid identity named `.sct Development`.
+The output must contain exactly one valid identity named `global.sct Development`.
 The packaging command rejects missing or duplicate identities. It does not fall back to unsigned or ad-hoc signing.
 Only `SCT_SIGN=adhoc` selects ad-hoc signing. See [CI release builds](#ci-release-builds).
 
@@ -47,9 +47,9 @@ This code-signing check replaces the signing library's general certificate looku
 The command then checks the complete signature and the expected bundle identifier and certificate.
 No private key enters the build directory or application bundle.
 
-On Apple Silicon, the output is `dist/sct-darwin-arm64/sct.app`.
-On Intel Macs, the output is `dist/sct-darwin-x64/sct.app`.
-The application window uses `.sct`. The filename is `sct.app` so Finder displays the application normally.
+On Apple Silicon, the output is `dist/global.sct-darwin-arm64/global.sct.app`.
+On Intel Macs, the output is `dist/global.sct-darwin-x64/global.sct.app`.
+The application window uses `global.sct`. The filename is `global.sct.app` so Finder displays the application normally.
 Git ignores `dist/` and `out/`.
 
 macOS may request permission for `codesign` to use the private key.
@@ -58,10 +58,10 @@ Approve that request through macOS. Do not enter your Keychain password into a p
 Open the signed app on Apple Silicon:
 
 ```sh
-open dist/sct-darwin-arm64/sct.app
+open dist/global.sct-darwin-arm64/global.sct.app
 ```
 
-Use the `sct-darwin-x64` directory on an Intel Mac.
+Use the `global.sct-darwin-x64` directory on an Intel Mac.
 Run `bun run install:cli` to install the `sct` command. See [CLI and SDK setup](runtime-injection.md).
 `bun run dev` and `bun start` use the development Electron runner. They create no signed app.
 
@@ -76,12 +76,12 @@ Run `bun run install:cli` to install the `sct` command. See [CLI and SDK setup](
 For an additional inspection on Apple Silicon:
 
 ```sh
-codesign --verify --deep --strict --verbose=2 dist/sct-darwin-arm64/sct.app
-codesign --display --verbose=4 dist/sct-darwin-arm64/sct.app
-codesign --display --requirements - dist/sct-darwin-arm64/sct.app
+codesign --verify --deep --strict --verbose=2 dist/global.sct-darwin-arm64/global.sct.app
+codesign --display --verbose=4 dist/global.sct-darwin-arm64/global.sct.app
+codesign --display --requirements - dist/global.sct-darwin-arm64/global.sct.app
 ```
 
-The identifier must be `com.omavashia2005.sct`. The authority must be `.sct Development`.
+The identifier must be `app.global-sct.desktop`. The authority must be `global.sct Development`.
 The designated requirement must remain the same after a rebuild.
 
 ## App icon
@@ -94,8 +94,8 @@ Then it makes the icon sizes with `sips` and the `.icns` file with `iconutil`.
 ## CI release builds
 
 The Release workflow (`.github/workflows/release.yml`) runs on each push to `main`. It does not wait for the Checks workflow.
-It runs `bun run package:mac` with `SCT_SIGN=adhoc`, because the CI runner has no `.sct Development` identity.
-It puts `sct.app` and an Applications link into `sct-macos-arm64.dmg`.
+It runs `bun run package:mac` with `SCT_SIGN=adhoc`, because the CI runner has no `global.sct Development` identity.
+It puts `global.sct.app` and an Applications link into `global.sct-macos-arm64.dmg`.
 Then it replaces the `latest` prerelease and its tag with a new prerelease for the pushed commit.
 A newer push stops an older run.
 

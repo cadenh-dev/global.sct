@@ -7,7 +7,7 @@ import { selectWorkspaceFolder } from './workspace'
 export function activate(context: vscode.ExtensionContext): void {
   const secrets = new SecretTree()
   const view = vscode.window.createTreeView('sct.secrets', { treeDataProvider: secrets })
-  view.message = 'Use Refresh .sct secrets to request metadata.'
+  view.message = 'Use Refresh global.sct secrets to request metadata.'
   context.subscriptions.push(
     secrets,
     view,
@@ -22,21 +22,21 @@ async function openTerminal(): Promise<void> {
   if (!folder) return
   try {
     vscode.window.createTerminal({
-      name: `.sct: ${folder.name}`,
+      name: `global.sct: ${folder.name}`,
       shellPath: sctExecutable(),
       shellArgs: ['run', '--interactive', '--', vscode.env.shell],
       cwd: folder.uri.fsPath
     }).show()
   } catch (error) {
-    await vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Cannot open the .sct terminal.')
+    await vscode.window.showErrorMessage(error instanceof Error ? error.message : 'Cannot open the global.sct terminal.')
   }
 }
 
 async function showStatus(): Promise<void> {
   try {
     const status = await readSctStatus()
-    await vscode.window.showInformationMessage(`.sct ${status.version} at ${status.executable}`)
+    await vscode.window.showInformationMessage(`global.sct ${status.version} at ${status.executable}`)
   } catch {
-    await vscode.window.showErrorMessage('Cannot run .sct. Install the sct CLI and make it available on PATH, or set SCT_CLI.')
+    await vscode.window.showErrorMessage('Cannot run global.sct. Install the sct CLI and make it available on PATH, or set SCT_CLI.')
   }
 }

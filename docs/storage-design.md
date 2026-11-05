@@ -2,7 +2,7 @@
 
 ## 1. Overview and goals
 
-This document designs the new vault storage for `.sct`.
+This document designs the new vault storage for `global.sct`.
 It covers Phase 0 only. See [docs/fork-plan.md](fork-plan.md) for the decisions.
 It does not change any code. It is a design.
 
@@ -10,7 +10,7 @@ It does not change any code. It is a design.
 
 The current vault keeps one key for each value. See [docs/storage.md](storage.md).
 It keeps a file key for each project too.
-Every key lives in the OS secret store under the `.sct` service.
+Every key lives in the OS secret store under the `global.sct` service.
 `vault.ts` reads each key with `AsyncEntry` from `@napi-rs/keyring`.
 A project read starts one secret-store read for each value.
 
@@ -32,7 +32,7 @@ The OS secret store holds at most one item, and only as a convenience (D1).
 1. AES-256-GCM protects every ciphertext. `seal.ts` stays the cipher layer.
 2. Additional authenticated data binds each ciphertext to its project and secret.
 3. The serial queue in `vault.ts` stays. One operation runs at a time.
-4. The app identity stays `com.omavashia2005.sct`, and the names stay `sct`, `@sct/env`, and MCP `sct` (D5, D19).
+4. The app identity stays `app.global-sct.desktop`, and the names stay `sct`, `@sct/env`, and MCP `sct` (D5, D19).
 
 ### Clean break
 
@@ -47,17 +47,17 @@ The old sharing identity and relay token are not read. The device gets a new dev
 
 ### Location
 
-The vault folder stays `~/.sct` by default.
+The vault folder stays `~/global.sct` by default.
 `settings.json` in the Electron `userData` folder can move the root. This behavior stays.
-On macOS the `userData` folder is usually `~/Library/Application Support/.sct`.
+On macOS the `userData` folder is usually `~/Library/Application Support/global.sct`.
 
 ### Files
 
 | File | Location | Content |
 |---|---|---|
-| `vault.json` | `~/.sct/vault.json` | The header. The KDF params, the salt, the verification tag, and the wrapped master key. |
-| `secrets.sct` | `~/.sct/[project-name]/secrets.sct` | The encrypted secrets of one project. |
-| `.internal/` | `~/.sct/internal/` | One sealed file for the sharing identity and each relay token. The master key seals each file. |
+| `vault.json` | `~/global.sct/vault.json` | The header. The KDF params, the salt, the verification tag, and the wrapped master key. |
+| `secrets.sct` | `~/global.sct/[project-name]/secrets.sct` | The encrypted secrets of one project. |
+| `.internal/` | `~/global.sct/internal/` | One sealed file for the sharing identity and each relay token. The master key seals each file. |
 | `settings.json` | `userData` folder | The vault root path. No secret. |
 
 The per-project file name and path stay the same as today.
@@ -333,7 +333,7 @@ It is not a replacement for the passphrase.
 
 When the user turns on "remember this device", the vault stores the master key in the OS secret store.
 It uses `@napi-rs/keyring`. That package uses Windows Credential Manager, Linux libsecret, or macOS Keychain.
-The vault stores one item. The account name is `master-key`. The service stays `.sct`.
+The vault stores one item. The account name is `master-key`. The service is `global.sct`.
 
 On a later start, the vault reads the stored master key.
 It verifies the key against the verifier in `vault.json`.
@@ -423,7 +423,7 @@ The interface uses `Buffer` and `null`. It never uses `any`.
 
 | Implementation | Backing | Responsibility |
 |---|---|---|
-| `KeyringSecretStore` | `@napi-rs/keyring` `AsyncEntry` | The real store. It reads, writes, and clears the `master-key` item under the `.sct` service. `available` tries a safe read and reports success or failure. |
+| `KeyringSecretStore` | `@napi-rs/keyring` `AsyncEntry` | The real store. It reads, writes, and clears the `master-key` item under the `global.sct` service. `available` tries a safe read and reports success or failure. |
 | `PassphraseOnlySecretStore` | None | For systems with no secret service. `read` returns `null`. `write` and `clear` do nothing. `available` returns `false`. The vault then always prompts for the passphrase. |
 | `InMemorySecretStore` | A field in the object | For tests. It holds one optional `Buffer`. It avoids `globalThis`. It needs no OS access. |
 

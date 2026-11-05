@@ -16,7 +16,7 @@ export async function resolveProject(projects: ProjectStore, name?: string) {
     const path = relative(project.directory, directory)
     return !isAbsolute(path) && path !== '..' && !path.startsWith(`..${sep}`)
   }).sort((a, b) => b.directory.length - a.directory.length)[0]
-  if (!project) throw new Error('Register this project folder in .sct first, or specify its registered name.')
+  if (!project) throw new Error('Register this project folder in global.sct first, or specify its registered name.')
   return project
 }
 
@@ -50,7 +50,7 @@ export async function streamEnvironment(projects: ProjectStore, vault: Vault, na
     () => vault.withProjectSecrets(project.id, (_project, values) => {
       process.stdout.write(`${JSON.stringify({ values } satisfies EnvironmentMessage)}\n`)
     }),
-    async () => { process.stdout.write(`${JSON.stringify({ error: 'Cannot refresh .sct secrets. Check the project, vault, and storage.' })}\n`) }
+    async () => { process.stdout.write(`${JSON.stringify({ error: 'Cannot refresh global.sct secrets. Check the project, vault, and storage.' })}\n`) }
   )
   try {
     process.stdin.resume()

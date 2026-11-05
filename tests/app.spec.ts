@@ -29,7 +29,7 @@ test('adds existing folders offline and restores projects after restart', async 
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text())
     })
-    await expect(page).toHaveTitle('.sct')
+    await expect(page).toHaveTitle('global.sct')
     await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Your projects start here' })).toBeVisible()
     await page.evaluate(() => document.fonts.ready.then(() => undefined))
@@ -116,7 +116,7 @@ test('manages secrets per project without rendering stored values', async () => 
     await page.getByLabel('Folder path').fill(folder)
     await page.getByRole('button', { name: 'Add project', exact: true }).click()
     await expect(page.getByRole('list', { name: 'Projects' })).toContainText('0 secrets')
-    expect((await readdir(join(root, '.sct'))).sort()).toEqual(['Demo', 'vault.json'])
+    expect((await readdir(join(root, 'global.sct'))).sort()).toEqual(['Demo', 'vault.json'])
 
     await page.getByRole('link', { name: 'Open secrets' }).click()
     await expect(page.getByRole('heading', { name: 'Demo', exact: true })).toBeVisible()
@@ -149,7 +149,7 @@ test('manages secrets per project without rendering stored values', async () => 
     await page.getByRole('button', { name: 'Save value' }).click()
     await expect(page.getByRole('status').first()).toHaveText('The value of OPENAI_API_KEY was updated.')
 
-    const file = await readFile(join(root, '.sct', 'Demo', 'secrets.sct'))
+    const file = await readFile(join(root, 'global.sct', 'Demo', 'secrets.sct'))
     expect(file.includes(value) || file.includes('OPENAI_API_KEY')).toBe(false)
     expect(await page.content()).not.toContain(value)
 
@@ -164,10 +164,10 @@ test('manages secrets per project without rendering stored values', async () => 
     await mkdir(join(root, 'moved'))
     await page.getByRole('link', { name: 'Storage' }).click()
     await expect(page.getByRole('heading', { name: 'Storage', exact: true })).toBeVisible()
-    await expect(page.getByText(join(root, '.sct'), { exact: true })).toBeVisible()
+    await expect(page.getByText(join(root, 'global.sct'), { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Change location…' }).click()
-    await expect(page.getByRole('status').first()).toHaveText(`The vault moved to ${join(root, 'moved', '.sct')}.`)
-    expect((await readdir(join(root, 'moved', '.sct'))).sort()).toEqual(['Demo', 'vault.json'])
+    await expect(page.getByRole('status').first()).toHaveText(`The vault moved to ${join(root, 'moved', 'global.sct')}.`)
+    expect((await readdir(join(root, 'moved', 'global.sct'))).sort()).toEqual(['Demo', 'vault.json'])
     await page.screenshot({ path: test.info().outputPath('storage.png') })
 
     await application.close()
@@ -184,7 +184,7 @@ test('manages secrets per project without rendering stored values', async () => 
     await page.getByLabel('New name for Demo').fill('Renamed')
     await page.getByRole('button', { name: 'Save name' }).click()
     await expect(page.getByRole('list', { name: 'Projects' })).toContainText('Renamed')
-    expect((await readdir(join(root, 'moved', '.sct'))).sort()).toEqual(['Renamed', 'vault.json'])
+    expect((await readdir(join(root, 'moved', 'global.sct'))).sort()).toEqual(['Renamed', 'vault.json'])
 
     const cli = spawn(application.process().spawnfile, [join(__dirname, 'electron-entry.cjs'), userData,
       'run', 'Renamed', '--', process.execPath, '-e', `
@@ -269,7 +269,7 @@ test('manages secrets per project without rendering stored values', async () => 
     await page.getByLabel('Type Renamed to confirm').fill('Renamed')
     await page.getByRole('button', { name: 'Delete project' }).click()
     await expect(page.getByRole('heading', { name: 'Your projects start here' })).toBeVisible()
-    expect((await readdir(join(root, 'moved', '.sct'))).sort()).toEqual(['vault.json'])
+    expect((await readdir(join(root, 'moved', 'global.sct'))).sort()).toEqual(['vault.json'])
     expect(messages.filter((message) => message.startsWith('error') || message.includes(value))).toEqual([])
   } finally {
     // The app deletes its own Keychain items. Keychain reads from this test process wait for a macOS access prompt.

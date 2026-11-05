@@ -30,12 +30,12 @@ export class SecretTree implements vscode.TreeDataProvider<SctSecret>, vscode.Di
       this.secrets = []
       this.changed.fire()
       view.description = folder.name
-      view.message = 'Waiting for a decision in the .sct app.'
+      view.message = 'Waiting for a decision in the global.sct app.'
       this.secrets = await readSecretMetadata(folder.uri.fsPath)
       view.message = this.secrets.length ? undefined : 'This project has no saved secrets.'
       this.changed.fire()
     } catch (error) {
-      view.message = 'Cannot read the .sct secret metadata.'
+      view.message = 'Cannot read the global.sct secret metadata.'
       await vscode.window.showErrorMessage(error instanceof Error ? error.message : view.message)
     } finally {
       this.refreshing = false

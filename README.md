@@ -1,12 +1,14 @@
-# .sct
+# global.sct
 
-.sct is a desktop app for macOS, Windows, and Linux. It keeps project secrets out of project folders.
+global.sct is a desktop app for macOS, Windows, and Linux. It keeps project secrets out of project folders.
 Your project needs no `.env` file.
 
-- **Vault.** .sct keeps secrets in an encrypted local vault. A passphrase derives one master key, and each value has its own data key. The OS secret store is optional.
+Existing installations: follow the [storage migration guide](docs/fork-storage-migration.md) before starting the fork.
+
+- **Vault.** global.sct keeps secrets in an encrypted local vault. A passphrase derives one master key, and each value has its own data key. The OS secret store is optional.
 - **Runtime injection.** `sct run -- <command>` gives the command its secrets as environment variables.
 - **SDK.** The dependency-free `@sct/env` package loads secrets into `process.env` and applies saved changes without a restart.
-- **Sharing.** .sct sends encrypted secrets to a verified device through AirDrop on macOS or through a relay.
+- **Sharing.** global.sct sends encrypted secrets to a verified device by link, through AirDrop on macOS, or through a relay.
 - **Agent Access.** Coding agents use secrets through a CLI and an MCP server. Each request opens a local approval window. Agents never receive secret values.
 
 
@@ -15,12 +17,12 @@ Demo video: https://youtu.be/kQwLTeVe2OE
 ## Download
 
 Releases use versioned Git tags such as `v0.1.0-beta.1`. They are unsigned beta builds until signing is available.
-Each release has a macOS DMG, a Windows ZIP, a Linux archive, and `SHA256SUMS.txt` on the [releases page](https://github.com/omavashia2005/.sct/releases).
+Each release has a macOS DMG, a Windows ZIP, a Linux archive, and `SHA256SUMS.txt` on the [releases page](https://github.com/cadenh-dev/global.sct/releases).
 The macOS app has an ad-hoc signature and no notarization. Thus macOS blocks the first start.
-Copy `sct.app` to Applications. Then right-click the app and select **Open**, or run:
+Copy `global.sct.app` to Applications. Then right-click the app and select **Open**, or run:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/sct.app
+xattr -dr com.apple.quarantine /Applications/global.sct.app
 ```
 
 On Windows, unzip the package and run `sct.exe`. If SmartScreen blocks it, select **More info**, then **Run anyway**.
@@ -31,8 +33,8 @@ On Linux, extract the archive and run `sct`.
 Use macOS, Windows, or Linux, Bun 1.4.4 or later, and Node.js 22.18 or later. On macOS, also install the Xcode command line tools.
 
 ```sh
-git clone https://github.com/omavashia2005/.sct.git
-cd .sct
+git clone https://github.com/cadenh-dev/global.sct.git
+cd global.sct
 bun install
 bun run dev
 ```
@@ -58,7 +60,7 @@ To load secrets in code, build the SDK and add it to your application. The SDK i
 
 ```sh
 bun run build:sdk
-bun add /absolute/path/to/.sct/packages/env   # Run this command in your application folder.
+bun add /absolute/path/to/global.sct/packages/env   # Run this command in your application folder.
 ```
 
 Load the secrets before the application imports:
@@ -108,13 +110,13 @@ To use your own relay, see [relay setup](docs/relay.md).
 Paste this prompt into your coding agent:
 
 ```text
-Set up .sct on this computer. Follow these steps in sequence:
+Set up global.sct on this computer. Follow these steps in sequence:
 
-1. Clone https://github.com/omavashia2005/.sct.git and open the cloned folder.
+1. Clone https://github.com/cadenh-dev/global.sct.git and open the cloned folder.
 2. Read AGENTS.md and README.md.
 3. Run `bun install`.
 4. On macOS, run `security find-identity -v -p codesigning`.
-   If the output does not show exactly one valid ".sct Development" identity, stop.
+   If the output does not show exactly one valid "global.sct Development" identity, stop.
    Tell me to follow docs/macos-signing.md. Do not create, export, or change certificates.
    On Windows or Linux, skip this step.
 5. Run the package command for this platform, then run `bun run install:cli`.
@@ -126,7 +128,7 @@ Set up .sct on this computer. Follow these steps in sequence:
 Rules:
 - Never read, print, or write a secret value.
 - Never create a .env file or another secret file.
-- Each .sct request opens an approval window. Wait for my decision. Do not retry a refused or expired request without my instruction.
+- Each global.sct request opens an approval window. Wait for my decision. Do not retry a refused or expired request without my instruction.
 ```
 
 ## Known limitations

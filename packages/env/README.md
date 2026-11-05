@@ -1,13 +1,13 @@
 # @sct/env
 
-Load a registered project's `.sct` secrets into `process.env` and keep them current.
+Load a registered project's `global.sct` secrets into `process.env` and keep them current.
 This package has no runtime dependencies. It supports server-side TypeScript on macOS with Node.js 22.18 or later and Bun.
 It requires the installed `sct` command. Vault access and decryption stay in the signed Electron main process.
 On Windows, the installer writes `sct.json` next to `sct.cmd`. The SDK reads the executable path from that file. Set `SCT_CLI` to use another executable path.
 
 ## Install from this repository
 
-Build the package in the .sct repository:
+Build the package in the global.sct repository:
 
 ```sh
 bun run build:sdk
@@ -16,11 +16,11 @@ bun run build:sdk
 Install it in your application:
 
 ```sh
-bun add /absolute/path/to/.sct/packages/env
+bun add /absolute/path/to/global.sct/packages/env
 ```
 
 The package is not published to npm yet. Use this local installation until a release exists.
-Register your application's source folder and save its secrets in the .sct desktop app.
+Register your application's source folder and save its secrets in the global.sct desktop app.
 Follow the [CLI setup](../../docs/runtime-injection.md) once to make `sct` available on `PATH`.
 
 ## Load before application imports

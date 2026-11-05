@@ -1,15 +1,15 @@
 # VS Code extension
 
-The VS Code extension is a local client of the .sct app.
+The VS Code extension is a local client of the global.sct app.
 It shows secret metadata for the open workspace folder and opens a terminal with the project secrets.
 It never receives a secret value or a private key.
 
 ## Requirements
 
 - VS Code 1.145 or later.
-- The .sct app and the `sct` CLI installed on the same device.
-- A workspace folder that is registered as an .sct project.
-- The vault unlocked in the .sct app or through the CLI.
+- The global.sct app and the `sct` CLI installed on the same device.
+- A workspace folder that is registered as a global.sct project.
+- The vault unlocked in the global.sct app or through the CLI.
 
 The extension starts the installed CLI. It does not bundle a second copy.
 On Windows, the extension uses `sct.exe`, not the `sct.cmd` shim.
@@ -35,14 +35,14 @@ Open the Command Palette and run one of these commands:
 
 | Command | Result |
 |---|---|
-| `Show .sct status` | Runs `sct --version` and shows the version and executable path |
-| `Refresh .sct secrets` | Reads secret names and IDs for the selected workspace folder |
-| `Open terminal with .sct secrets` | Opens a terminal that runs `sct run --interactive -- <shell>` |
+| `Show global.sct status` | Runs `sct --version` and shows the version and executable path |
+| `Refresh global.sct secrets` | Reads secret names and IDs for the selected workspace folder |
+| `Open terminal with global.sct secrets` | Opens a terminal that runs `sct run --interactive -- <shell>` |
 
 ### Secret metadata
 
-The **.sct secrets** view is in the Explorer.
-Select **Refresh .sct secrets** in the view title.
+The **global.sct secrets** view is in the Explorer.
+Select **Refresh global.sct secrets** in the view title.
 
 The extension runs this command in the selected workspace folder:
 
@@ -50,7 +50,7 @@ The extension runs this command in the selected workspace folder:
 sct agent list_secrets --stdin
 ```
 
-The request goes through the local Agent Access approval window in the .sct app.
+The request goes through the local Agent Access approval window in the global.sct app.
 The extension receives names and IDs only.
 It does not receive values, wrapped keys, or private keys.
 
@@ -74,7 +74,7 @@ On macOS and Linux, it is the configured shell.
 
 ## Approval and caller identity
 
-The .sct app still owns the approval decision.
+The global.sct app still owns the approval decision.
 The extension does not add a second approval window.
 
 The caller walk identifies the editor process:
@@ -83,7 +83,7 @@ The caller walk identifies the editor process:
 - macOS: the `Code` app with the `com.microsoft.VSCode` identifier and the Microsoft Team ID.
 - Linux: the name `code` gives an unverified caller. The approval window asks for the extra confirmation.
 
-Open the .sct app and approve the request.
+Open the global.sct app and approve the request.
 The approval applies to one request and one deadline.
 
 ## Limits
@@ -99,9 +99,9 @@ The approval applies to one request and one deadline.
 
 | Problem | Action |
 |---|---|
-| `Cannot run .sct` | Install the `sct` CLI, add it to `PATH`, or set `SCT_CLI` to the full `sct.exe` path |
+| `Cannot run global.sct` | Install the `sct` CLI, add it to `PATH`, or set `SCT_CLI` to the full `sct.exe` path |
 | No secrets appear | Unlock the vault, register the folder as a project, and approve the request in the app |
-| The request stays pending | Open the .sct window and check the Agent Access request |
+| The request stays pending | Open the global.sct window and check the Agent Access request |
 | The terminal opens without secrets | Check the workspace folder, the vault lock, and the approval state |
 | More than one workspace folder exists | Run the command again and select the correct folder |
 | Windows cannot start `sct.cmd` | Use `sct.exe` or set `SCT_CLI` to its full path |

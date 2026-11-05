@@ -6,13 +6,18 @@ This document is a plan. It changes no code.
 The closed decisions are in [docs/fork-plan.md](fork-plan.md). This plan does not open them again.
 Every task needs your approval before work starts.
 
+The [remaining feature plan](remaining-features-plan.md) expands tasks 2.5–2.11 and 4.1–4.4.
+It records the technical choices selected under the user's delegation, dependencies, and completion checks.
+Its detailed specification closes P1–P6, D11, Q9, and Q10. Implementation remains separate from this planning request.
+
 ### Goal of the fork
 
 The fork makes `sct` work on macOS, Windows, and Linux.
 It replaces the per-value Keychain items with one vault key that a passphrase unlocks.
 It adds peer-to-peer sharing and keeps the relay as an optional mailbox.
 It adds a VS Code client, a user gate, and a later theme change.
-The fork keeps the name `sct`, the CLI `sct`, `@sct/env`, and the identity `com.omavashia2005.sct` (D5, D19).
+The app is `global.sct`, with identity `app.global-sct.desktop`. It keeps the `sct` CLI and `@sct/env` (updated D5, D19).
+Existing storage uses the [explicit fork migration](fork-storage-migration.md).
 
 ### Phase names
 
@@ -79,7 +84,7 @@ It lists the tasks, the gaps that the design does not cover, and the checks.
 | 0.1 | C1 | Add the shared types `VaultHeader`, `ScryptParams`, `SealedField`, `WrappedKey`, and `SecretStore`. | New `src/shared/vault.ts` |
 | 0.2 | C1 | Add the header parser for `vault.json`. Use an Effect schema with `Schema.UnknownFromJsonString` and `Schema.decodeUnknownOption`. Return a typed error for a parse failure, a bad version, or a bad field length. See Q1. | New `src/main/vault-header.ts` |
 | 0.3 | C1 | Add `deriveMasterKey` and `verifyPassphrase`. Use `scrypt` from `node:crypto`. Fill each temporary `Buffer` with zeros after use. | `src/main/vault-header.ts`, `src/main/seal.ts` (no change to the cipher) |
-| 0.4 | C1 | Add `KeyringSecretStore`, `PassphraseOnlySecretStore`, and `InMemorySecretStore`. The keyring store uses one `master-key` item under the `.sct` service. | New `src/main/key-store.ts` |
+| 0.4 | C1 | Add `KeyringSecretStore`, `PassphraseOnlySecretStore`, and `InMemorySecretStore`. The keyring store uses one `master-key` item under the `global.sct` service. | New `src/main/key-store.ts` |
 | 0.5 | C1 | Change `Vault` to use the master key. Wrap one file key for each project and one data key for each value. Change the file magic from `SCT1` to `SCT2`. Remove the per-value `AsyncEntry` reads. Keep the serial queue and the `.tmp` plus `rename` writes. | `src/main/vault.ts` |
 | 0.6 | C1 | Add `unlock`, `lock`, and `isLocked` to `Vault`. A locked vault returns an error that asks for an unlock. Accept a `SecretStore` in the constructor. | `src/main/vault.ts` |
 | 0.7 | C1 | Move the grant-cleanup key from its Keychain item to the master key. See Q2. | `src/main/vault.ts` |
@@ -155,7 +160,7 @@ Signed builds wait on D12. Unsigned beta releases are the current path.
 
 ### Work items
 
-The fork plan sequence does not list C5 and C15. The decision table adds C5 by itself and C15 "with C7". This plan puts them in Phase 1. Your approval is necessary. See Q5.
+Q5 is closed. C5 and C15 are in Phase 1, as recorded in the implementation status below.
 
 ### Status (2026-11-04)
 
@@ -192,7 +197,7 @@ The existing Playwright suite now unlocks the vault through `tests/ui.ts`. It st
 | 1.3 | C17 | Hide the **Cards** link and the cards route when the platform is not `darwin`. Hide the AirDrop send path and the AirDrop help text. Keep the main-process guard in `sendToNearbyMac`. Do not show an empty view. | `src/renderer/src/App.tsx`, `src/renderer/src/SharingView.tsx`, `src/renderer/src/CardsView.tsx` |
 | 1.4 | C4 | Split `identifyCaller` into one process reader for each platform. Linux reads `/proc/<pid>/stat` and `/proc/<pid>/exe`. Windows reads the parent process through a fixed PowerShell `Get-CimInstance Win32_Process` query, with no user input in the command. | `src/main/caller.ts` |
 | 1.5 | C4 | Add the signature check for each platform. On Windows, use `Get-AuthenticodeSignature` and compare the signer. On Linux there is no code signature, so a name match gives an unverified caller. See Q6. | `src/main/caller.ts`, `src/shared/agent.ts` (no type change expected) |
-| 1.6 | C6 | Add the Windows CLI shim. Write `sct.cmd` to a user folder, for example `%LOCALAPPDATA%\Programs\sct\bin`. Keep the marker check and the "do not overwrite another command" rule. On Linux, use the current POSIX script with the Linux executable path. | `scripts/install-cli.ts` |
+| 1.6 | C6 | Add the Windows CLI shim. Write `sct.cmd` to a user folder, for example `%LOCALAPPDATA%\Programs\global.sct\bin`. Keep the marker check and the "do not overwrite another command" rule. On Linux, use the current POSIX script with the Linux executable path. | `scripts/install-cli.ts` |
 | 1.7 | C15 | Stop the command on Windows. Windows has no process groups, so `process.kill(-pid)` fails. Use `taskkill /T /F /PID` to stop the child tree. On Linux, keep the process groups. Find `ps` at `/bin/ps` or `/usr/bin/ps`. | `src/main/launch.ts` |
 | 1.8 | C7 | Add `scripts/package-linux.ts` and `scripts/package-windows.ts` with `@electron/packager`. Add `package:linux` and `package:win` scripts. Change the `description` in `package.json`, because it says "for macOS". | `scripts/`, `package.json` |
 | 1.9 | C7 | Add the signing step for each platform from D12. Read credentials only from CI secrets. Put no credential in the repository. | `scripts/package-*.ts`, `.github/workflows/release.yml` |
@@ -258,7 +263,7 @@ The delivery modes table in [docs/fork-plan.md](fork-plan.md#delivery-modes) con
 |---|---|---|
 | Direct | Hyperswarm (C8a) or WebRTC (C8b) | The peer is online |
 | Mailbox | The current SpacetimeDB relay | The peer is offline, and the user permits a server copy |
-| Link | sct link `sct://import/...` (C8c) | Always available |
+| Link | sct link `global-sct://import/...` (C8c) | Always available |
 
 ### Work items
 
@@ -269,10 +274,10 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.1 | C8d | Define the shared transport and receipt types. Put the mode, the transport name, the transfer ID, the recipient device, and the receipt signature in one file. | New `src/shared/transport.ts`, `src/shared/envelope.ts` |
 | 2.2 | C8d | Make the relay receipt fit the contract. Keep the relay wire format. Map the relay receipt to the shared receipt in the main process only. | `src/main/envelope.ts`, `src/main/relay-connection.ts` |
 | 2.3 | D8 | Add pairing without the relay. Use the current device card and pairing code (`describeDevice`, `formatCode`). Remove the relay identity from the code for non-relay modes. | `src/main/transfer.ts`, `src/main/sharing.ts` |
-| 2.4 | C8c | Add the Link transport. Encrypt to the peer's key. Encode as `sct://import/...`. Add an `sct://receipt/...` link for the manual receipt. Set a maximum size of 16,384 characters. Use the current envelope (Q7). | New `src/main/transport-link.ts` |
-| 2.5 | C8c | Register the `sct://` protocol handler in the app. Check every link with a strict schema before import. | `src/main/index.ts`, `scripts/package-*.ts` |
+| 2.4 | C8c | Add the Link transport. Encrypt to the peer's key. Encode as `global-sct://import/...`. Add an `global-sct://receipt/...` link for the manual receipt. Set a maximum size of 16,384 characters. Use the current envelope (Q7). | New `src/main/transport-link.ts` |
+| 2.5 | C8c | Register the `global-sct://` protocol handler in the app. Check every link with a strict schema before import. | `src/main/index.ts`, `scripts/package-*.ts` |
 | 2.6 | C8a | Add the Hyperswarm transport in the main process. Derive the topic from the verified pair keys. Send the same envelope. Return the receipt in the same session. | New `src/main/transport-hyperswarm.ts`, `package.json` |
-| 2.7 | C8b | Add the WebRTC transport. WebRTC exists only in the renderer, so use a hidden window that carries ciphertext only. Use the D7 signalling path. | New `src/main/transport-webrtc.ts`, new hidden-window entry, `electron.vite.config.ts` |
+| 2.7 | C8b | Add WebRTC in an isolated hidden window with ciphertext, connection metadata, and session TURN credentials. Use the detailed D7 specification. | New `src/main/transport-webrtc.ts`, hidden-window entry, `electron.vite.config.ts` |
 | 2.8 | C13 | Put the relay behind the transport interface as the Mailbox mode. Keep the relay module, the SpacetimeDB database, and the relay code. See Q8. | `src/main/relay-connection.ts`, `src/main/index.ts` |
 | 2.9 | All | Add the mode selector to the send screen. Show Direct only when the peer is online. Show Mailbox only when the user permits a server copy. Always show Link. Use the Hallmark Terminal role tokens. | `src/renderer/src/SharingView.tsx`, `src/renderer/src/styles.css` (tokens only), `src/shared/sharing.ts` |
 | 2.10 | All | Show the receipt state for each mode in the activity list. Build the UI with the delivery code, so that you can test from two app windows. | `src/renderer/src/SharingView.tsx`, `src/renderer/src/SharingMotion.tsx` |
@@ -285,7 +290,7 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.1 | Done. `src/shared/transport.ts` has the delivery mode, receipt, and record types. |
 | 2.2 | Done. The main process verifies the relay receipt and maps it to `TransferReceipt` with mode `mailbox`. Each sent row carries the shared receipt state. |
 | 2.3 | Done. Pairing uses a link, a saved file, or a pasted link. The Windows smoke test covers the flow. macOS and Linux are not run here. |
-| 2.4 | Done. Link mode uses `sct://import/` and `sct://receipt/` links with the current envelope. The link limit is 16,384 characters. A manual receipt link verifies the import. The Link tab and saved records work on all platforms. A two-device check is not done here. |
+| 2.4 | Done. Link mode uses `global-sct://import/` and `global-sct://receipt/` links with the current envelope. The link limit is 16,384 characters. A manual receipt link verifies the import. The Link tab and saved records work on all platforms. A two-device check is not done here. |
 | 2.5-2.11 | Open. |
 
 A possible shape for the shared types. All names are proposals:
@@ -307,7 +312,7 @@ export interface TransferReceipt {
 export type ReceiptState =
   | { state: 'pending' }
   | { state: 'received'; receipt: TransferReceipt }
-  | { state: 'manual' } // Link mode: the sender waits for a pasted sct://receipt link.
+  | { state: 'manual' } // Link mode: the sender waits for a pasted global-sct://receipt link.
   | { state: 'expired' }
 ```
 
@@ -319,8 +324,8 @@ These decisions are closed (2026-11-04).
 |---|---|---|---|
 | Q7 | Link encryption | The current X25519 envelope (`sct-relay` v1). No `age` library | No new dependency. The envelope has a sender signature. The receipt contract and its tests exist |
 | D6 | Transport order | Link, Hyperswarm, WebRTC | Link has no network dependency and tests the receipt contract first |
-| D7 | WebRTC signalling | Manual token exchange with signed and sealed `sct://connect` links | It adds no server. The signature binds the DTLS fingerprint to the verified peer |
-| D8 | Pairing without the relay | The device card as an `sct://pair/v1/<card>` link or a file, with the current pairing code | `transfer.ts` already makes and compares these codes. It works on all platforms |
+| D7 | WebRTC signalling | Manual token exchange with signed and sealed `global-sct://connect` links | It adds no server. The signature binds the DTLS fingerprint to the verified peer |
+| D8 | Pairing without the relay | The device card as an `global-sct://pair/v1/<card>` link or a file, with the current pairing code | `transfer.ts` already makes and compares these codes. It works on all platforms |
 | — | Envelope identity for Link and Direct | The device ID from `describeDevice(card).id` | It passes the current 64-hex check. The wire format does not change |
 | — | Link length limit | 16,384 characters. The app checks the length before it decodes the link. Above the limit, the app offers Mailbox | It is below the Windows command-line limit of 32,767 characters |
 | — | Link file fallback | None | Mailbox covers large transfers |
@@ -330,7 +335,7 @@ These decisions are closed (2026-11-04).
 | — | Hyperswarm announce | Only while the desktop app is open and unlocked | Nothing announces when the app is closed |
 | — | Direct receipt | The session stays open for up to 10 minutes for the import. After that, the receipt waits for the next session, or the user sends a manual receipt link | A receipt is never lost |
 | — | STUN and TURN | No STUN by default. An option for public STUN. The user supplies TURN, and its credential goes in the vault `.internal/` folder | No third party sees an IP address without consent. No secret file |
-| — | Hidden WebRTC window | Ciphertext and SDP only, a separate partition, and its own IPC check | This changes the renderer boundary. It needs your approval before task work starts |
+| — | Hidden WebRTC window | Ciphertext, SDP, session controls, ICE addresses, and selected TURN credentials. Separate nonpersistent partition and dedicated IPC checks | Selected under delegated planning. No vault keys or shared secret values cross this boundary |
 | Q8 | The relay after the three transports | Keep it as the mailbox | D10 and D18 |
 | Q9 | AirDrop and C8d | AirDrop stays outside C8d | macOS reports no delivery, so a receipt is not possible |
 
@@ -338,7 +343,7 @@ These decisions are closed (2026-11-04).
 
 - **NAT failure.** Hyperswarm cannot always connect through a strict NAT. Show "peer not reachable" and offer Mailbox or Link. Do not retry without limits.
 - **Native modules.** Hyperswarm uses native modules. Rebuild them for Electron on each platform from Phase 1.
-- **Renderer boundary.** WebRTC runs in a renderer. Now the renderer receives metadata only. The hidden window must receive ciphertext only, never a key or a value. This changes the boundary in [docs/architecture.md](architecture.md). Your approval is necessary.
+- **Renderer boundary.** The planned hidden WebRTC window receives session TURN credentials as a narrow exception. It receives no vault keys or shared secret values. Update the architecture when implementing this boundary.
 - **Link size.** A URL has a practical length limit. A package can be 8 MiB now. Link mode has a limit of 16,384 characters. A larger transfer uses Mailbox.
 - **Link replay.** A pasted link can be imported two times. Use the current duplicate-ID check before import.
 
@@ -442,7 +447,7 @@ Change the color theme after the other work (C18).
 
 - C16 needs Phase 0 for the passphrase verifier and Phase 2 for the final share paths.
 - C18 starts before the new sharing UI (D15). Each later screen gets one check in both variants. Task 4.6 takes the final screenshots after the other phases.
-- D11 has an answer before C16. D15, Q12, and Q13 are closed. The theme setting is an Appearance section on the Storage page.
+- D11 is closed: use the vault passphrase. Q10 covers app and agent shares, with no reveal feature. D15, Q12, and Q13 are closed.
 
 ### Work items
 
@@ -451,24 +456,24 @@ Change the color theme after the other work (C18).
 | 4.1 | C16 | Add the gate check in the main process. Check the vault passphrase against the `vault.json` verifier. The renderer sends the passphrase one time and receives only pass or fail. | `src/main/vault.ts` or new `src/main/gate.ts`, `src/shared/api.ts` |
 | 4.2 | C16 | Run the gate before each share in every mode, and before each AirDrop send on macOS. | `src/main/sharing.ts`, `src/main/index.ts`, Phase 2 transport files |
 | 4.3 | C16 | Add the gate dialog. Use familiar form fields and the Hallmark Terminal tokens. | `src/renderer/src/` |
-| 4.4 | C16 | Decide which agent requests use the gate, for example `send_secrets_to`. See Q10. | `src/main/agent-access.ts` |
+| 4.4 | C16 | Apply the gate to agent operations that send secrets, including `send_secrets_to`. Keep local metadata and runtime approval unchanged. | `src/main/agent-access.ts` |
 | 4.5 | C18 | Change only the role-token values in the token declarations. Add no literal color outside them. | `src/renderer/src/styles.css` |
 | 4.6 | C18 | Take screenshots of each screen before and after the change. | Docs |
 
 ### Key decisions
 
-These decisions need your approval. The recommendation is not final.
+These decisions are closed. The remaining feature plan defines the confirmation behavior and new-screen checks.
 
 | ID | Decision | Options | Recommended | Reason |
 |---|---|---|---|---|
-| D11 | Gate factors | Password only. Password plus WebAuthn. | Password only, with the vault passphrase | Most Linux systems have no platform authenticator. The verifier already exists |
+| D11 | Gate factors | Closed under delegated planning | Vault passphrase only | Reuses the verifier across platforms. No WebAuthn dependency |
 | D15 | Color theme | Closed: two variants of the Terminal theme, Terminal (dark) and Cream (light). AGENTS.md changes to allow them. The theme work starts before the new sharing UI | — | Each new screen gets one check in both variants. The setting goes in `userData/preferences.json`, because `Vault.moveTo` overwrites `settings.json`. The values are `light`, `dark`, and `system`. The default is `light` (Cream) (Q12) |
 
 ### Risks
 
 - **The gate is not a full protection.** A gate cannot protect a compromised machine. State this in the docs.
-- **There is no reveal action.** C16 names "share and reveal". The app has no reveal or copy action for values now. The only reveal text is the injection-only grant rule. See Q10.
-- **Theme conflict.** C18 with a new palette conflicts with the design-system rules in AGENTS.md. Change AGENTS.md first, or keep the theme.
+- **Gate scope.** Q10 covers shares only, including agent shares. It adds no reveal or copy-value action.
+- **Theme scope.** Cream and Terminal are already documented in AGENTS.md. Verify new screens in both variants without changing the palette.
 - **Token gaps.** A literal color outside the tokens stays the same after a theme change. Search `styles.css` and the `.tsx` files before the change.
 
 ### Verification
@@ -498,7 +503,7 @@ Rows that show "Closed" have an answer. The other rows need your answer before t
 | D6 | 2 | Transport order | Link, Hyperswarm, WebRTC. Another order | Closed: Link, Hyperswarm, WebRTC |
 | D7 | 2 | WebRTC signalling | Manual token exchange. Stateless broker | Closed: manual token exchange |
 | D8 | 2 | Pairing without the relay | One-time code. QR code. DHT topic | Closed: device card link or file, with the pairing code |
-| D11 | 4 | Gate factors | Password only. Password plus WebAuthn | Password only (vault passphrase) |
+| D11 | 4 | Gate factors | Closed | Vault passphrase only |
 | D12 | 1 | Signing credentials | Deferred. Unsigned beta releases | Signing later |
 | D13 | 1 | CI runners and release channel | Closed: three runners. Versioned tags | Versioned unsigned beta releases |
 | D14 | 3 | Extension link | CLI only. Local endpoint. MCP path | Closed: CLI only |
@@ -535,13 +540,13 @@ Q1 to Q4 are closed. The decisions are in section 7 of [docs/storage-design.md](
 
 | ID | Phase | Question |
 |---|---|---|
-| Q5 | 1 | Do C5 (AirDrop build guard) and C15 (Windows stop) go into Phase 1? The fork plan sequence does not list them. |
-| Q6 | 1 | On Linux, is an unverified caller with the extra confirmation acceptable? Linux has no code signature to check. |
+| Q5 | 1 | Closed and implemented: C5 and C15 are in Phase 1. |
+| Q6 | 1 | Closed and implemented: Linux callers remain unverified and require the extra confirmation. Platform verification is separate. |
 | Q7 | 2 | Closed: the current X25519 envelope. No `age` library. |
 | Q8 | 2 | Closed: keep the relay as the mailbox (D10, D18). |
-| Q9 | 2 | Partly closed: the macOS AirDrop flow stays outside the C8d receipt contract. Open: do #33 remote demo tasks stay on Mailbox mode only? |
-| Q10 | 4 | The app has no reveal action. Does C16 cover only share, or does it add a reveal action? Do agent share requests also use the gate? |
+| Q9 | 2 | Closed: AirDrop stays outside C8d. Remote demo tasks and results stay on Mailbox. |
+| Q10 | 4 | Closed: confirm app and agent shares with the vault passphrase. Add no reveal action. Exclude receipt acknowledgments. |
 | Q11 | 3 | Closed: a `--interactive` flag on `sct run`. It starts no detached child, does no live restart, and forwards no stop signal. |
 | Q12 | 4 | Closed: the user selects Light (Cream), Dark (Terminal), or System. System follows the OS light or dark setting. Light (Cream) is the default. |
 | Q13 | 4 | Closed: Cream uses the dark forest green from the user's reference (`#216929`). It passes 5.6:1 on cream, so both variants use the same selected-tab style. See [docs/theme.md](theme.md). |
-| — | All | Answer D11. D6, D7, D8, D14, and D15 are closed. D12 is deferred. D13 is closed. |
+| — | All | D6, D7, D8, D11, D13, D14, and D15 are closed. D12 remains deferred. See the remaining feature specification for implementation choices. |

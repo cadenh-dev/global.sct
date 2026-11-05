@@ -149,7 +149,7 @@ function HandoffObjectFaces({ object }: { object: HandoffObject }) {
   </>
   if (object.shape === 'device') return <>
     <div className="handoff-face handoff-front handoff-device">
-      <span className="handoff-kind">.sct device card</span>
+      <span className="handoff-kind">global.sct device card</span>
       <span className="handoff-title">{object.name}</span>
       <span className="handoff-fingerprint">{object.fingerprint}</span>
     </div>

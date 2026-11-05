@@ -61,7 +61,7 @@ export function ProjectSecretsView({ projectId, projects, secrets, updateSecrets
 
       <section className="panel" aria-labelledby="add-secret-heading">
         <h2 id="add-secret-heading">Add a secret</h2>
-        <p>.sct encrypts the value in the vault. The value is not shown again.</p>
+        <p>global.sct encrypts the value in the vault. The value is not shown again.</p>
         <form onSubmit={(event) => { void save(event, project) }}>
           <fieldset disabled={operation.busy}>
             <label htmlFor="secret-name">Name</label>
@@ -160,7 +160,7 @@ function SecretRow({ secret, busy, run, updateSecrets }: SecretRowProps) {
   if (mode === 'delete') {
     return (
       <li>
-        <div><p>Delete {secret.name}? .sct removes its encrypted vault entry. You cannot undo this.</p></div>
+        <div><p>Delete {secret.name}? global.sct removes its encrypted vault entry. You cannot undo this.</p></div>
         <div className="row-actions">
           <button type="button" className="secondary" disabled={busy} onClick={() => setMode('view')}>Cancel</button>
           <button ref={confirm} type="button" disabled={busy} onClick={() => { void remove() }}>Delete secret</button>

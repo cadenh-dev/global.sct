@@ -5,9 +5,9 @@ export function decodeMessage(line: string): EnvironmentMessage {
   try {
     message = JSON.parse(line)
   } catch {
-    throw new Error('The .sct CLI returned an invalid response.')
+    throw new Error('The global.sct CLI returned an invalid response.')
   }
-  if (typeof message !== 'object' || message === null) throw new Error('The .sct CLI returned an invalid response.')
+  if (typeof message !== 'object' || message === null) throw new Error('The global.sct CLI returned an invalid response.')
   if ('error' in message && typeof message.error === 'string') return { error: message.error }
   if ('values' in message && typeof message.values === 'object' && message.values !== null && !Array.isArray(message.values)) {
     const values = message.values as Record<string, unknown>
@@ -16,5 +16,5 @@ export function decodeMessage(line: string): EnvironmentMessage {
       return { values: values as Record<string, string> }
     }
   }
-  throw new Error('The .sct CLI returned an invalid response.')
+  throw new Error('The global.sct CLI returned an invalid response.')
 }

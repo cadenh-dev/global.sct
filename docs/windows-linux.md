@@ -1,6 +1,6 @@
 # Windows and Linux
 
-.sct runs on Windows and Linux. The macOS-only features stay on macOS.
+global.sct runs on Windows and Linux. The macOS-only features stay on macOS.
 
 ## What differs by platform
 
@@ -38,8 +38,8 @@ bun run package:linux  # Linux
 
 The output is in `dist/`:
 
-- Windows: `dist/sct-win32-<arch>/sct.exe`
-- Linux: `dist/sct-linux-<arch>/sct`
+- Windows: `dist/global.sct-win32-<arch>/sct.exe`
+- Linux: `dist/global.sct-linux-<arch>/sct`
 
 The build copies the platform `@napi-rs/keyring` binary into the package.
 The build does not run `swiftc` on Windows or Linux.
@@ -54,7 +54,7 @@ Stable tags are rejected until signing is available. See [Windows and Linux sign
 bun run install:cli
 ```
 
-- Windows: the command writes `%LOCALAPPDATA%\Programs\sct\bin\sct.cmd`.
+- Windows: the command writes `%LOCALAPPDATA%\Programs\global.sct\bin\sct.cmd`.
 - Linux: the command writes `~/.local/bin/sct`.
 
 Add the folder to `PATH`, then open a new terminal.

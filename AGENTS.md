@@ -2,7 +2,7 @@ Always use the [ASD-STE100](https://github.com/danyuchn/asd-ste100-skill) skill 
 
 Use the [hallmark](https://github.com/nutlope/hallmark)  skill to do any UI and design related stuff.
 
-This project is called .sct, look at the docs and github issues if necessary to check how this works and what it does
+This project is called global.sct, look at the docs and github issues if necessary to check how this works and what it does
 
 Every time you implement something, make sure that you're doing exactly what is asked of you and if any major change is incoming, always ensure with me as to what the change is and if you have any assumptions going into it. Do not make decisions for yourself at all. Always talk to me first.
 

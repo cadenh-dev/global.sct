@@ -5,8 +5,8 @@ import { join } from 'node:path'
 import manifest from '../package.json'
 import electron from 'electron/package.json'
 
-const identityName = '.sct Development'
-const bundleId = 'com.omavashia2005.sct'
+const identityName = 'global.sct Development'
+const bundleId = 'app.global-sct.desktop'
 
 if (process.platform !== 'darwin' || (process.arch !== 'arm64' && process.arch !== 'x64')) {
   throw new Error('The signed macOS build requires an Apple Silicon or Intel Mac.')
@@ -33,20 +33,21 @@ for (const name of ['@napi-rs/keyring', `@napi-rs/keyring-darwin-${process.arch}
 const [output] = await packager({
   dir: 'out',
   out: 'dist',
-  name: 'sct',
+  name: 'global.sct',
+  executableName: 'sct',
   appBundleId: bundleId,
   appCategoryType: 'public.app-category.developer-tools',
   icon: 'build/icon.icns',
   extendInfo: {
     CFBundleDocumentTypes: [{
-      CFBundleTypeName: '.sct encrypted transfer',
+      CFBundleTypeName: 'global.sct encrypted transfer',
       CFBundleTypeRole: 'Viewer',
       LSHandlerRank: 'Owner',
-      LSItemContentTypes: ['com.omavashia2005.sct.transfer']
+      LSItemContentTypes: ['app.global-sct.desktop.transfer']
     }],
     UTExportedTypeDeclarations: [{
-      UTTypeIdentifier: 'com.omavashia2005.sct.transfer',
-      UTTypeDescription: '.sct encrypted transfer',
+      UTTypeIdentifier: 'app.global-sct.desktop.transfer',
+      UTTypeDescription: 'global.sct encrypted transfer',
       UTTypeConformsTo: ['public.data'],
       UTTypeTagSpecification: { 'public.filename-extension': ['sct-transfer'] }
     }]
@@ -72,7 +73,7 @@ const [output] = await packager({
   }
 })
 
-const appPath = join(output, 'sct.app')
+const appPath = join(output, 'global.sct.app')
 execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath], { stdio: 'inherit' })
 if (!adhoc) {
   execFileSync('/usr/bin/codesign', [

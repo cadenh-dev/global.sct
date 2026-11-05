@@ -1,9 +1,9 @@
 ---
 name: sct-describe-secret
-description: Identify a saved .sct secret by project and secret ID when an agent needs metadata for a selected credential.
+description: Identify a saved global.sct secret by project and secret ID when an agent needs metadata for a selected credential.
 ---
 
-# Describe a .sct secret
+# Describe a global.sct secret
 
 Use the `describe_secret` MCP tool with `projectId` and `secretId` from `list_secrets`.
 Do not infer a secret ID from its environment name.
@@ -20,7 +20,7 @@ printf '%s' '{"secretId":"00000000-0000-4000-8000-000000000002"}' | sct agent de
 
 Replace the example IDs with actual metadata IDs.
 The CLI example selects the project from the working directory.
-The user must approve the request in the local .sct window.
+The user must approve the request in the local global.sct window.
 The result contains only `id`, `projectId`, and `name`.
 This operation does not reveal, copy, or test the credential value.
 Stop after refusal, expiry, or failure. Do not search another project without user instruction.

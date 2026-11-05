@@ -1,4 +1,4 @@
-# .sct glossary
+# global.sct glossary
 
 The docs use some words with one fixed meaning:
 
@@ -9,15 +9,15 @@ The docs use some words with one fixed meaning:
 
 ## Local
 
-**.sct** — The Electron, React, and TypeScript app in this repository. It manages local secrets and encrypted handoffs between devices.
+**global.sct** - The Electron, React, and TypeScript app in this repository. It manages local secrets and encrypted handoffs between devices.
 
-**Signing identity** — The `.sct Development` certificate and private key in Keychain. A stable signature keeps Keychain access after rebuilds. See [macOS signing](macos-signing.md).
+**Signing identity** — The `global.sct Development` certificate and private key in Keychain. A stable signature keeps Keychain access after rebuilds. See [macOS signing](macos-signing.md).
 
 **OS secret store** — The optional system store for the remembered master key and relay cache keys. It is macOS Keychain, Windows Credential Manager, or Linux libsecret.
 
 **Local vault** — The encrypted `secrets.sct` files, `vault.json`, and `.internal/` values. It works offline. See [vault storage](storage.md).
 
-**Electron main process** — The trusted process for vault access, encryption, child process starts, sharing, relay connections, and Agent Access. .sct runs no separate daemon.
+**Electron main process** — The trusted process for vault access, encryption, child process starts, sharing, relay connections, and Agent Access. global.sct runs no separate daemon.
 
 **Renderer** — The sandboxed process that shows the React UI. It receives metadata only and never a stored value.
 
@@ -37,9 +37,9 @@ The docs use some words with one fixed meaning:
 
 **MCP** — Model Context Protocol. `sct mcp` exposes the ten operations as tools, prompts, and skill resources.
 
-**Caller authentication** — .sct finds the first listed agent among the parent processes and checks its platform signature. macOS uses `codesign`, Windows uses Authenticode, and Linux has no code signature. .sct rejects an impostor. An unverified caller needs an extra statement from the user in the approval window.
+**Caller authentication** — global.sct finds the first listed agent among the parent processes and checks its platform signature. macOS uses `codesign`, Windows uses Authenticode, and Linux has no code signature. global.sct rejects an impostor. An unverified caller needs an extra statement from the user in the approval window.
 
-**Local approval** — The user's decision in the .sct window. It applies to one request. An agent or relay message cannot approve its own request.
+**Local approval** — The user's decision in the global.sct window. It applies to one request. An agent or relay message cannot approve its own request.
 
 **Secret boundary** — The rules that limit which processes receive secret values. An approved process can copy a value that it receives.
 
@@ -53,7 +53,7 @@ The docs use some words with one fixed meaning:
 
 **Transfer package** — A `.sct-transfer` file. It holds selected secrets, encrypted and signed for one verified device. It expires after 24 hours.
 
-**AirDrop** — The macOS-only transport for transfer packages, device cards, and mock Wallet cards. .sct opens only the AirDrop picker.
+**AirDrop** — The macOS-only transport for transfer packages, device cards, and mock Wallet cards. global.sct opens only the AirDrop picker.
 
 **Relay** — Cloud-hosted SpacetimeDB that persists and routes ciphertext. It never receives the keys that decrypt payloads. See [relay setup](relay.md).
 
@@ -61,7 +61,7 @@ The docs use some words with one fixed meaning:
 
 **TLS** — Protects each relay connection. Payload encryption separately protects contents from the relay.
 
-**Mock Wallet card** — A generic Apple Wallet pass with fake data. walletmcppass.com signs it. .sct sends it to an iPhone through AirDrop. See [mock Wallet cards](wallet-cards.md).
+**Mock Wallet card** — A generic Apple Wallet pass with fake data. walletmcppass.com signs it. global.sct sends it to an iPhone through AirDrop. See [mock Wallet cards](wallet-cards.md).
 
 ## Relay delivery
 
@@ -85,9 +85,9 @@ These terms describe Phase 2 relay delivery and the remote demo tasks of issue #
 
 **Message expiry** — After this deadline, a message cannot be delivered or executed. It cannot revoke a delivered credential.
 
-**Access expiry** — After this deadline, a grant blocks new vault use. Cleanup in #19 will delete grant material when .sct starts or the Mac wakes. It cannot delete external copies.
+**Access expiry** — After this deadline, a grant blocks new vault use. Cleanup in #19 will delete grant material when global.sct starts or the Mac wakes. It cannot delete external copies.
 
-**Execution claim** — A durable record that .sct writes before a remote task starts. A claim without an outcome after a crash needs local review.
+**Execution claim** — A durable record that global.sct writes before a remote task starts. A claim without an outcome after a crash needs local review.
 
 **Execution result** — An encrypted reply with an approved outcome. It contains no credential or unrestricted log.
 

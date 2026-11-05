@@ -65,7 +65,7 @@ test('the CLI installer creates an idempotent launcher and preserves existing co
     const target = join(root, 'bin', 'sct.cmd')
     await installCli(process.execPath, target)
     await installCli(process.execPath, target)
-    assert.match(await readFile(target, 'utf8'), /REM # \.sct command launcher/)
+    assert.match(await readFile(target, 'utf8'), /REM # global\.sct command launcher/)
     assert.equal(execFileSync(process.env.ComSpec ?? 'cmd.exe', ['/c', target, '-e', 'process.stdout.write("launched")'],
       { encoding: 'utf8' }), 'launched')
     await rm(target)
@@ -79,7 +79,7 @@ test('the CLI installer creates an idempotent launcher and preserves existing co
   await installCli(process.execPath, target)
   await installCli(process.execPath, target)
   assert.equal((await lstat(target)).isSymbolicLink(), false)
-  assert.equal(await readFile(target, 'utf8'), `#!/bin/sh\n# .sct command launcher\nexec '${process.execPath}' "$@"\n`)
+  assert.equal(await readFile(target, 'utf8'), `#!/bin/sh\n# global.sct command launcher\nexec '${process.execPath}' "$@"\n`)
   assert.equal(execFileSync(target, ['-e', 'process.stdout.write("launched")'], { encoding: 'utf8' }), 'launched')
   await rm(target)
   await writeFile(target, 'existing-command')
@@ -89,7 +89,7 @@ test('the CLI installer creates an idempotent launcher and preserves existing co
 
 test('SDK protocol errors cannot include plaintext response contents', () => {
   for (const message of ['private-invalid-json', '{"values":{"BAD-NAME":"private"}}', '{"values":{"TOKEN":3}}']) {
-    assert.throws(() => decodeMessage(message), { message: 'The .sct CLI returned an invalid response.' })
+    assert.throws(() => decodeMessage(message), { message: 'The global.sct CLI returned an invalid response.' })
   }
   assert.deepEqual(decodeMessage('{"values":{"EMPTY":"","TOKEN":"literal $=\\nvalue"}}'), {
     values: { EMPTY: '', TOKEN: 'literal $=\nvalue' }
@@ -225,7 +225,7 @@ test('the SDK loads and refreshes values through the real vault without holding 
   t.after(() => { child.kill('SIGTERM') })
   const waitFor = watchOutput(child)
   await waitFor('loaded-ready')
-  const filename = join(root, '.sct', project.name, 'secrets.sct')
+  const filename = join(root, 'global.sct', project.name, 'secrets.sct')
   const ciphertext = await readFile(filename)
   await rm(filename)
   await waitFor('unavailable-ready')

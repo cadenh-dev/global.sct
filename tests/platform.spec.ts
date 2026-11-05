@@ -15,7 +15,7 @@ test('Windows shows the vault-first layout and pairing without AirDrop', async (
 
   try {
     const page = await application.firstWindow()
-    await expect(page).toHaveTitle('.sct')
+    await expect(page).toHaveTitle('global.sct')
     await page.getByLabel('Passphrase', { exact: true }).fill('test passphrase for the vault')
     await page.getByLabel('Confirm passphrase').fill('test passphrase for the vault')
     await page.getByRole('button', { name: 'Create vault' }).click()
@@ -44,13 +44,13 @@ test('Windows shows the vault-first layout and pairing without AirDrop', async (
     await expect(page.getByRole('button', { name: 'Import .sct-device file…', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Copy pairing link', exact: true }).click()
     const localLink = await application.evaluate(({ clipboard }) => clipboard.readText())
-    expect(localLink).toMatch(/^sct:\/\/pair\/v1\/[A-Za-z0-9_-]+$/)
+    expect(localLink).toMatch(/^global-sct:\/\/pair\/v1\/[A-Za-z0-9_-]+$/)
     await page.getByLabel('Paste pairing link', { exact: true }).fill(localLink)
     await page.getByRole('button', { name: 'Review pairing link', exact: true }).click()
     await expect(page.getByRole('alert')).toHaveText('This is your own device card. Select the other device’s card.')
     await expect(page.getByRole('button', { name: 'Confirm recipient', exact: true })).toHaveCount(0)
 
-    await page.getByLabel('Paste pairing link', { exact: true }).fill('sct://pair/v2/invalid')
+    await page.getByLabel('Paste pairing link', { exact: true }).fill('global-sct://pair/v2/invalid')
     await page.getByRole('button', { name: 'Review pairing link', exact: true }).click()
     await expect(page.getByRole('alert')).toContainText('The pairing link is invalid.')
 

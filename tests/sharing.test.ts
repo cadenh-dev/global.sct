@@ -125,7 +125,7 @@ test('selected secrets enter only the chosen project with fresh local keys and a
   assert.ok(imported[0])
   await recipient.vault.withSecret(imported[0], (value) => assert.equal(value.toString(), ' private $literal\nvalue '))
   assert.deepEqual((await recipient.vault.listSecrets()).filter((entry) => entry.projectId === other.id), [])
-  const encrypted = await readFile(join(recipient.root, '.sct', target.name, 'secrets.sct'))
+  const encrypted = await readFile(join(recipient.root, 'global.sct', target.name, 'secrets.sct'))
   assert.ok(!encrypted.includes('TOKEN') && !encrypted.includes('private'))
   assert.equal((await recipient.sharing.state()).incoming.length, 0)
   assert.deepEqual(await readdir(join(recipient.root, 'sharing', 'inbox')), [])

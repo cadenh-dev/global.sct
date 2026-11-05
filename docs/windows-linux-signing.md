@@ -58,13 +58,13 @@ Prerequisites:
 Signing step:
 
 1. Install the Trusted Signing client tools on the Windows runner.
-2. Sign `dist/sct-win32-<arch>/sct.exe` with `signtool` and the Trusted Signing dlib.
+2. Sign `dist/global.sct-win32-<arch>/sct.exe` with `signtool` and the Trusted Signing dlib.
 3. Use a timestamp server.
 4. Sign the Electron helper executables and DLLs that the package contains, or state which files stay unsigned.
 5. Verify the result:
 
 ```powershell
-$signature = Get-AuthenticodeSignature -LiteralPath dist\sct-win32-x64\sct.exe
+$signature = Get-AuthenticodeSignature -LiteralPath dist\global.sct-win32-x64\sct.exe
 if ($signature.Status -ne 'Valid') { throw "The Windows signature is not valid." }
 ```
 
@@ -78,7 +78,7 @@ Use an OV or EV certificate from a public CA.
 2. Sign the main executable:
 
 ```powershell
-signtool sign /sha1 <thumbprint> /tr <timestamp-url> /td sha256 dist\sct-win32-x64\sct.exe
+signtool sign /sha1 <thumbprint> /tr <timestamp-url> /td sha256 dist\global.sct-win32-x64\sct.exe
 ```
 
 3. Verify with `Get-AuthenticodeSignature`.
@@ -94,7 +94,7 @@ Use these checks:
 1. Publish a SHA-256 checksum for each artifact:
 
 ```sh
-sha256sum dist/sct-linux-x64/sct > dist/sct-linux-x64/sct.sha256
+sha256sum dist/global.sct-linux-x64/sct > dist/global.sct-linux-x64/sct.sha256
 ```
 
 2. Optionally sign the checksum with a release GPG key.

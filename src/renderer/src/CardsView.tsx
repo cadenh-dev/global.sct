@@ -27,7 +27,7 @@ export function CardsView() {
     setHandoff({ stage: 'wait', ...card })
     const shared = await operation.run('Choose the iPhone in the picker.', async () => {
       await window.sct.shareMockCard(id)
-      return 'If you chose the iPhone, the pass is on its way. The recipient taps Add in Wallet. .sct cannot confirm delivery or installation.'
+      return 'If you chose the iPhone, the pass is on its way. The recipient taps Add in Wallet. global.sct cannot confirm delivery or installation.'
     })
     setHandoff(shared ? { stage: 'handed', ...card } : null)
   }
@@ -44,7 +44,7 @@ export function CardsView() {
       <StatusLine status={operation.status} />
       <section className="panel" aria-labelledby="card-heading">
         <h2 id="card-heading">Create a mock card</h2>
-        <p>Use fake details only. walletmcppass.com signs the pass. .sct sends it these fields, and no secrets or keys.</p>
+        <p>Use fake details only. walletmcppass.com signs the pass. global.sct sends it these fields, and no secrets or keys.</p>
         <form onSubmit={(event) => { void create(event) }}>
           <fieldset disabled={operation.busy}>
             <label htmlFor="card-holder">Cardholder name</label>
@@ -54,7 +54,7 @@ export function CardsView() {
             <input id="card-label" autoComplete="off" required maxLength={40} placeholder="Demo card" value={label}
               onChange={(event) => setLabel(event.target.value)} />
             <p className="card-notice">{cardNotice}</p>
-            <p className="field-help">Every card shows this text. The recipient needs no .sct app. The service allows 30 free cards a day.</p>
+            <p className="field-help">Every card shows this text. The recipient needs no global.sct app. The service allows 30 free cards a day.</p>
             <div className="form-actions">
               <button type="submit" disabled={!cardholder.trim() || !label.trim()}>{operation.busy ? 'Please wait…' : 'Create and send to…'}</button>
             </div>

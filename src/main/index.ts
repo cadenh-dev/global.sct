@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process'
 import { homedir, hostname } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { rmSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import { readdir, writeFile } from 'node:fs/promises'
 import { ProjectStore } from './projects'
 import { Vault } from './vault'
@@ -43,7 +43,7 @@ app.on('open-file', (event, path) => {
 
 function handle(channel: string, operation: (...args: unknown[]) => unknown): void {
   ipcMain.handle(channel, async (event: IpcMainInvokeEvent, ...args: unknown[]): Promise<Reply<unknown>> => {
-    if (!isAppRequest(event)) return { ok: false, error: '.sct rejected this request.' }
+    if (!isAppRequest(event)) return { ok: false, error: 'global.sct rejected this request.' }
     try {
       return { ok: true, value: await operation(...args) }
     } catch (error) {
@@ -111,7 +111,7 @@ async function createWindow(hash = incomingFiles.length ? '/sharing' : undefined
   await loadTheme()
   const variant = themeVariant()
   const window = new BrowserWindow({
-    title: '.sct',
+    title: 'global.sct',
     width: 1000,
     height: 720,
     minWidth: 640,
@@ -151,21 +151,22 @@ async function createWindow(hash = incomingFiles.length ? '/sharing' : undefined
 }
 
 async function pickDirectory(options: OpenDialogOptions): Promise<string | null> {
-  if (!mainWindow) throw new Error('The .sct window is unavailable.')
+  if (!mainWindow) throw new Error('The global.sct window is unavailable.')
   const result = await dialog.showOpenDialog(mainWindow, options)
   return result.canceled ? null : result.filePaths[0] ?? null
 }
 
 function reportStartupError(error: unknown): void {
-  console.error('.sct could not start.', error)
-  dialog.showErrorBox('.sct could not start', error instanceof Error ? error.message : 'The application window could not load. Check the development terminal for details.')
+  console.error('global.sct could not start.', error)
+  dialog.showErrorBox('global.sct could not start', error instanceof Error ? error.message : 'The application window could not load. Check the development terminal for details.')
   app.quit()
 }
 
-app.setName('.sct')
+app.setName('global.sct')
+if (process.platform === 'win32') app.setAppUserModelId('app.global-sct.desktop')
 app.whenReady().then(async () => {
   if (launchArguments[0] === '--version') {
-    if (launchArguments.length !== 1) throw new Error('Usage: sct --version. Return the .sct version.')
+    if (launchArguments.length !== 1) throw new Error('Usage: sct --version. Return the global.sct version.')
     await writeCliOutput(app.getVersion())
     app.exit(0)
     return
@@ -176,9 +177,10 @@ app.whenReady().then(async () => {
     app.exit(0)
     return
   }
+  requireForkStorage()
   registerThemeHandlers()
   const projects = new ProjectStore(join(app.getPath('userData'), 'projects.json'))
-  const store = await createSecretStore('.sct')
+  const store = await createSecretStore('global.sct')
   const vault = new Vault(projects, join(app.getPath('userData'), 'settings.json'), homedir(), store)
   await vault.start()
   registerVaultHandlers(vault, projects)
@@ -212,6 +214,14 @@ app.whenReady().then(async () => {
     reportStartupError(error)
   }
 })
+
+function requireForkStorage(): void {
+  if (['settings.json', 'projects.json'].some((name) => existsSync(join(app.getPath('userData'), name))) ||
+    existsSync(join(homedir(), 'global.sct', 'vault.json'))) return
+  if (existsSync(join(app.getPath('appData'), '.sct', 'projects.json')) || existsSync(join(homedir(), '.sct', 'vault.json'))) {
+    throw new Error('Existing .sct storage needs an explicit move. Close both apps and run bun run migrate:fork from the global.sct repository. See docs/fork-storage-migration.md.')
+  }
+}
 
 function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
   handle('vault:status', () => vault.status())
@@ -416,11 +426,11 @@ function registerSharing(service: Sharing): void {
   handle('sharing:device-card', async () => sendToNearbyMac(await service.deviceCardFile()))
   handle('sharing:copy-pairing-link', async () => clipboard.writeText(encodePairingLink(await service.deviceCard())))
   handle('sharing:save-device-card', async () => {
-    if (!mainWindow) throw new Error('The .sct window is unavailable.')
+    if (!mainWindow) throw new Error('The global.sct window is unavailable.')
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Save your device card',
       defaultPath: join(app.getPath('downloads'), 'device.sct-device'),
-      filters: [{ name: '.sct device card', extensions: ['sct-device'] }]
+      filters: [{ name: 'global.sct device card', extensions: ['sct-device'] }]
     })
     if (result.canceled || !result.filePath) return false
     await writeFile(result.filePath, JSON.stringify(await service.deviceCard()), { mode: 0o600 })
@@ -429,7 +439,7 @@ function registerSharing(service: Sharing): void {
   handle('sharing:preview-pairing-link', (link) => service.previewPeer({ link }))
   handle('sharing:pick-peer', async () => {
     const path = await pickDirectory({ title: 'Verify a recipient device', properties: ['openFile'], defaultPath: app.getPath('downloads'),
-      filters: [{ name: '.sct device card', extensions: ['sct-device'] }] })
+      filters: [{ name: 'global.sct device card', extensions: ['sct-device'] }] })
     return path ? service.previewPeer(path) : null
   })
   handle('sharing:confirm-peer', async (token) => {
@@ -439,8 +449,8 @@ function registerSharing(service: Sharing): void {
   })
   handle('sharing:send', async (input) => sendToNearbyMac(await service.exportSecrets(input)))
   handle('sharing:pick-transfer', async () => {
-    const path = await pickDirectory({ title: 'Choose a received .sct transfer', properties: ['openFile'], defaultPath: app.getPath('downloads'),
-      filters: [{ name: '.sct transfer', extensions: ['sct-transfer'] }] })
+    const path = await pickDirectory({ title: 'Choose a received global.sct transfer', properties: ['openFile'], defaultPath: app.getPath('downloads'),
+      filters: [{ name: 'global.sct transfer', extensions: ['sct-transfer'] }] })
     if (!path) return null
     const preview = await service.openTransfer(path)
     sharingChanged()
@@ -494,7 +504,7 @@ async function openIncomingFiles(): Promise<void> {
     mainWindow?.show()
     sharingChanged()
   } catch (error) {
-    dialog.showErrorBox('Cannot open this .sct transfer', error instanceof Error ? error.message : 'The transfer could not be opened.')
+    dialog.showErrorBox('Cannot open this global.sct transfer', error instanceof Error ? error.message : 'The transfer could not be opened.')
   } finally {
     openingFiles = false
     if (incomingFiles.length) void openIncomingFiles()

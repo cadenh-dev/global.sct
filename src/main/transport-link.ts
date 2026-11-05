@@ -4,7 +4,7 @@ import type { LinkState } from '../shared/transport'
 import { readObject } from './transfer'
 import { readTransfer } from './envelope'
 
-const prefixes = { transfer: 'sct://import/', receipt: 'sct://receipt/' }
+const prefixes = { transfer: 'global-sct://import/', receipt: 'global-sct://receipt/' }
 const base64url = z.string().min(1).regex(/^[A-Za-z0-9_-]+$/).refine((value) =>
   Buffer.from(value, 'base64url').toString('base64url') === value)
 const transferLink = z.strictObject({
@@ -82,8 +82,10 @@ function encodeLink(data: z.infer<typeof transferLink> | z.infer<typeof receiptL
 function decodeLink(link: unknown, kind: keyof typeof prefixes): Record<string, unknown> {
   if (typeof link !== 'string') throw invalidLink()
   requireLength(link)
-  if (!link.startsWith(prefixes[kind])) throw invalidLink()
-  const encoded = base64url.safeParse(link.slice(prefixes[kind].length))
+  // Preserve saved upstream links without claiming its OS protocol handler.
+  const prefix = [prefixes[kind], prefixes[kind].replace('global-sct:', 'sct:')].find((value) => link.startsWith(value))
+  if (!prefix) throw invalidLink()
+  const encoded = base64url.safeParse(link.slice(prefix.length))
   if (!encoded.success) throw invalidLink()
   try { return readObject(Buffer.from(encoded.data, 'base64url')) } catch { throw invalidLink() }
 }
@@ -93,5 +95,5 @@ function requireLength(link: string): void {
 }
 
 function invalidLink(): Error {
-  return new Error('The link is invalid. Paste a complete sct://import/ or sct://receipt/ link of the correct kind.')
+  return new Error('The link is invalid. Paste a complete global-sct://import/ or global-sct://receipt/ link of the correct kind.')
 }

@@ -1,6 +1,6 @@
 # Local Agent Access
 
-.sct exposes its core operations through a TypeScript CLI and a stdio MCP server.
+global.sct exposes its core operations through a TypeScript CLI and a stdio MCP server.
 Both interfaces use the same request checks and local approval window.
 Responses contain metadata and fixed outcomes, without secret values or process logs.
 Local project operations require no relay configuration, paired device, or network connection.
@@ -76,7 +76,7 @@ Keep vault storage outside source folders. No operation creates an `.env` file o
 
 ## Caller authentication
 
-.sct identifies the calling program before it checks the request.
+global.sct identifies the calling program before it checks the request.
 It reads the parent processes up to the first process with a listed agent name.
 Then the platform signature check tests that running process against the agent's requirement.
 
@@ -99,7 +99,7 @@ The MCP client is usually the direct parent of `sct mcp`.
 A shell tool usually starts `sct agent`, so the agent is a more distant ancestor.
 
 - A listed agent that passes its check becomes a verified caller. The approval window shows its name.
-- A process with a listed agent name that fails the macOS or Windows check is an impostor. .sct rejects each request before local approval.
+- A process with a listed agent name that fails the macOS or Windows check is an impostor. global.sct rejects each request before local approval.
   The result has status `failed` and names the failed signature check.
 - On Linux, a listed agent name gives an unverified caller. Linux has no code signature to check.
 - If no listed agent is among the ancestors, the approval window labels the caller as unverified.
@@ -112,20 +112,20 @@ Another program that the verified agent starts also passes this check.
 ## VS Code client
 
 The VS Code extension uses the local CLI. It receives secret names and IDs only.
-The command **Open terminal with .sct secrets** opens a terminal with `sct run --interactive -- <shell>`.
+The command **Open terminal with global.sct secrets** opens a terminal with `sct run --interactive -- <shell>`.
 The extension host never receives the values.
 See [VS Code extension](vscode.md).
 
 ## Local approval
 
-Each request requires explicit approval in the local .sct window.
+Each request requires explicit approval in the local global.sct window.
 The window shows the operation, project, selected secret names, request ID, and deadline where applicable.
 The default deadline is two minutes. A caller can request up to five minutes from submission.
 Refusal, expiry, or disconnection prevents a pending request from receiving approval.
 Approval applies to one request only. It cannot authorize another task or secret selection.
 
 The agent cannot approve through CLI input, MCP, or a tool response.
-Host approval in an MCP client does not replace the local .sct decision.
+Host approval in an MCP client does not replace the local global.sct decision.
 `run_demo` accepts only the fixed environment demo, without arbitrary commands or unrestricted process logs.
 The child and its descendants can read or copy injected values.
 
@@ -164,10 +164,10 @@ Stdout carries MCP messages only. Fixed diagnostics use stderr without submitted
 Closing stdin ends the MCP process and cancels pending requests.
 
 The server exposes the operations above as tools.
-It also exposes each workflow as a prompt with the operation name and a Markdown resource at `sct://skills/<operation>`.
+It also exposes each workflow as a prompt with the operation name and a Markdown resource at `global-sct://skills/<operation>`.
 MCP `run_demo` requires a saved `secretId`. MCP does not accept a plaintext credential value.
 See [the Claude Code demo project](../examples/claude-code/README.md) for a configuration that allows only the `sct` server.
-Claude Code permission decisions apply first. Each allowed call still requires the local .sct decision.
+Claude Code permission decisions apply first. Each allowed call still requires the local global.sct decision.
 PR #48 checked discovery, approval, refusal, expiry, reused approvals, rejected inputs, and transcripts through Claude Code 2.1.287.
 
 ## Skills
@@ -186,7 +186,7 @@ Common locations are `~/.agents/skills` for Codex and `~/.claude/skills` for Cla
 If the skills CLI is available, install from GitHub:
 
 ```sh
-npx skills add omavashia2005/.sct
+npx skills add cadenh-dev/global.sct
 ```
 
 Select the workflows you need. A skill does not grant access or bypass local approval.
@@ -223,7 +223,7 @@ This interface does not provide relay pairing, publication, or delivery acknowle
 
 `request_remote_demo` asks the recipient of a relay transfer to run the fixed demo with that grant.
 The `grantId` is the `messageId` of a sent transfer with `state: "received"`.
-The agent session writes an encrypted request file. The .sct desktop app sends the task and must be open.
+The agent session writes an encrypted request file. The global.sct desktop app sends the task and must be open.
 The recipient approves the task on its own Mac. Read the outcome in the `tasks` rows of `relay_status`.
 `delivered` means that the recipient saved the task. It does not mean approval or execution.
 See [remote demo tasks](architecture.md#remote-demo-tasks).
@@ -234,7 +234,7 @@ See [relay configuration](relay.md) for `SCT_RELAY` and the cache behavior.
 `sct run` needs no Agent Access approval. For a manual demo, save `SCT_DEMO_TOKEN` in a registered project and run from that project:
 
 ```sh
-sct run -- node /absolute/path/to/.sct/out/demo/index.cjs
+sct run -- node /absolute/path/to/global.sct/out/demo/index.cjs
 ```
 
 The demo prints presence only. It creates no project files and uses no network service.

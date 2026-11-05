@@ -21,7 +21,7 @@ export interface SctStatus {
 
 export async function readSctStatus(): Promise<SctStatus> {
   const executable = sctExecutable()
-  // A .sct release without --version opens the desktop window and does not exit, so the check stops after a time limit.
+  // A global.sct release without --version opens the desktop window and does not exit, so the check stops after a time limit.
   const { stdout } = await promisify(execFile)(executable, ['--version'], { timeout: 10_000 })
   return { executable, version: stdout.trim() }
 }
@@ -34,15 +34,15 @@ export function readSecretMetadata(cwd: string): Promise<SctSecret[]> {
     let output = ''
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => { output += chunk })
-    child.once('error', () => reject(new Error('Cannot run .sct. Check the CLI installation and SCT_CLI.')))
-    child.stdin.once('error', () => reject(new Error('Cannot send the metadata request to .sct.')))
+    child.once('error', () => reject(new Error('Cannot run global.sct. Check the CLI installation and SCT_CLI.')))
+    child.stdin.once('error', () => reject(new Error('Cannot send the metadata request to global.sct.')))
     child.once('close', (code) => {
       try {
         const outcome = parseMetadataOutcome(output)
         if (outcome.status !== 'completed') {
-          throw new Error(outcome.error || `The .sct request ${outcome.status}.`)
+          throw new Error(outcome.error || `The global.sct request ${outcome.status}.`)
         }
-        if (code !== 0 || !outcome.result) throw new Error('The .sct metadata request did not complete.')
+        if (code !== 0 || !outcome.result) throw new Error('The global.sct metadata request did not complete.')
         resolve(outcome.result.map(({ id, name }) => ({ id, name })))
       } catch (error) {
         reject(error)
@@ -56,6 +56,6 @@ function parseMetadataOutcome(output: string) {
   try {
     return metadataOutcome.parse(JSON.parse(output)) satisfies AgentOutcome
   } catch {
-    throw new Error('The .sct CLI returned an invalid metadata response.')
+    throw new Error('The global.sct CLI returned an invalid metadata response.')
   }
 }

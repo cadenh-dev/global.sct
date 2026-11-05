@@ -8,7 +8,7 @@ export function sctExecutable(): string {
   const localAppData = process.env.LOCALAPPDATA
   if (!localAppData) return 'sct.exe'
   try {
-    const config: unknown = JSON.parse(readFileSync(join(localAppData, 'Programs', 'sct', 'bin', 'sct.json'), 'utf8'))
+    const config: unknown = JSON.parse(readFileSync(join(localAppData, 'Programs', 'global.sct', 'bin', 'sct.json'), 'utf8'))
     if (typeof config === 'object' && config !== null && 'executable' in config &&
       typeof config.executable === 'string') return requireExecutable(config.executable)
   } catch {

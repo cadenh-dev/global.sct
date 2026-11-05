@@ -74,7 +74,7 @@ function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>
     <div className="app">
       <header className="app-header">
         <div className="header-start">
-          <span className="wordmark">.sct</span>
+          <span className="wordmark">global.sct</span>
           <nav aria-label="Main">
             <a href="#/" aria-current={route.view === 'projects' || route.view === 'project' ? 'page' : undefined}>Projects</a>
             <a href="#/secrets" aria-current={route.view === 'secrets' ? 'page' : undefined}>All secrets</a>

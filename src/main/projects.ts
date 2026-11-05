@@ -52,10 +52,10 @@ export class ProjectStore {
     try {
       projects = JSON.parse(contents)
     } catch (error) {
-      throw new Error('The saved project list is invalid. .sct did not change it.', { cause: error })
+      throw new Error('The saved project list is invalid. global.sct did not change it.', { cause: error })
     }
     if (!Array.isArray(projects) || !projects.every(isSavedProject)) {
-      throw new Error('The saved project list is invalid. .sct did not change it.')
+      throw new Error('The saved project list is invalid. global.sct did not change it.')
     }
     return projects
   }
@@ -117,7 +117,7 @@ export class ProjectStore {
       directory = await realpath(input.directory)
       if (!(await stat(directory)).isDirectory()) throw new Error('Not a directory.')
     } catch (error) {
-      throw new Error('Select an existing folder that .sct can access.', { cause: error })
+      throw new Error('Select an existing folder that global.sct can access.', { cause: error })
     }
 
     const projects = await this.list()

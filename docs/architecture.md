@@ -1,6 +1,6 @@
-# .sct architecture and implementation order
+# global.sct architecture and implementation order
 
-.sct uses Electron, React, and TypeScript. The Electron main process owns every sensitive operation on a Mac.
+global.sct uses Electron, React, and TypeScript. The Electron main process owns every sensitive operation on a Mac.
 These operations include vault access, the vault key, encryption, child processes, sharing, relay connections, and Agent Access.
 A passphrase derives the master key. The OS secret store only remembers it.
 The sandboxed renderer calls a narrow preload bridge and receives metadata only.
@@ -8,7 +8,7 @@ Each Mac keeps its own vault, private keys, cached activity, and pending message
 
 ## Local runtime injection
 
-The project registry maps a project to its source folder. The vault root resolves `.sct/[project-name]/secrets.sct`.
+The project registry maps a project to its source folder. The vault root resolves `global.sct/[project-name]/secrets.sct`.
 `sct run` decrypts locally and supplies the child environment before the command starts.
 The `@sct/env` SDK receives values through a signed helper's private pipes and updates `process.env`.
 The project folder needs no `.env` file, replacement secret file, manifest, symlink, or FIFO. Both paths work offline.
@@ -18,7 +18,7 @@ See [runtime injection](runtime-injection.md).
 
 `sct agent` (CLI) and `sct mcp` (stdio MCP server) run inside the signed executable and share one request path:
 
-1. Identify the caller. .sct finds the first listed agent among the parent processes and checks its code signature.
+1. Identify the caller. global.sct finds the first listed agent among the parent processes and checks its code signature.
    An impostor fails before any other check. An unverified caller needs an extra confirmation in the approval window.
 2. Check the request against a strict schema. Unknown fields and arbitrary commands fail.
 3. Show the local approval window. Each approval applies to one request and one deadline.
@@ -36,7 +36,7 @@ See [sharing](sharing.md). Relay sharing below is the second transport. The **Re
 ## Link sharing
 
 Link mode encrypts selected secrets for one verified device and encodes the envelope and its wrapped key as an
-`sct://import/...` string. The recipient imports the link and returns an `sct://receipt/...` string.
+`global-sct://import/...` string. The recipient imports the link and returns an `global-sct://receipt/...` string.
 The main process keeps the link records in the vault sharing folder.
 The renderer receives the ciphertext links and metadata only.
 See [sharing](sharing.md#link-mode).
@@ -272,7 +272,7 @@ A result contains the outcome, the exit code, whether `SCT_DEMO_TOKEN` was prese
 A task that names no imported grant from its sender is refused without user action. A task after a deadline expires.
 
 A claim without an outcome after a restart becomes `uncertain`. The task does not run again.
-The user must review it before .sct sends the uncertain result and before .sct starts another run.
+The user must review it before global.sct sends the uncertain result and before global.sct starts another run.
 The sender must submit a new task to run the demo again.
 
 Only the desktop app writes relay files and runs tasks. An agent session opens a passive relay.

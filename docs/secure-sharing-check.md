@@ -8,7 +8,7 @@ The check date was 2026-10-24.
 The project owner used two real Mac desktop apps.
 The owner confirmed that the apps showed a verified recipient and completed secret sharing.
 
-The check used the app UI. It did not use the .sct CLI, MCP, an agent, or an approval flow.
+The check used the app UI. It did not use the global.sct CLI, MCP, an agent, or an approval flow.
 
 ## Security evidence
 

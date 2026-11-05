@@ -1,9 +1,9 @@
 ---
 name: sct-run-demo
-description: Request the fixed .sct environment demo with one selected saved secret or private CLI stdin input, without exposing its value.
+description: Request the fixed global.sct environment demo with one selected saved secret or private CLI stdin input, without exposing its value.
 ---
 
-# Run the approved .sct demo
+# Run the approved global.sct demo
 
 Use the `run_demo` MCP tool with a registered `projectId` and a `secretId` from `list_secrets`.
 MCP accepts saved secret references only. Do not supply a plaintext value through MCP.
@@ -20,7 +20,7 @@ printf '%s' '{"secretId":"00000000-0000-4000-8000-000000000002"}' | sct agent ru
 
 Replace the example IDs with actual metadata IDs.
 The CLI example selects the project from the working directory.
-The user must approve this exact request in the local .sct window.
+The user must approve this exact request in the local global.sct window.
 The fixed demo receives the selected value as `SCT_DEMO_TOKEN` in its environment.
 Its result contains `exitCode` and `secretPresent`, without process logs.
 Report success only if the outcome completes with `exitCode: 0` and `secretPresent: true`.

@@ -48,7 +48,7 @@ export function StorageView() {
       <div className="page-heading">
         <div>
           <h1>Storage</h1>
-          <p className="description">Where .sct keeps encrypted secrets on this device, and how the window looks.</p>
+          <p className="description">Where global.sct keeps encrypted secrets on this device, and how the window looks.</p>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export function StorageView() {
         {location.state === 'loading' && <p role="status">Loading the storage location…</p>}
         {location.state === 'error' && <p className="error" role="alert">{location.error}</p>}
         {location.state === 'ready' && <p className="path">{location.value}</p>}
-        <p className="field-help">Select a folder. .sct moves its .sct folder and all project secrets into it. The vault keys move with the folder.</p>
+        <p className="field-help">Select a folder. global.sct moves its global.sct folder and all project secrets into it. The vault keys move with the folder.</p>
         <div className="form-actions">
           <button type="button" disabled={location.state !== 'ready' || operation.busy} onClick={() => { void change() }}>
             {operation.busy ? 'Please wait…' : 'Change location…'}

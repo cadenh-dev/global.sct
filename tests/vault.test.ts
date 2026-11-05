@@ -44,25 +44,25 @@ async function setup(t: TestContext) {
 test('secrets stay encrypted at rest and renderer operations return only metadata', async (t) => {
   const { root, open, folder } = await setup(t)
   const vault = await open()
-  assert.equal(vault.location(), join(root, '.sct'))
+  assert.equal(vault.location(), join(root, 'global.sct'))
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
-  assert.ok((await stat(join(root, '.sct', 'Demo'))).isDirectory())
+  assert.ok((await stat(join(root, 'global.sct', 'Demo'))).isDirectory())
 
   const value = `sk-${randomUUID()}`
   const secret = await vault.addSecret({ projectId: project.id, name: 'OPENAI_API_KEY', value })
   assert.deepEqual(Object.keys(secret).sort(), ['id', 'name', 'projectId'])
-  const file = await readFile(join(root, '.sct', 'Demo', 'secrets.sct'))
+  const file = await readFile(join(root, 'global.sct', 'Demo', 'secrets.sct'))
   assert.equal(file.subarray(0, 4).toString(), 'SCT2')
   assert.ok(!file.includes(value) && !file.includes('OPENAI_API_KEY'))
 
-  const header = JSON.parse(await readFile(join(root, '.sct', 'vault.json'), 'utf8')) as Record<string, unknown>
+  const header = JSON.parse(await readFile(join(root, 'global.sct', 'vault.json'), 'utf8')) as Record<string, unknown>
   assert.equal(header.version, 1)
   assert.ok(!JSON.stringify(header).includes(passphrase))
 
   assert.deepEqual(await (await open()).listSecrets(), [secret])
   await (await open()).withSecret(secret, (plaintext) => assert.equal(plaintext.toString('utf8'), value))
   await vault.updateSecret({ projectId: project.id, id: secret.id, value: `${value}-new` })
-  assert.notDeepEqual(await readFile(join(root, '.sct', 'Demo', 'secrets.sct')), file)
+  assert.notDeepEqual(await readFile(join(root, 'global.sct', 'Demo', 'secrets.sct')), file)
   assert.deepEqual(await vault.listSecrets(), [secret])
   await (await open()).withSecret(secret, (plaintext) => assert.equal(plaintext.toString('utf8'), `${value}-new`))
 
@@ -124,16 +124,16 @@ test('internal values survive concurrent writes from two vault processes', async
   assert.ok(existing)
   try { assert.ok(['left', 'right'].includes(existing.toString())) } finally { existing.fill(0) }
 
-  const files = await readdir(join(root, '.sct', '.internal'))
+  const files = await readdir(join(root, 'global.sct', '.internal'))
   assert.equal(files.length, 3)
   assert.ok(files.every((name) => /^[0-9a-f]{64}\.sct$/.test(name)))
   for (const name of files) {
-    const contents = await readFile(join(root, '.sct', '.internal', name))
+    const contents = await readFile(join(root, 'global.sct', '.internal', name))
     assert.equal(contents.subarray(0, 4).toString(), 'SCI2')
     assert.ok(!contents.includes('identity-') && !contents.includes('token-'))
   }
 
-  const identityFile = join(root, '.sct', '.internal',
+  const identityFile = join(root, 'global.sct', '.internal',
     `${createHash('sha256').update('sharing/identity').digest('hex')}.sct`)
   await writeFile(identityFile, 'broken')
   await assert.rejects(left.readInternal('sharing/identity'), /internal secret file is invalid/)
@@ -238,14 +238,14 @@ test('internal reads reject invalid references and other projects', async (t) =>
   const project = await vault.addProject({ name: 'Demo', directory: await folder('demo') })
   const other = await vault.addProject({ name: 'Other', directory: await folder('other') })
   const secret = await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: 'private value' })
-  const contents = await readFile(join(root, '.sct', project.name, 'secrets.sct'))
+  const contents = await readFile(join(root, 'global.sct', project.name, 'secrets.sct'))
   const rejectConsumer = () => assert.fail('An invalid read must not reach the consumer.')
   for (const input of [null, {}, { projectId: project.id }, { ...secret, projectId: 'missing' },
     { ...secret, projectId: other.id }, { ...secret, id: 'missing' }]) {
     await assert.rejects(vault.withSecret(input, rejectConsumer))
   }
   await vault.withSecret(secret, (buffer) => assert.equal(buffer.toString('utf8'), 'private value'))
-  assert.deepEqual(await readFile(join(root, '.sct', project.name, 'secrets.sct')), contents)
+  assert.deepEqual(await readFile(join(root, 'global.sct', project.name, 'secrets.sct')), contents)
 })
 
 test('invalid secrets and duplicate names do not change the vault', async (t) => {
@@ -377,8 +377,8 @@ test('project names cannot leave the vault folder or repeat', async (t) => {
   }
   await vault.addProject({ name: 'Demo', directory: await folder('demo') })
   await assert.rejects(vault.addProject({ name: 'demo', directory: await folder('other') }), /already exists/)
-  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['Demo', 'vault.json'])
-  assert.deepEqual((await readdir(root)).sort(), ['.sct', 'app-data', 'folders'])
+  assert.deepEqual((await readdir(join(root, 'global.sct'))).sort(), ['Demo', 'vault.json'])
+  assert.deepEqual((await readdir(root)).sort(), ['app-data', 'folders', 'global.sct'])
 })
 
 test('renaming a project moves its secrets, and deleting it removes its files', async (t) => {
@@ -389,19 +389,19 @@ test('renaming a project moves its secrets, and deleting it removes its files', 
   const secret = await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: 'value' })
 
   await vault.renameProject({ id: project.id, name: 'Renamed' })
-  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['Renamed', 'vault.json'])
+  assert.deepEqual((await readdir(join(root, 'global.sct'))).sort(), ['Renamed', 'vault.json'])
   assert.deepEqual(await vault.listSecrets(), [secret])
   await (await open()).withSecret(secret, (buffer) => assert.equal(buffer.toString('utf8'), 'value'))
 
-  await mkdir(join(root, '.sct', 'Taken', 'unrelated'), { recursive: true })
+  await mkdir(join(root, 'global.sct', 'Taken', 'unrelated'), { recursive: true })
   await assert.rejects(vault.renameProject({ id: project.id, name: 'Taken' }), /already contains a folder named Taken/)
-  await rm(join(root, '.sct', 'Taken'), { recursive: true })
+  await rm(join(root, 'global.sct', 'Taken'), { recursive: true })
   await vault.renameProject({ id: project.id, name: 'renamed' })
-  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['renamed', 'vault.json'])
+  assert.deepEqual((await readdir(join(root, 'global.sct'))).sort(), ['renamed', 'vault.json'])
   assert.deepEqual(await vault.listSecrets(), [secret])
 
   await vault.deleteProject(project.id)
-  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['vault.json'])
+  assert.deepEqual((await readdir(join(root, 'global.sct'))).sort(), ['vault.json'])
   assert.ok((await stat(directory)).isDirectory())
 })
 
@@ -413,7 +413,7 @@ test('startup creates folders for existing projects and skips names that are not
     { id: 'older', name: 'older/name', directory: await folder('older') }
   ]))
   await open()
-  assert.deepEqual((await readdir(join(root, '.sct'))).sort(), ['Existing', 'vault.json'])
+  assert.deepEqual((await readdir(join(root, 'global.sct'))).sort(), ['Existing', 'vault.json'])
 })
 
 test('a secrets file copied into a different project does not open', async (t) => {
@@ -423,7 +423,7 @@ test('a secrets file copied into a different project does not open', async (t) =
   const second = await vault.addProject({ name: 'Second', directory: await folder('second') })
   await vault.addSecret({ projectId: first.id, name: 'TOKEN', value: 'value' })
   const other = await vault.addSecret({ projectId: second.id, name: 'OTHER', value: 'value' })
-  await copyFile(join(root, '.sct', 'First', 'secrets.sct'), join(root, '.sct', 'Second', 'secrets.sct'))
+  await copyFile(join(root, 'global.sct', 'First', 'secrets.sct'), join(root, 'global.sct', 'Second', 'secrets.sct'))
   await assert.rejects(vault.listSecrets(), /different project/)
   await assert.rejects(vault.withSecret(other, () => assert.fail('A copied vault must not open.')), /different project/)
 })
@@ -435,15 +435,15 @@ test('moving the storage location moves the vault and persists after restart', a
   const secret = await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: 'value' })
   const target = await folder('new-root')
 
-  assert.equal(await vault.moveTo(target), join(target, '.sct'))
-  await assert.rejects(stat(join(root, '.sct')))
+  assert.equal(await vault.moveTo(target), join(target, 'global.sct'))
+  await assert.rejects(stat(join(root, 'global.sct')))
   const restarted = await open()
-  assert.equal(restarted.location(), join(target, '.sct'))
+  assert.equal(restarted.location(), join(target, 'global.sct'))
   assert.deepEqual(await restarted.listSecrets(), [secret])
   await restarted.withSecret(secret, (buffer) => assert.equal(buffer.toString('utf8'), 'value'))
 
-  await mkdir(join(root, 'occupied', '.sct'), { recursive: true })
+  await mkdir(join(root, 'occupied', 'global.sct'), { recursive: true })
   await assert.rejects(restarted.moveTo(join(root, 'occupied')), /already contains/)
-  await assert.rejects(restarted.moveTo(join(target, '.sct', 'Demo')), /outside/)
-  assert.equal(restarted.location(), join(target, '.sct'))
+  await assert.rejects(restarted.moveTo(join(target, 'global.sct', 'Demo')), /outside/)
+  assert.equal(restarted.location(), join(target, 'global.sct'))
 })

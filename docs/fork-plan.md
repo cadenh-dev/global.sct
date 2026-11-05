@@ -5,7 +5,8 @@
 This document records the proposals from the Gemini conversation about .sct.
 It compares each proposal with the current code.
 Use the decision table before you start any work.
-Each recommendation needs your approval.
+The user delegated the remaining technical choices on 2026-11-04.
+The [remaining feature plan](remaining-features-plan.md) records those choices. Implementation and new tests remain separate work.
 
 ## Source
 
@@ -32,7 +33,7 @@ The chat has 12 pages and 10 user prompts.
 | Each secret value has its own Keychain key. | [`vault.ts`](../src/main/vault.ts) creates one key for each value, and one file key for each project. |
 | A project read starts one Keychain read for each value. | `withProjectSecrets` starts all reads together with `Promise.allSettled`. |
 | The caller check uses macOS tools. | [`caller.ts`](../src/main/caller.ts) runs `/bin/ps` and `/usr/bin/codesign`. |
-| The build and the CLI install are macOS-only. | [`install-cli.ts`](../scripts/install-cli.ts) writes a POSIX script to `~/.local/bin`. The package path contains `sct-darwin-${process.arch}`. |
+| The build and the CLI install are macOS-only. | [`install-cli.ts`](../scripts/install-cli.ts) writes a POSIX script to `~/.local/bin`. The package path contains `global.sct-darwin-${process.arch}`. |
 | AirDrop is macOS-only. | `native/airdrop.swift` compiles with `swiftc` in the `build:airdrop` script. |
 | The relay is a central service. | `packages/relay` and [`relay-connection.ts`](../src/main/relay-connection.ts) use SpacetimeDB Maincloud. |
 | Agent approval opens a local window. | [`mcp.ts`](../src/main/mcp.ts) and [`agent-access.ts`](../src/main/agent-access.ts) use the approval window. |
@@ -92,7 +93,7 @@ Correct the record before you plan work.
 | C13 | Keep the relay as the optional mailbox | Relay works | Keep | None | It stays a third-party service and a SpacetimeDB build step |
 | C14 | Remove `docs/macos-signing.md` | The file is required | Keep | None | Keychain prompts return |
 | C15 | Process-group signals for `sct run` | `launch.ts` uses `process.kill(-pid)` and `/bin/ps` | Add with C7 | Medium | A Windows job object is a different mechanism |
-| C16 | User gate on share and reveal | None | Add | Medium | A gate cannot protect a compromised machine |
+| C16 | User gate on app and agent shares | None | Add. Vault passphrase only. No reveal feature | Medium | A gate cannot protect a compromised machine |
 | C17 | Keep Wallet cards on macOS only | Cards and AirDrop are macOS only | Keep, and hide the view on other systems | Low | Two UI paths |
 | C18 | New color theme | Current Terminal theme | Add later | Low | Needs a full token pass and screenshots |
 
@@ -104,7 +105,7 @@ The sender selects one mode for each transfer.
 |---|---|---|---|
 | Direct | Hyperswarm or WebRTC | No | Same session |
 | Mailbox | The current relay | Yes | On pickup |
-| Link | Paste `sct://import/...` | Yes, by hand | Manual `sct://receipt/...` |
+| Link | Paste `global-sct://import/...` | Yes, by hand | Manual `global-sct://receipt/...` |
 
 Rules:
 
@@ -134,23 +135,20 @@ These values do:
 
 | Value | Current | Where |
 |---|---|---|
-| Package name | `sct` | `package.json` |
-| Runtime application name, and the `userData` folder | `.sct` | `app.setName('.sct')` in `src/main/index.ts` |
-| macOS bundle ID | `com.omavashia2005.sct` | `scripts/package-macos.ts` |
-| Transfer type ID | `com.omavashia2005.sct.transfer` | `scripts/package-macos.ts` |
-| Local signing identity | `.sct Development` | `scripts/package-macos.ts` |
-| Keychain service | `.sct` | `Vault`, `Sharing`, and `Relay` constructors |
-| Vault folder | `~/.sct` | `Vault` default root |
+| Package name | `global.sct` | `package.json` |
+| Runtime application name, and the `userData` folder | `global.sct` | `app.setName('global.sct')` in `src/main/index.ts` |
+| macOS bundle ID | `app.global-sct.desktop` | `scripts/package-macos.ts` |
+| Transfer type ID | `app.global-sct.desktop.transfer` | `scripts/package-macos.ts` |
+| Local signing identity | `global.sct Development` | `scripts/package-macos.ts` |
+| OS master-key service | `global.sct` | `createSecretStore` in `src/main/index.ts` |
+| Vault folder | `~/global.sct` | `Vault` default root |
 | CLI command | `sct` | `scripts/install-cli.ts` |
 | SDK package | `@sct/env` | `packages/env/package.json` |
-| MCP server name | `.sct` | `src/main/mcp.ts` |
+| MCP server name | `global.sct` | `src/main/mcp.ts` |
+| Link scheme | `global-sct://` | Pairing, transfer, receipt, and MCP resource encoders |
 
-Two profiles are possible:
-
-| Profile | Bundle ID and service | Effect |
-|---|---|---|
-| Keep the upstream identity | `com.omavashia2005.sct` and `.sct` | The build replaces the upstream app. Both apps share the Keychain items and the `userData` folder. Two installs collide |
-| Use a fork identity | For example `com.cadenh-dev.sct` and `dev.cadenh.sct` | The two apps can coexist. The current Keychain items are invisible. A migration must read the `.sct` service one time |
+The fork now uses a separate identity. This replaces the earlier D5 and D19 decisions to retain the upstream identity.
+Use the [explicit migration](fork-storage-migration.md) to preserve an existing vault and its project records.
 
 ## Recorded decisions
 
@@ -173,9 +171,11 @@ Two profiles are possible:
 | 2026-11-04 | Theme setting: Light (Cream), Dark (Terminal), or System. Cream is the default | Q12 is closed. The setting is an Appearance section on the Storage page. AGENTS.md lists both variants |
 | 2026-11-04 | Cream uses the colors of the user's reference screenshot, with a dark forest green accent | Q13 is closed. Both variants use the same selected-tab style. See [docs/theme.md](theme.md) |
 | 2026-11-04 | Add `sct run --interactive` for shells | Q11 is closed. The VS Code terminal uses `sct run --interactive -- <shell>` |
+| 2026-11-04 | Delegate the remaining technical choices | The remaining feature specification closes protocol choices P1–P6, D11, Q9, and Q10. It selects transport limits, receipt recovery, and the TURN credential exception. Implementation remains separate |
 | 2026-11-03 | Keep Wallet cards on macOS only | C17 enters scope |
 | 2026-11-03 | Change the color theme later | C18 enters scope, after the other work |
-| 2026-11-03 | The fork is a new build of `sct`. It is not a second app | Keep the name `sct`, the CLI `sct`, `@sct/env`, and the app identity. The build replaces the upstream app on a machine that has it |
+| 2026-11-03 | Initially retain the upstream identity | Superseded by the standalone identity decision below |
+| 2026-11-04 | Name the standalone fork `global.sct` | Separate vault, app records, OS credential service, and application identifier. Use `global-sct://` links. Keep the `sct` CLI and `@sct/env`. Move existing storage explicitly |
 
 ## Open decisions
 
@@ -185,13 +185,13 @@ Two profiles are possible:
 | D2 | The scope of one master key | Decided: one key for the vault | Phase 0 | One unlock opens every project |
 | D3 | The key derivation function | Decided: `scrypt` from `node:crypto` | Phase 0 | No new dependency |
 | D4 | The existing vaults | Decided: clean break | Phase 0 | Old vault files are not read. Users re-enter secrets |
-| D5 | The application identity | Decided: keep `com.omavashia2005.sct` | Phase 0 | The build replaces the upstream app. A later change needs a migration |
+| D5 | The application identity | Decided: `app.global-sct.desktop`, separate app records and credential service | Phase 0 | The user selected standalone fork identity. Existing storage moves explicitly |
 | D6 | The order of the transports | Decided: Link, then Hyperswarm, then WebRTC | Phase 2 | The link transport has no network dependency. It tests the receipt contract first |
-| D7 | The WebRTC signalling path | Decided: manual token exchange with signed and sealed `sct://connect` links | Phase 2 | It adds no server. The signature binds the DTLS fingerprint to the verified peer |
-| D8 | Pairing without the relay | Decided: the device card as an `sct://pair/v1/<card>` link or a file, with the current pairing code | Phase 2 | It uses `previewPeer`, `confirmPeer`, and `pairingCode`. It works on all platforms |
+| D7 | The WebRTC signalling path | Decided: manual token exchange with signed and sealed `global-sct://connect` links | Phase 2 | It adds no server. The signature binds the DTLS fingerprint to the verified peer |
+| D8 | Pairing without the relay | Decided: the device card as an `global-sct://pair/v1/<card>` link or a file, with the current pairing code | Phase 2 | It uses `previewPeer`, `confirmPeer`, and `pairingCode`. It works on all platforms |
 | D9 | The receipt when the peer is offline | Decided: the mailbox returns the receipt on pickup | Phase 2 | The direct and link modes use C8d |
 | D10 | The relay code | Decided: keep it | Phase 2 | It is the mailbox implementation |
-| D11 | The gate factors | Password only, or a password plus WebAuthn | Phase 4 | Linux has no platform authenticator in most distributions |
+| D11 | The gate factors | Decided: vault passphrase only | Phase 4 | Reuses the existing verifier across platforms |
 | D12 | The signing credentials | Decided: deferred. Unsigned beta releases until signing is available | Phase 1 | No certificate means no signed build |
 | D13 | The CI runners and the release channel | Decided: three runners. Versioned beta tags until signing | Phase 1 | The old workflow replaced `latest` on each push |
 | D14 | The VS Code extension scope and link | Decided: CLI only (`sct agent` and `sct run`) | Phase 3 | It adds no socket or pipe (C3). It uses the current caller check and approval window |
@@ -199,7 +199,7 @@ Two profiles are possible:
 | D16 | Backward compatibility | Decided: break the format | Phase 0 | The new build reads no old vault or transfer file |
 | D17 | The release target | Decided: a standalone fork | Phase 1 | The release target is this repository |
 | D18 | The SpacetimeDB database | Decided: keep it | Phase 2 | Maincloud holds the current relay data |
-| D19 | The product names | Decided: keep `sct`, `@sct/env`, and the MCP name `sct` | Phase 1 | One install of `sct` per `PATH` |
+| D19 | The product names | Decided: `global.sct` app and MCP server. Keep `sct` CLI and `@sct/env` | Phase 1 | One selected `sct` command per PATH |
 
 ## Effects of the clean break
 

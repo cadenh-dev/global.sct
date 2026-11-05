@@ -9,7 +9,7 @@ export interface LoadEnvOptions {
   onError?: (error: Error) => void
 }
 
-/** Load this project's .sct secrets and keep process.env current. The returned function stops updates and restores inherited values. */
+/** Load this project's global.sct secrets and keep process.env current. The returned function stops updates and restores inherited values. */
 export function loadEnv(options: LoadEnvOptions = {}): Promise<() => void> {
   const child = spawn(sctExecutable(), ['_env', ...(options.project ? [options.project] : [])], { stdio: ['pipe', 'pipe', 'pipe'] })
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity })
@@ -54,10 +54,10 @@ export function loadEnv(options: LoadEnvOptions = {}): Promise<() => void> {
         console.error(error.message)
       }
     }
-    child.once('error', () => failed(new Error('Cannot launch .sct. Install the sct CLI and make it available on PATH.')))
+    child.once('error', () => failed(new Error('Cannot launch global.sct. Install the sct CLI and make it available on PATH.')))
     child.once('close', () => {
       if (!stopped) {
-        failed(new Error('The .sct secret connection closed. Call loadEnv() to connect again.'))
+        failed(new Error('The global.sct secret connection closed. Call loadEnv() to connect again.'))
         close()
       }
     })
@@ -71,7 +71,7 @@ export function loadEnv(options: LoadEnvOptions = {}): Promise<() => void> {
         }
         apply(message.values)
       } catch {
-        failed(new Error('The .sct CLI returned an invalid response.'))
+        failed(new Error('The global.sct CLI returned an invalid response.'))
         close()
         return
       }

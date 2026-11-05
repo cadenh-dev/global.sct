@@ -47,7 +47,7 @@ export class AgentAccess {
   async submit(input: unknown, signal?: AbortSignal): Promise<AgentOutcome> {
     const id = randomUUID()
     const caller = await this.services.caller
-    if (!caller) return { requestId: id, status: 'failed', error: 'The calling program failed its signature check. .sct rejected the request.' }
+    if (!caller) return { requestId: id, status: 'failed', error: 'The calling program failed its signature check. global.sct rejected the request.' }
     try {
       if (this.closed || signal?.aborted) throw new Error('The caller disconnected.')
       const { submission, stdinValue } = requireSubmission(input)
@@ -149,7 +149,7 @@ export class AgentAccess {
       const grant = state.sent.find((item) => item.messageId === submission.input.grantId && item.state === 'received')
       if (!grant) throw new Error('Select a relay transfer that the recipient imported.')
       const peer = state.peers.find((item) => item.identity === grant.recipient)?.name ?? grant.recipient.slice(0, 12)
-      return { view: { secrets: [], detail: `Ask ${peer} to run the fixed environment demo with the secrets of relay transfer ${grant.messageId}. That device must also approve. The .sct app sends the request. The result can arrive later.` } }
+      return { view: { secrets: [], detail: `Ask ${peer} to run the fixed environment demo with the secrets of relay transfer ${grant.messageId}. That device must also approve. The global.sct app sends the request. The result can arrive later.` } }
     }
     if (submission.operation === 'sharing_state' || submission.operation === 'relay_status') {
       return { view: { secrets: [], detail: submission.operation === 'sharing_state'

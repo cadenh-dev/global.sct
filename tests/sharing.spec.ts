@@ -25,7 +25,7 @@ test('shares selected secrets into the recipient project without exposing values
     }
     const sender = applications[0]
     const recipient = applications[1]
-    if (!sender || !recipient) throw new Error('Both .sct windows must start.')
+    if (!sender || !recipient) throw new Error('Both global.sct windows must start.')
     const source = await sender.app.firstWindow()
     const destination = await recipient.app.firstWindow()
     await unlock(source, passphrase)
@@ -132,7 +132,7 @@ test('shares selected secrets into the recipient project without exposing values
     await expect(destination.getByRole('heading', { name: 'Received transfers' })).toBeVisible()
     await expect(destination.getByRole('list', { name: 'Received secrets from backend' })).toHaveText('API_TOKEN')
     await destination.getByLabel('Destination project').selectOption({ label: 'api' })
-    await expect(destination.getByText(join(root, 'recipient', '.sct', 'api', 'secrets.sct'), { exact: true })).toBeVisible()
+    await expect(destination.getByText(join(root, 'recipient', 'global.sct', 'api', 'secrets.sct'), { exact: true })).toBeVisible()
     await destination.screenshot({ path: test.info().outputPath('receive-secrets.png') })
     await destination.getByRole('button', { name: 'Import secrets' }).click()
     await expect(destination.getByRole('status').first()).toContainText('Imported 1 secret into api')
@@ -143,8 +143,8 @@ test('shares selected secrets into the recipient project without exposing values
     const imported = await destination.evaluate(() => window.sct.listSecrets())
     expect(imported).toHaveLength(1)
     expect(imported[0]).toMatchObject({ name: 'API_TOKEN', projectId: projects.find((project) => project.name === 'api')?.id })
-    expect((await readFile(join(root, 'recipient', '.sct', 'api', 'secrets.sct'))).includes(value)).toBe(false)
-    expect(await readdir(join(root, 'recipient', '.sct', 'other'))).toEqual([])
+    expect((await readFile(join(root, 'recipient', 'global.sct', 'api', 'secrets.sct'))).includes(value)).toBe(false)
+    expect(await readdir(join(root, 'recipient', 'global.sct', 'other'))).toEqual([])
     expect(await source.content()).not.toContain(value)
     expect(await destination.content()).not.toContain(value)
 

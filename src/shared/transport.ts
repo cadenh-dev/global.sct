@@ -24,7 +24,7 @@ export interface TransferReceipt {
 export type ReceiptState =
   | { state: 'pending' }
   | { state: 'received'; receipt: TransferReceipt }
-  // Link mode: the sender waits for a pasted sct://receipt link.
+  // Link mode: the sender waits for a pasted global-sct://receipt link.
   | { state: 'manual' }
   | { state: 'expired' }
   | { state: 'failed'; error: string }

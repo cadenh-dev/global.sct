@@ -180,7 +180,7 @@ function ProjectRow({ project, secretCount, busy, run, updateProjects, updateSec
       <li>
         <form className="inline-form" aria-label={`Delete ${project.name}`} onSubmit={(event) => { void remove(event) }}>
           <fieldset disabled={busy}>
-            <p>Delete {project.name} and all of its secrets? .sct removes the vault folder and encrypted entries of this project. The project folder does not change.</p>
+            <p>Delete {project.name} and all of its secrets? global.sct removes the vault folder and encrypted entries of this project. The project folder does not change.</p>
             <label htmlFor={`delete-${project.id}`}>Type {project.name} to confirm</label>
             <div className="inline-field">
               <input ref={field} id={`delete-${project.id}`} value={confirmation} autoComplete="off"

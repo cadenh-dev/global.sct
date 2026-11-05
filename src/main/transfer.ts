@@ -80,7 +80,7 @@ export function readDeviceCard(contents: Buffer): DeviceCard {
 export function encodePairingLink(card: DeviceCard): string {
   const contents = Buffer.from(JSON.stringify(card))
   readDeviceCard(contents)
-  return `sct://pair/v1/${contents.toString('base64url')}`
+  return `global-sct://pair/v1/${contents.toString('base64url')}`
 }
 
 export function readPairingLink(input: unknown): DeviceCard {
@@ -92,10 +92,13 @@ export function readPairingLink(input: unknown): DeviceCard {
 
 function requirePairingLink(input: unknown): string {
   // Check the link and encoded card limits before allocating the decoded bytes.
-  if (typeof input !== 'string' || input.length > pairingLinkLimit || !input.startsWith('sct://pair/v1/')) {
+  if (typeof input !== 'string' || input.length > pairingLinkLimit) {
     throw invalidPairingLink()
   }
-  const encoded = input.slice('sct://pair/v1/'.length)
+  // Old links remain usable by paste. The fork does not register the upstream scheme.
+  const prefix = ['global-sct://pair/v1/', 'sct://pair/v1/'].find((value) => input.startsWith(value))
+  if (!prefix) throw invalidPairingLink()
+  const encoded = input.slice(prefix.length)
   if (!encoded || encoded.length > Math.ceil(4096 * 4 / 3) || encoded.length % 4 === 1 || /[^A-Za-z0-9_-]/.test(encoded)) {
     throw invalidPairingLink()
   }
@@ -103,7 +106,7 @@ function requirePairingLink(input: unknown): string {
 }
 
 function invalidPairingLink(): Error {
-  return new Error('The pairing link is invalid. Paste an sct://pair/v1/ link from the other device.')
+  return new Error('The pairing link is invalid. Paste a global-sct://pair/v1/ link from the other device.')
 }
 
 export function describeDevice(card: DeviceCard): SharingDevice {
@@ -258,5 +261,5 @@ export function decodeBase64(value: unknown, length?: number): Buffer {
 }
 
 function invalid(): Error {
-  return new Error('The .sct package is invalid or uses an unsupported format.')
+  return new Error('The global.sct package is invalid or uses an unsupported format.')
 }

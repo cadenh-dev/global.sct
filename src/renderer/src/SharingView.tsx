@@ -748,12 +748,12 @@ function RelayTask({ task, state, busy, run }: { task: RelayTaskItem; state: Rel
     {task.error && <p className="error" role="alert">{task.error}</p>}
     {task.direction === 'received' && task.state === 'awaiting-approval' && <div className="form-actions">
       <button type="button" className="secondary" disabled={busy}
-        onClick={() => decide('refuse', 'Refusing the task…', 'The task was refused. .sct sends the refusal.')}>Refuse</button>
+        onClick={() => decide('refuse', 'Refusing the task…', 'The task was refused. global.sct sends the refusal.')}>Refuse</button>
       <button type="button" disabled={busy}
-        onClick={() => decide('approve', 'Running the fixed demo…', 'The run finished. .sct sends the result.')}>Approve once</button>
+        onClick={() => decide('approve', 'Running the fixed demo…', 'The run finished. global.sct sends the result.')}>Approve once</button>
     </div>}
     {task.reviewRequired && <>
-      <p>The app stopped during this run. .sct cannot know whether the demo finished. It does not run this task again.</p>
+      <p>The app stopped during this run. global.sct cannot know whether the demo finished. It does not run this task again.</p>
       <div className="form-actions">
         <button type="button" disabled={busy}
           onClick={() => decide('report', 'Saving the review…', 'The uncertain result is queued for the sender.')}>Send uncertain result</button>

@@ -45,7 +45,7 @@ export const agentTools = {
     schema: z.strictObject({ expiresAt })
   },
   request_remote_demo: {
-    description: 'Ask the recipient of a received relay transfer to run the fixed environment demo with that grant, after local approval. The recipient must also approve on its device. The .sct app sends the request. Read the outcome later with relay_status.',
+    description: 'Ask the recipient of a received relay transfer to run the fixed environment demo with that grant, after local approval. The recipient must also approve on its device. The global.sct app sends the request. Read the outcome later with relay_status.',
     schema: z.strictObject({ grantId: z.uuid().describe('Message ID of a relay transfer that this device sent and the recipient imported.'), expiresAt })
   }
 } as const

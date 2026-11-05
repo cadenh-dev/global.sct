@@ -562,9 +562,9 @@ async function readLimited(path: string, limit = transferLimit): Promise<Buffer>
   const file = await open(path, 'r')
   try {
     const info = await file.stat()
-    if (!info.isFile() || info.size > limit) throw new Error('Select a valid .sct file within the transfer size limit.')
+    if (!info.isFile() || info.size > limit) throw new Error('Select a valid global.sct file within the transfer size limit.')
     const contents = await file.readFile()
-    if (contents.length > limit) throw new Error('The .sct file exceeds the transfer size limit.')
+    if (contents.length > limit) throw new Error('The global.sct file exceeds the transfer size limit.')
     return contents
   } finally {
     await file.close()

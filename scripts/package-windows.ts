@@ -25,7 +25,7 @@ for (const name of ['@napi-rs/keyring', `@napi-rs/keyring-win32-${process.arch}-
 const [output] = await packager({
   dir: 'out',
   out: 'dist',
-  name: 'sct',
+  name: 'global.sct',
   executableName: 'sct',
   electronVersion: electron.version,
   platform: 'win32',

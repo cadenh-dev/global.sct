@@ -10,7 +10,7 @@ export interface SecretStore {
 
 const account = 'master-key'
 
-// The optional "remember this device" store. It holds one master key under the .sct service.
+// The optional "remember this device" store. It holds one master key under the global.sct service.
 export class KeyringSecretStore implements SecretStore {
   private readonly service: string
 

@@ -1,9 +1,9 @@
 ---
 name: sct-request-remote-demo
-description: Ask a paired relay recipient to run the fixed .sct environment demo with the secrets of one relay transfer that it imported. The recipient approves on its own Mac.
+description: Ask a paired relay recipient to run the fixed global.sct environment demo with the secrets of one relay transfer that it imported. The recipient approves on its own Mac.
 ---
 
-# Request a remote .sct demo run
+# Request a remote global.sct demo run
 
 Call `relay_status` first. Select a `sent` row with `state: "received"`. Its `messageId` is the grant ID.
 Then call the `request_remote_demo` MCP tool with that grant ID.
@@ -19,8 +19,8 @@ printf '%s' '{"grantId":"00000000-0000-4000-8000-000000000001"}' | sct agent req
 ```
 
 Replace the example ID with an actual message ID.
-The user must approve this exact request in the local .sct window.
-The result contains `taskId` and `status: "queued"`. The .sct desktop app encrypts and sends the task. It must be open.
+The user must approve this exact request in the local global.sct window.
+The result contains `taskId` and `status: "queued"`. The global.sct desktop app encrypts and sends the task. It must be open.
 The recipient must approve the task on its own Mac within 24 hours.
 The task can only run the fixed demo with the secrets of that grant. It accepts no command, executable, or other operation.
 

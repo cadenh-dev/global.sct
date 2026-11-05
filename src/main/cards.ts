@@ -51,9 +51,9 @@ async function requestPass(card: MockCardInput): Promise<URL> {
     // The service rejects unknown keys. The colors are the paper, ink, and accent tokens of the Terminal theme.
     body: JSON.stringify({
       style: 'generic',
-      organization_name: '.sct',
+      organization_name: 'global.sct',
       description: `Mock card. ${cardNotice}.`,
-      logo_text: '.sct',
+      logo_text: 'global.sct',
       header_fields: [{ key: 'notice', value: cardNotice }],
       primary_fields: [{ key: 'cardholder', label: 'Cardholder', value: card.cardholder }],
       secondary_fields: [{ key: 'card', label: 'Card', value: card.label }],
@@ -66,7 +66,7 @@ async function requestPass(card: MockCardInput): Promise<URL> {
   }).catch(() => {
     throw new Error('Cannot reach walletmcppass.com. Check the internet connection and try again.')
   })
-  // .sct never pays. Past the free limit, the service asks for an x402 payment with status 402.
+  // global.sct never pays. Past the free limit, the service asks for an x402 payment with status 402.
   if (response.status === 402 || response.status === 429) throw new Error('The free daily limit of walletmcppass.com is used. Try again after 00:00 UTC.')
   if (response.status === 503) throw new Error('walletmcppass.com is busy. Try again later.')
   const body: unknown = await response.json().catch(() => null)
@@ -104,7 +104,7 @@ function requirePass(contents: Buffer): void {
     throw new Error('The downloaded file is not a signed Apple Wallet pass.')
   }
   if (!readPassJson(contents, pass).includes(cardNotice)) {
-    throw new Error(`The signed pass does not show “${cardNotice}”. .sct did not send it.`)
+    throw new Error(`The signed pass does not show “${cardNotice}”. global.sct did not send it.`)
   }
 }
 

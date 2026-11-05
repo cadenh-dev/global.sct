@@ -35,11 +35,11 @@ export function UnlockView({ status, onUnlocked }: { status: VaultStatus; onUnlo
   return (
     <div className="app unlock-screen">
       <main className="unlock-panel">
-        <span className="wordmark">.sct</span>
+        <span className="wordmark">global.sct</span>
         <h1>{creating ? 'Create a vault passphrase' : 'Unlock your vault'}</h1>
         <p className="description">
           {creating
-            ? 'The passphrase derives the key for every project. .sct does not store the passphrase.'
+            ? 'The passphrase derives the key for every project. global.sct does not store the passphrase.'
             : 'Enter the passphrase for this vault.'}
         </p>
         <form className="panel" onSubmit={(event) => { void submit(event) }}>

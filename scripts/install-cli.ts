@@ -3,10 +3,10 @@ import { constants } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join, resolve } from 'node:path'
 
-const marker = '# .sct command launcher'
+const marker = '# global.sct command launcher'
 
 // Electron finds its helper apps only from the real executable path. A symbolic link makes it exit before its window opens.
-// `exec` replaces the shell, so the caller stays the parent process of .sct.
+// `exec` replaces the shell, so the caller stays the parent process of global.sct.
 export async function installCli(executable: string, destination: string): Promise<void> {
   await access(executable, constants.X_OK)
   const { command, contents } = launcher(executable)
@@ -16,16 +16,16 @@ export async function installCli(executable: string, destination: string): Promi
   await rename(`${destination}.tmp`, destination)
 }
 
-// Accept a missing command and an earlier .sct link to the same executable. Reject every other existing command.
+// Accept a missing command and an earlier global.sct link to the same executable. Reject every other existing command.
 async function isInstalled(destination: string, executable: string, command: string): Promise<boolean> {
   try {
     if ((await lstat(destination)).isSymbolicLink()) {
       if (resolve(dirname(destination), await readlink(destination)) === executable) return false
-      throw new Error('The sct command points to another application. Remove that link before installing .sct.')
+      throw new Error('The sct command points to another application. Remove that link before installing global.sct.')
     }
     const current = await readFile(destination, 'utf8')
-    if (!current.includes(marker)) throw new Error('The sct command already exists and is not an .sct launcher.')
-    if (!current.includes(command)) throw new Error('The sct command starts another application. Remove it before installing .sct.')
+    if (!current.includes(marker)) throw new Error('The sct command already exists and is not a global.sct launcher.')
+    if (!current.includes(command)) throw new Error('The sct command starts another application. Remove it before installing global.sct.')
     return true
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
@@ -59,10 +59,10 @@ function cliTarget() {
   if (process.platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA
     if (!localAppData) throw new Error('Cannot find LOCALAPPDATA. Set it before you install the sct command.')
-    const folder = join(localAppData, 'Programs', 'sct', 'bin')
+    const folder = join(localAppData, 'Programs', 'global.sct', 'bin')
     return {
       destination: join(folder, 'sct.cmd'),
-      executable: `dist/sct-win32-${process.arch}/sct.exe`,
+      executable: `dist/global.sct-win32-${process.arch}/sct.exe`,
       pathHint: `Add this folder to PATH, then open a new terminal:\n${folder}`
     }
   }
@@ -70,8 +70,8 @@ function cliTarget() {
   return {
     destination,
     executable: process.platform === 'darwin'
-      ? `dist/sct-darwin-${process.arch}/sct.app/Contents/MacOS/sct`
-      : `dist/sct-linux-${process.arch}/sct`,
+      ? `dist/global.sct-darwin-${process.arch}/global.sct.app/Contents/MacOS/sct`
+      : `dist/global.sct-linux-${process.arch}/sct`,
     pathHint: `Add this line to ${process.platform === 'darwin' ? '~/.zshrc' : '~/.profile'}, then open a new terminal:\nexport PATH="$HOME/.local/bin:$PATH"`
   }
 }
