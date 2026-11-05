@@ -393,7 +393,7 @@ The extension starts commands with project secrets. It never receives a secret v
 | 3.2 | Done. The extension starts the shared `sct` executable. |
 | 3.3 | Done. The tree view shows names and IDs only. Live VS Code behavior is unverified. |
 | 3.4 | Done. The terminal command uses `sct run --interactive -- <shell>`. Live VS Code behavior is unverified. |
-| 3.5 | Open. |
+| 3.5 | Done. The extension guide is in [docs/vscode.md](vscode.md). It is linked from the Agent Access and runtime injection docs. |
 | Caller identity | Done for `code` and `Code.exe`. Windows uses the Authenticode signer and product name. macOS uses the app signature. macOS is not run here. Linux is unverified. |
 
 ### Key decisions

@@ -106,6 +106,10 @@ With `--interactive`, these rules apply:
 
 On Windows, give the executable of the shell, for example `pwsh.exe` or `cmd.exe`. .sct starts no shell for you, so a `.cmd` or `.bat` file cannot start.
 
+The VS Code extension uses this form in its **Open terminal with .sct secrets** command.
+Only that terminal gets the project secrets.
+See [VS Code extension](vscode.md).
+
 ### Input, signals, and exit codes
 
 - Terminal input and output stay connected to the command.

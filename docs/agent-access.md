@@ -109,6 +109,13 @@ Caller authentication identifies the program. It does not replace local approval
 A verified agent can still request an operation that the user must refuse.
 Another program that the verified agent starts also passes this check.
 
+## VS Code client
+
+The VS Code extension uses the local CLI. It receives secret names and IDs only.
+The command **Open terminal with .sct secrets** opens a terminal with `sct run --interactive -- <shell>`.
+The extension host never receives the values.
+See [VS Code extension](vscode.md).
+
 ## Local approval
 
 Each request requires explicit approval in the local .sct window.
