@@ -61,7 +61,7 @@ export class ShareGate {
     if (this.active !== entry) throw new Error('This share confirmation is no longer active. Start the share again.')
     this.release()
     // Start the approved operation only after the one-use authorization is gone.
-    void entry.execute().then(entry.resolve, entry.reject).finally(() => {
+    void Promise.resolve().then(entry.execute).then(entry.resolve, entry.reject).finally(() => {
       this.advance()
     })
   }
