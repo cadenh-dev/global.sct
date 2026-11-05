@@ -470,7 +470,7 @@ Status (2026-11-05):
 
 - 4.1 to 4.4 are done in the main process. The gate checks the vault passphrase, holds the operation, and releases it once. Link, Direct, WebRTC, Mailbox, AirDrop, and agent `send_secrets_to` use it.
 - 4.5 is done. The new screens use the existing role tokens.
-- 4.6 is done on Windows for the Send, WebRTC, connection-link review, Link receipt, share confirmation, and development Links states in both themes. The packaged registration controls and macOS/Linux variants remain open.
+- 4.6 is done on Windows for the Send, WebRTC, connection-link review, Link receipt, share confirmation, and packaged Links registration states in both themes. The macOS and Linux variants remain open.
 
 ### Key decisions
 

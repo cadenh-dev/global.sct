@@ -109,13 +109,14 @@ The full-window screenshots are 1200 × 800 on Windows. The Links image is a pan
 | Connection link review | ![Cream connection link](media/themes/cream/connection-link.png) | ![Terminal connection link](media/themes/terminal/connection-link.png) |
 | Link receipt | ![Cream link receipt](media/themes/cream/link-receipt.png) | ![Terminal link receipt](media/themes/terminal/link-receipt.png) |
 | Share confirmation | ![Cream share confirmation](media/themes/cream/share-gate.png) | ![Terminal share confirmation](media/themes/terminal/share-gate.png) |
-| Links registration (development) | ![Cream links](media/themes/cream/links.png) | ![Terminal links](media/themes/terminal/links.png) |
+| Links registration | ![Cream links](media/themes/cream/links.png) | ![Terminal links](media/themes/terminal/links.png) |
 | Storage | ![Cream storage](media/themes/cream/storage.png) | ![Terminal storage](media/themes/terminal/storage.png) |
 
 The new screens use the same role tokens and components.
-The **Links** image shows the development state. A packaged app shows the registration controls.
+The **Links** image shows the packaged registration controls.
 The screenshots use synthetic project, secret, and recipient metadata.
-Task 4.6 is complete for these screens on Windows. The packaged registration controls and the macOS and Linux variants need separate evidence. The development **Links** state is shown with a note. The packaged registration controls are not captured because this host cannot automate the packaged window with the current Playwright setup.
+Task 4.6 is complete for these screens on Windows.
+The macOS and Linux variants need separate evidence.
 
 ## What stays the same
 
