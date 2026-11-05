@@ -29,32 +29,42 @@ export async function readSctStatus(): Promise<SctStatus> {
 export function readSecretMetadata(cwd: string): Promise<SctSecret[]> {
   return new Promise((resolve, reject) => {
     const child = spawn(sctExecutable(), ['agent', 'list_secrets', '--stdin'], {
-      cwd, shell: false, windowsHide: true, env: sctEnvironment(), stdio: ['pipe', 'pipe', 'ignore']
+      cwd, shell: false, windowsHide: true, env: sctEnvironment(), stdio: ['pipe', 'pipe', 'pipe']
     })
     let output = ''
+    let errors = ''
     child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => { output += chunk })
+    child.stderr.on('data', (chunk: string) => { errors += chunk })
     child.once('error', () => reject(new Error('Cannot run global.sct. Check the CLI installation and SCT_CLI.')))
     child.stdin.once('error', () => reject(new Error('Cannot send the metadata request to global.sct.')))
     child.once('close', (code) => {
+      let outcome: ReturnType<typeof parseMetadataOutcome>
       try {
-        const outcome = parseMetadataOutcome(output)
-        if (outcome.status !== 'completed') {
-          throw new Error(outcome.error || `The global.sct request ${outcome.status}.`)
-        }
-        if (code !== 0 || !outcome.result) throw new Error('The global.sct metadata request did not complete.')
-        resolve(outcome.result.map(({ id, name }) => ({ id, name })))
-      } catch (error) {
-        reject(error)
+        outcome = parseMetadataOutcome(output)
+      } catch {
+        reject(new Error(`The global.sct CLI returned an invalid metadata response.${errors.trim() ? ` ${errors.trim()}` : ''}`))
+        return
       }
+      if (outcome.status !== 'completed') {
+        reject(new Error(outcome.error || `The global.sct request ${outcome.status}.`))
+        return
+      }
+      if (code !== 0 || !outcome.result) {
+        reject(new Error('The global.sct metadata request did not complete.'))
+        return
+      }
+      resolve(outcome.result.map(({ id, name }) => ({ id, name })))
     })
     child.stdin.end('{}')
   })
 }
 
 function parseMetadataOutcome(output: string) {
+  const line = output.trim().split(/\r?\n/).filter(Boolean).at(-1)
   try {
-    return metadataOutcome.parse(JSON.parse(output)) satisfies AgentOutcome
+    return metadataOutcome.parse(JSON.parse(line ?? '')) satisfies AgentOutcome
   } catch {
     throw new Error('The global.sct CLI returned an invalid metadata response.')
   }
