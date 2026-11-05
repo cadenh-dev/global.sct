@@ -52,7 +52,24 @@ The check did these steps:
 6. The recipient imported the secret and returned the signed receipt.
 7. The sender showed the transfer as `received`.
 
-The check did not test TURN, public STUN, a live Mailbox server, macOS, or Linux.
+The check did not test TURN, public STUN, macOS, or Linux.
+
+## Live Mailbox check (2026-11-05)
+
+A second temporary two-window Playwright check used the live Maincloud relay on Windows x64.
+The check file was deleted after the run.
+
+The check did these steps:
+
+1. Both app instances connected to Maincloud and registered their device keys.
+2. The devices paired in the **Relay** tab. Both users compared the same code.
+3. The sender selected **Mailbox** in the **Send** tab and permitted the encrypted server copy.
+4. The sender entered the vault passphrase in the share dialog.
+5. The recipient imported the transfer and the app returned the signed receipt.
+6. The sender showed the transfer as `received`.
+7. The recipient vault contained the imported secret name.
+
+The live relay password, token, and secret value did not appear in the UI or test output.
 
 ## Application checks
 

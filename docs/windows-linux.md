@@ -132,6 +132,7 @@ The Playwright tests need a graphical session. The Windows smoke test runs on th
 - `bun run check`, `bun run typecheck:tsc`, `bun run test`, and `bun run build` passed. The unit suite had 39 passes and 3 skips.
 - React Doctor returned 100/100.
 - A temporary two-window Playwright check passed. It paired two vaults, rejected a wrong passphrase, accepted the correct passphrase, cancelled a share, and completed a 60,000-character WebRTC transfer with an import and receipt. The check file was not committed.
+- A temporary two-window Playwright check passed against the live Maincloud relay. The apps connected, registered, paired relay devices, queued a Mailbox transfer, imported it, and returned the signed receipt. The check file was not committed.
 - The Windows package includes Hyperswarm and Sodium. The `.node` files are in `app.asar.unpacked`.
 - macOS, Linux, TURN, public STUN, and cross-network checks are open.
 The existing suite now unlocks the vault, but it still uses macOS and POSIX assumptions. It needs platform gating before it can run on all platforms.

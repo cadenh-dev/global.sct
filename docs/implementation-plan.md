@@ -294,7 +294,7 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.5 | Done. The app accepts pairing, import, receipt, and connection links from the OS, validates them, holds one pending link, and fills the matching screen. Windows second-instance routing is verified. Packaged registration and macOS/Linux registration are not run. |
 | 2.6 | Partly done. Hyperswarm Direct sends and verifies a receipt between two Windows app instances. The Windows package includes Hyperswarm and its native closure. macOS/Linux and packaged Direct are not run. |
 | 2.7 | Done on Windows. Signed and sealed offer and answer links, the hidden window, chunked transfer, receipt, manual fallback, SDP checks, and the connection deadline work between two app instances. A 60,000-character secret completed an import and receipt. TURN and cross-network checks are not run. |
-| 2.8 | Done. The relay is the Mailbox mode. The send gate, verified relay peers, and explicit server-copy permission guard it. A live relay transfer is not run here. |
+| 2.8 | Done. The relay is the Mailbox mode. The send gate, verified relay peers, and explicit server-copy permission guard it. A live Maincloud transfer completed pairing, queue, import, and receipt on Windows. |
 | 2.9 | Done. The **Send** tab selects Direct, WebRTC, Link, or Mailbox from the current sessions. Mailbox needs the permission checkbox. |
 | 2.10 | Done. Relay, Link, Direct, and WebRTC rows show the receipt state. The live relay display is not run. |
 | 2.11 | Done. This document, [sharing](sharing.md), [relay](relay.md), and [architecture](architecture.md) record the three modes and the remaining platform checks. |
@@ -470,7 +470,7 @@ Status (2026-11-05):
 
 - 4.1 to 4.4 are done in the main process. The gate checks the vault passphrase, holds the operation, and releases it once. Link, Direct, WebRTC, Mailbox, AirDrop, and agent `send_secrets_to` use it.
 - 4.5 is done. The new screens use the existing role tokens.
-- 4.6 is open. Screenshots of the new Send, WebRTC, connection-link, receipt, and share-gate states are not taken.
+- 4.6 is done on Windows for the Send, WebRTC, Link receipt, share confirmation, and development Links states in both themes. The connection-link review, packaged registration controls, and macOS/Linux variants remain open.
 
 ### Key decisions
 
