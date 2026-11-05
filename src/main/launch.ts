@@ -83,7 +83,7 @@ export async function runProject(projects: ProjectStore, vault: Vault, args: str
         signalCommand(launched, 'SIGKILL')
         child = undefined
         if (!restarting || closing) {
-          finish(closing && forwardedSignal ? 128 + constants.signals[forwardedSignal]
+          finish(closing && forwardedSignal && code === null ? 128 + constants.signals[forwardedSignal]
             : code ?? (signal ? 128 + constants.signals[signal] : 1))
         }
       })
