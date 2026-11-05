@@ -393,6 +393,7 @@ The extension starts commands with project secrets. It never receives a secret v
 | 3.3 | Done. The tree view shows names and IDs only. Live VS Code behavior is unverified. |
 | 3.4 | Done. The terminal command uses `sct run --interactive -- <shell>`. Live VS Code behavior is unverified. |
 | 3.5 | Open. |
+| Caller identity | Done for `code` and `Code.exe`. Windows uses the Authenticode signer and product name. macOS uses the app signature. macOS is not run here. Linux is unverified. |
 
 ### Key decisions
 
@@ -409,7 +410,7 @@ These decisions are closed (2026-11-04).
 
 - **Two approval paths.** A separate approval UI in VS Code makes a second path. Use the app approval window only.
 - **The extension host gets values.** `environmentVariableCollection` needs the values in the extension. The recommended C12 form prevents this.
-- **Caller identity.** The caller walk finds `code` or `Code.exe` as an ancestor. Today the walk knows only `claude`. A new entry needs a signature rule for each platform, as in task 1.5.
+- **Caller identity.** The caller walk now includes `code` and `Code.exe`. macOS and Windows use a signature rule. Linux returns an unverified caller. The macOS helper identifier is not in the list, so the walk uses the main app ancestor.
 - **Locked vault.** `sct run` from the terminal needs an unlock. The Q3 answer applies here too.
 
 ### Verification

@@ -16,6 +16,13 @@ interface AgentIdentity {
   product: string
 }
 
+const vscodeIdentity: AgentIdentity = {
+  name: 'Visual Studio Code',
+  requirement: 'identifier "com.microsoft.VSCode" and anchor apple generic and certificate leaf[subject.OU] = "UBF8T346G9"',
+  publisher: 'Microsoft Corporation',
+  product: 'Visual Studio Code'
+}
+
 // Each entry maps an agent's executable name to its signing identifiers.
 // Verify the Windows product text with the real Claude Code build before release.
 const signedAgents = new Map<string, AgentIdentity>([['claude', {
@@ -23,7 +30,12 @@ const signedAgents = new Map<string, AgentIdentity>([['claude', {
   requirement: 'identifier "com.anthropic.claude-code" and anchor apple generic and certificate leaf[subject.OU] = "Q6L2SF6YDW"',
   publisher: 'Anthropic',
   product: 'Claude Code'
-}]])
+}], ['code', vscodeIdentity]])
+
+// The macOS app executable is capitalized. The Windows reader converts names to lowercase.
+if (process.platform === 'darwin') signedAgents.set('Code', vscodeIdentity)
+// Do not add Code Helper (Plugin) until its requested signing identifier is confirmed.
+// The official 1.145.0 package uses com.microsoft.VSCode.helper, without the .plugin suffix.
 
 interface CallerProcess {
   parent: number
@@ -67,11 +79,23 @@ async function verifyCaller(pid: number, ancestor: CallerProcess, agent: AgentId
 // macOS reports the parent and executable with ps. The live process is checked against its Apple requirement.
 async function readMacProcess(pid: number): Promise<CallerProcess | null> {
   try {
-    const match = /^\s*(\d+)\s+(.+)$/.exec((await run('/bin/ps', ['-o', 'ppid=,comm=', '-p', String(pid)])).stdout.trim())
-    return match ? { parent: Number(match[1]), name: basename(match[2] ?? '') } : null
+    const match = /^\s*(\d+)\s+(.+)$/.exec((await run('/bin/ps', ['-ww', '-o', 'ppid=,comm=', '-p', String(pid)])).stdout.trim())
+    if (!match) return null
+    const executable = match[2]?.startsWith('/') ? match[2] : await readMacExecutable(pid)
+    return { parent: Number(match[1]), name: executable ? basename(executable) : '', path: executable }
   } catch {
     // The process exited before the check. Its identity is unknown.
     return null
+  }
+}
+
+// ps can report a short argv[0]. Read the first mapped executable path without parsing its spaces.
+async function readMacExecutable(pid: number): Promise<string | undefined> {
+  try {
+    const { stdout } = await run('/usr/sbin/lsof', ['-a', '-p', String(pid), '-d', 'txt', '-Fn'], { timeout: 5000 })
+    return stdout.split('\n').find((line) => line.startsWith('n/'))?.slice(1)
+  } catch {
+    return undefined
   }
 }
 

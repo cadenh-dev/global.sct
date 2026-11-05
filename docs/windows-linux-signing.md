@@ -30,6 +30,7 @@ git push origin v0.1.0-beta.1
 - The Windows and Linux package scripts do not sign.
 - The macOS build keeps its local identity and notarization path. See [macOS signing](macos-signing.md).
 - The Windows caller check expects a valid Authenticode signature from an `Anthropic` signer with `Claude Code` metadata.
+- For Visual Studio Code (`Code.exe`), the Windows caller check expects a valid Authenticode signature from `Microsoft Corporation` with `Visual Studio Code` metadata.
 
 ## Windows options
 

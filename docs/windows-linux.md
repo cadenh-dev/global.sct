@@ -73,8 +73,10 @@ D13 is closed: three runners and versioned tags. D12 is deferred: no paid signin
 Do not publish an unsigned package as a signed build.
 See [Windows and Linux signing](windows-linux-signing.md) for the signing path and the current release steps.
 
-The Windows caller check requires a valid Authenticode signature, an `Anthropic` signer, and `Claude Code` in the file metadata.
-A signed Claude Code build with another signer is rejected as an impostor.
+The Windows caller check requires a valid Authenticode signature and the matching publisher and product metadata.
+Claude Code requires an `Anthropic` signer and `Claude Code` in the file metadata.
+Visual Studio Code (`Code.exe`) requires a `Microsoft Corporation` signer and `Visual Studio Code` in the file metadata.
+A listed caller that fails its signature check cannot request local approval.
 Verify the metadata with the real Claude Code build before release. A certificate thumbprint pin is a follow-up.
 
 ## Limits

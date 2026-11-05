@@ -83,6 +83,16 @@ Then the platform signature check tests that running process against the agent's
 | Agent | Executable name | macOS | Windows | Linux |
 |---|---|---|---|---|
 | Claude Code | `claude`, `claude.exe` | Identifier `com.anthropic.claude-code`, Apple Developer ID, Team ID `Q6L2SF6YDW` | Authenticode signature with an `Anthropic` subject | No code signature. The caller is unverified |
+| Visual Studio Code | `code`, `Code`, `Code.exe` | Identifier `com.microsoft.VSCode`, Apple signature anchor, Team ID `UBF8T346G9` | Valid Authenticode signature with a `Microsoft Corporation` subject and `Visual Studio Code` product metadata | No code signature. The caller is unverified |
+
+The macOS reader uses the full executable path and matches its complete name.
+It uses `lsof` when `ps` reports a short name. It does not match a partial or generic name.
+The signature check still checks the running process by PID.
+
+The official [VS Code 1.145.0 macOS package](https://vscode.download.prss.microsoft.com/dbazure/download/stable/a717861c07586a53d83b80d742cd3f59b20a6273/VSCode-darwin-arm64.zip) confirms the app identifier and Team ID.
+Its `Code Helper (Plugin)` executable has signing identifier `com.microsoft.VSCode.helper` and Team ID `UBF8T346G9`.
+The requested `com.microsoft.VSCode.helper.plugin` identifier remains unconfirmed, so the known caller list omits that helper.
+The caller walk continues to the main app ancestor.
 
 `src/main/caller.ts` contains this list.
 The MCP client is usually the direct parent of `sct mcp`.
