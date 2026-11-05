@@ -86,6 +86,14 @@ The caller walk identifies the editor process:
 Open the global.sct app and approve the request.
 The approval applies to one request and one deadline.
 
+## Host check (2026-11-05)
+
+The Windows host has VS Code 1.143.1.
+The extension requires VS Code `^1.145.0`.
+The development host does not load the extension because of this version difference.
+Update VS Code to 1.145 or later before the live extension check.
+The extension build passes.
+
 ## Limits
 
 - The extension has no relay dependency.

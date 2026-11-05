@@ -89,6 +89,14 @@ This proves the TURN configuration, credential storage, relay policy, route labe
 It does not prove public STUN, a remote TURN server, or a cross-network path.
 Those checks need separate network conditions.
 
+## VS Code host check (2026-11-05)
+
+The Windows host has VS Code 1.143.1.
+The extension requires VS Code `^1.145.0`.
+The development host does not load the extension.
+The extension build passes.
+Update VS Code to 1.145 or later before the live extension check.
+
 ## Application checks
 
 - `bun run test`: 39 passed, 3 skipped.
