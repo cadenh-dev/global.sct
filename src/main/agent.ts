@@ -12,7 +12,7 @@ export async function runAgent(args: string[], submit: AgentSubmit): Promise<num
       [name, { description: tool.description, inputSchema: z.toJSONSchema(tool.schema) }]))))
     return 0
   }
-  if (process.stdin.isTTY || !((args.length === 2 && args[1] === '--stdin') ||
+  if (!process.stdin || process.stdin.isTTY || !((args.length === 2 && args[1] === '--stdin') ||
     (args.length === 3 && Object.hasOwn(agentTools, args[1]) && args[2] === '--stdin'))) {
     throw new Error('Usage: sct agent [operation] --stdin. Supply JSON through a private stdin pipe.')
   }
@@ -28,8 +28,9 @@ export async function runAgent(args: string[], submit: AgentSubmit): Promise<num
     const outcome = await submit(args.length === 3 ? { operation: args[1], input: decoded } : decoded)
     await writeCliOutput(JSON.stringify(outcome))
     return outcome.status === 'completed' ? 0 : 1
-  } catch {
-    console.error('The agent request could not complete. Supply valid JSON within the input limit and check the local approval window.')
+  } catch (error) {
+    console.error(error instanceof Error ? error.message
+      : 'The agent request could not complete. Supply valid JSON within the input limit and check the local approval window.')
     return 1
   }
 }
