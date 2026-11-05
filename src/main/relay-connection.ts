@@ -18,6 +18,8 @@ import type { RelayMessageKind, RelayTaskOutcome } from '../shared/envelope'
 import { relayInboxFinished, relaySentFinished, relayTaskFinished } from '../shared/relay'
 import type { RelayAcceptInput, RelayActivityKey, RelayConnection, RelayDeliveryState, RelayInboxItem, RelayPeer, RelayQueueInput,
   RelaySentItem, RelayState, RelayTaskDecision, RelayTaskItem } from '../shared/relay'
+import type { TransferReceipt } from '../shared/transport'
+import { relayReceiptState } from './transport'
 
 export interface RelayServer {
   uri: string
@@ -54,6 +56,8 @@ interface CachedSentItem {
   receivedAt: string | null
   receipt: string | null
 }
+
+type VerifiedReceipt = { receipt: TransferReceipt; error: null } | { receipt: null; error: string }
 
 interface CachedInboxItem {
   messageId: string
@@ -771,43 +775,52 @@ export class Relay {
       remote.delete(`${item.messageId}/${item.recipient}`)
       const notice = notices.get(`${item.messageId}/${item.recipient}`)
       notices.delete(`${item.messageId}/${item.recipient}`)
-      const receiptError = sent?.status === 'Received' ? await this.receiptError(item, sent) : null
+      const verified = sent?.status === 'Received' ? await this.verifyReceipt(item, sent) : undefined
       const expiry = notice ? await this.expiryResult(item.messageId, item.recipient, notice) : undefined
+      const state = deliveryState(item, sent, verified?.error ?? null, now)
       return {
         messageId: item.messageId,
         recipient: item.recipient,
-        state: deliveryState(item, sent, receiptError, now),
+        state,
         createdAt: new Date(item.createdAt).toISOString(),
         deliverBy: new Date(item.deliverBy).toISOString(),
         receivedAt: sent?.receivedAt ?? null,
         accessExpiresAt: item.accessExpiresAt === null ? null : new Date(item.accessExpiresAt).toISOString(),
         accessExpiredAt: expiry?.expiredAt ?? null,
-        error: receiptError ?? expiry?.error ?? item.error
+        error: verified?.error ?? expiry?.error ?? item.error,
+        receiptState: relayReceiptState(state, verified?.error ?? expiry?.error ?? item.error, verified?.receipt ?? null)
       }
     }))
-    for (const sent of remote.values()) items.push({
-      messageId: sent.messageId,
-      recipient: sent.recipient,
-      state: sent.status === 'Received' ? 'failed' : 'sent',
-      createdAt: null,
-      deliverBy: sent.deliverBy,
-      receivedAt: sent.receivedAt,
-      accessExpiresAt: null,
-      accessExpiredAt: null,
-      error: sent.status === 'Received' ? 'The local transfer is unavailable, so .sct cannot verify its receipt.' : null
-    })
+    for (const sent of remote.values()) {
+      const state: RelayDeliveryState = sent.status === 'Received' ? 'failed' : 'sent'
+      const error = sent.status === 'Received' ? 'The local transfer is unavailable, so .sct cannot verify its receipt.' : null
+      items.push({
+        messageId: sent.messageId,
+        recipient: sent.recipient,
+        state,
+        createdAt: null,
+        deliverBy: sent.deliverBy,
+        receivedAt: sent.receivedAt,
+        accessExpiresAt: null,
+        accessExpiredAt: null,
+        error,
+        receiptState: relayReceiptState(state, error, null)
+      })
+    }
     items.push(...await Promise.all([...notices.values()].map(async (notice): Promise<RelaySentItem> => {
       const expiry = await this.expiryResult(notice.correlationId, notice.sender, notice)
+      const state: RelayDeliveryState = expiry.error ? 'failed' : 'received'
       return {
         messageId: notice.correlationId,
         recipient: notice.sender,
-        state: expiry.error ? 'failed' : 'received',
+        state,
         createdAt: null,
         deliverBy: null,
         receivedAt: null,
         accessExpiresAt: null,
         accessExpiredAt: expiry.expiredAt,
-        error: expiry.error
+        error: expiry.error,
+        receiptState: relayReceiptState(state, expiry.error ?? 'The local transfer is unavailable, so .sct cannot verify its receipt.', null)
       }
     })))
     return items.sort((left, right) => (right.createdAt ?? '').localeCompare(left.createdAt ?? ''))
@@ -847,15 +860,16 @@ export class Relay {
     return items.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
   }
 
-  private async receiptError(item: OutboundTransfer, sent: CachedSentItem): Promise<string | null> {
+  private async verifyReceipt(item: OutboundTransfer, sent: CachedSentItem): Promise<VerifiedReceipt> {
     try {
       if (!sent.receipt) throw new Error('The relay did not return an encrypted receipt.')
       const identity = this.cache.identity
       if (!identity) throw new Error('The relay identity is unavailable.')
-      await (await this.crypto()).verifyRelayReceipt(identity, await this.verifiedPeer(item.recipient), item.messageId, Buffer.from(sent.receipt, 'base64'))
-      return null
+      const receipt = await (await this.crypto()).verifyRelayReceipt(identity, await this.verifiedPeer(item.recipient),
+        item.messageId, Buffer.from(sent.receipt, 'base64'))
+      return { receipt, error: null }
     } catch (error) {
-      return message(error)
+      return { receipt: null, error: message(error) }
     }
   }
 
@@ -1122,7 +1136,7 @@ export class Relay {
     const items = await Promise.all(this.outbox.filter((item) => item.kind === 'task').map(async (task): Promise<RelayTaskItem> => {
       const result = this.results.find((item) => item.taskId === task.messageId && item.sender === task.recipient)
       const sent = this.cache.sent.find((item) => item.messageId === task.messageId && item.recipient === task.recipient)
-      const receiptError = sent?.status === 'Received' ? await this.receiptError(task, sent) : null
+      const receiptError = sent?.status === 'Received' ? (await this.verifyReceipt(task, sent)).error : null
       const delivery = deliveryState(task, sent, receiptError, now)
       return {
         messageId: task.messageId, direction: 'sent', peer: task.recipient, grantId: task.grantId ?? '', digest: null,
@@ -1146,7 +1160,7 @@ export class Relay {
       const grant = this.received.find((item) => item.messageId === task.grantId && item.sender === task.sender)
       const result = this.outbox.find((item) => item.kind === 'result' && item.taskId === task.messageId)
       const sent = result && this.cache.sent.find((item) => item.messageId === result.messageId && item.recipient === result.recipient)
-      const receiptError = result && sent?.status === 'Received' ? await this.receiptError(result, sent) : null
+      const receiptError = result && sent?.status === 'Received' ? (await this.verifyReceipt(result, sent)).error : null
       const expired = task.state === 'awaiting-approval' && task.approveBy <= now
       return {
         messageId: task.messageId, direction: 'received', peer: task.sender, grantId: task.grantId, digest: task.digest,

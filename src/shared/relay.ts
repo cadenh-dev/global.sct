@@ -2,6 +2,7 @@
 
 import type { SecretMetadata } from './secrets'
 import type { RelayTaskOutcome } from './envelope'
+import type { ReceiptState } from './transport'
 
 // off: the relay is turned off. offline: the app waits for the next connection attempt.
 export type RelayConnection = 'off' | 'connecting' | 'connected' | 'offline'
@@ -44,6 +45,9 @@ export interface RelayInboxItem {
 
 export type RelayDeliveryState = 'queued' | 'sent' | 'received' | 'failed' | 'expired'
 
+// The relay has no manual receipt. Link mode waits for a pasted receipt link.
+export type RelayReceiptState = Exclude<ReceiptState, { state: 'manual' }>
+
 export interface RelaySentItem {
   messageId: string
   recipient: string
@@ -54,6 +58,8 @@ export interface RelaySentItem {
   accessExpiresAt: string | null
   accessExpiredAt: string | null
   error: string | null
+  // The shared receipt contract (C8d). The main process sets this from the verified relay receipt.
+  receiptState: RelayReceiptState
 }
 
 export interface RelayQueueInput {

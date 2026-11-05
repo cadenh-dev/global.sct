@@ -238,6 +238,8 @@ The sender checks the notice. Then the UI reports the access expiry and successf
 After the vault import, .sct saves an encrypted signed receipt before it acknowledges the delivery.
 The relay keeps the receipt for an offline sender.
 The sender verifies the receipt before it reports durable delivery.
+The main process maps the verified receipt to the shared `TransferReceipt` with mode `mailbox`.
+The `receiptState` field of each sent row carries the shared receipt state.
 Retries reuse the original IDs and cannot import the same transfer two times.
 
 A modal shows each relay send and each new arrival. See [send and receive animations](sharing.md#send-and-receive-animations).
