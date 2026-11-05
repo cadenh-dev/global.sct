@@ -41,11 +41,11 @@ test('adds existing folders offline and restores projects after restart', async 
     expect(await page.evaluate(() => ({ process: 'process' in window, require: 'require' in window })))
       .toEqual({ process: false, require: false })
     expect(await page.evaluate(() => Object.keys(window.sct).sort()))
-      .toEqual(['acceptRelayTransfer', 'addProject', 'addSecret', 'chooseVaultLocation', 'confirmRelayPair', 'confirmSharingPeer', 'copyPairingLink', 'copyText', 'createLink', 'createMockCard',
-        'deleteProject', 'deleteSecret', 'dismissPendingLink', 'dismissTransfer', 'forgetDevice', 'getAgentRequests', 'getDirectState', 'getLinkState', 'getPendingLink', 'getProtocolStatus', 'getRelayState', 'getSharingState',
-        'getThemePreference', 'getVaultLocation', 'getVaultStatus', 'hideAllRelayActivity', 'hideRelayActivity', 'importDirect', 'importLink', 'importTransfer', 'listProjects', 'listSecrets', 'lockVault', 'onAgentChanged', 'onDirectChanged', 'onPendingLinkChanged', 'onRelayChanged',
-        'onSharingChanged', 'onThemeChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'platform', 'previewLink', 'previewPairingLink', 'queueRelayTask', 'queueRelayTransfer', 'registerProtocol', 'removeProtocol', 'removeRelayPair', 'renameProject',
-        'requestRelayPair', 'respondRelayTask', 'respondToAgent', 'saveDeviceCard', 'sendDirect', 'setThemePreference', 'shareDeviceCard', 'shareMockCard', 'shareSecrets', 'theme', 'unlockVault', 'updateSecret', 'verifyDirectReceipt', 'verifyLinkReceipt'])
+      .toEqual(['acceptRelayTransfer', 'acceptWebRtcAnswer', 'acceptWebRtcOffer', 'addProject', 'addSecret', 'cancelShare', 'chooseVaultLocation', 'closeWebRtc', 'confirmRelayPair', 'confirmShare', 'confirmSharingPeer', 'copyPairingLink', 'copyText', 'createLink', 'createMockCard', 'createWebRtcOffer',
+        'deleteProject', 'deleteSecret', 'dismissPendingLink', 'dismissTransfer', 'forgetDevice', 'getAgentRequests', 'getDirectState', 'getLinkState', 'getPendingLink', 'getProtocolStatus', 'getRelayState', 'getShareRequest', 'getSharingState',
+        'getThemePreference', 'getVaultLocation', 'getVaultStatus', 'getWebRtcIce', 'getWebRtcState', 'hideAllRelayActivity', 'hideRelayActivity', 'importDirect', 'importLink', 'importTransfer', 'importWebRtc', 'listProjects', 'listSecrets', 'lockVault', 'onAgentChanged', 'onDirectChanged', 'onPendingLinkChanged', 'onRelayChanged',
+        'onShareChanged', 'onSharingChanged', 'onThemeChanged', 'onWebRtcChanged', 'pickDirectory', 'pickSharingPeer', 'pickTransfer', 'platform', 'previewLink', 'previewPairingLink', 'previewWebRtcLink', 'queueRelayTask', 'queueRelayTransfer', 'registerProtocol', 'removeProtocol', 'removeRelayPair', 'renameProject',
+        'requestRelayPair', 'respondRelayTask', 'respondToAgent', 'saveDeviceCard', 'saveWebRtcIce', 'sendDirect', 'sendWebRtc', 'setThemePreference', 'shareDeviceCard', 'shareMockCard', 'shareSecrets', 'theme', 'unlockVault', 'updateSecret', 'verifyDirectReceipt', 'verifyLinkReceipt', 'verifyWebRtcReceipt'])
 
     await page.getByRole('button', { name: 'Add a project', exact: true }).click()
     await application.evaluate(({ dialog }) => {

@@ -9,8 +9,8 @@ import type { RelayGrant } from '../shared/envelope.ts'
 import type { SealedField, UnlockInput, VaultStatus } from '../shared/vault.ts'
 import type { TransferSecret } from './transfer.ts'
 import { decodeFile, encodeFile, open, seal } from './seal.ts'
-import { createVaultHeader, decodeSealed, deriveMasterKey, encodeSealed, readVaultHeader, verifyPassphrase,
-  writeVaultHeader } from './vault-header.ts'
+import { createVaultHeader, decodeSealed, deriveMasterKey, encodeSealed, readVaultHeader,
+  verifyPassphrase as checkPassphrase, writeVaultHeader } from './vault-header.ts'
 import type { SecretStore } from './key-store.ts'
 
 // secrets.sct layout: magic | IV | GCM tag | ciphertext. The ciphertext holds names and individually sealed values.
@@ -93,7 +93,7 @@ export class Vault {
       const saved = await readVaultHeader(file)
       if (saved) {
         const masterKey = await deriveMasterKey(passphrase, saved.kdf, saved.salt)
-        if (!verifyPassphrase(masterKey, saved)) {
+        if (!checkPassphrase(masterKey, saved)) {
           masterKey.fill(0)
           throw new Error('The passphrase is not correct. Try again.')
         }
@@ -133,13 +133,36 @@ export class Vault {
       if (!header) return false
       const stored = await this.store.read()
       if (!stored) return false
-      if (!verifyPassphrase(stored, header)) {
+      if (!checkPassphrase(stored, header)) {
         stored.fill(0)
         await this.store.clear()
         return false
       }
       this.setMasterKey(stored)
       return true
+    })
+  }
+
+  // A share confirmation checks the passphrase without replacing the active master key.
+  verifySharePassphrase(input: unknown): Promise<void> {
+    return this.serialize(async () => {
+      this.requireKey()
+      if (typeof input !== 'string' || input.length === 0 || input.length > 1024) throw new Error('Enter your vault passphrase.')
+      const header = await readVaultHeader(this.headerFile())
+      if (!header) throw new Error('The vault header is unavailable. Unlock the vault and try again.')
+      const masterKey = await deriveMasterKey(input, header.kdf, header.salt)
+      try {
+        if (!checkPassphrase(masterKey, header)) throw new Error('The passphrase is not correct. Try again.')
+      } finally {
+        masterKey.fill(0)
+      }
+    })
+  }
+
+  project(id: string): Promise<Project> {
+    return this.serialize(async () => {
+      this.requireKey()
+      return await this.projects.find(id)
     })
   }
 

@@ -5,15 +5,13 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { z } from 'zod/v4'
 import { readReceipt, readTransfer } from './envelope'
+import { encodeFrame, FrameReader, readTransferBody, transferBody } from './direct-frame'
 import { decodeReceiptLink, encodeReceiptLink } from './transport-link'
 import type { Sharing } from './sharing'
 import type { DirectImportInput, DirectImportResult, DirectIncomingItem, DirectReceiptInput,
   DirectSendInput, DirectSentItem, DirectState } from '../shared/direct'
 import type { TransferReceipt } from '../shared/transport'
 
-const transferLimit = 8 * 1024 * 1024
-const wrappedKeyLimit = 4096
-const frameBodyLimit = 1 + 4 + transferLimit + wrappedKeyLimit
 const authLimit = 4096
 const receiptLimit = 16_384
 const authTimeout = 30_000
@@ -77,6 +75,21 @@ interface IncomingRecord extends DirectIncomingItem {
   wrappedKey: Buffer
 }
 
+interface PendingReceiptRecord {
+  receipt: Buffer
+  senderName: string
+  projectName: string
+  receivedAt: number
+}
+
+const pendingReceiptSchema = z.union([
+  z.string(),
+  z.object({
+    receipt: z.string(), senderName: z.string().min(1).max(100),
+    projectName: z.string().min(1).max(100), receivedAt: z.number().int().nonnegative()
+  })
+])
+
 const sentSchema = z.array(z.object({
   transferId: z.uuidv4(),
   recipientId: z.string().regex(/^[0-9a-f]{64}$/),
@@ -107,10 +120,11 @@ export class HyperswarmTransport {
   private swarm: HyperswarmInstance | undefined
   private readonly topics = new Map<string, { day: string; topic: Buffer; discovery: HyperswarmDiscovery }>()
   private readonly sessions = new Set<Session>()
+  private readonly sending = new Set<string>()
   private readonly byPeer = new Map<string, Session>()
   private readonly sent = new Map<string, DirectSentItem>()
   private readonly incoming = new Map<string, IncomingRecord>()
-  private readonly pendingReceipts = new Map<string, Buffer>()
+  private readonly pendingReceipts = new Map<string, PendingReceiptRecord>()
   private readonly receiptTimers = new Map<string, NodeJS.Timeout>()
   private started = false
   private error: string | null = null
@@ -184,6 +198,9 @@ export class HyperswarmTransport {
       peers: peers.map((peer) => ({ ...peer, available: this.byPeer.has(peer.id) })),
       incoming,
       sent: [...this.sent.values()].sort((left, right) => right.createdAt - left.createdAt),
+      receipts: [...this.pendingReceipts].map(([transferId, value]) => ({
+        transferId, senderName: value.senderName, projectName: value.projectName, receiptLink: encodeReceiptLink(value.receipt)
+      })),
       error: this.error
     }
   }
@@ -192,27 +209,34 @@ export class HyperswarmTransport {
     const request = requireSend(input)
     const session = this.byPeer.get(request.recipientId)
     if (!session?.ready) throw new Error('Peer not reachable. Use Link or Relay.')
-    const sealed = await this.sharing.prepareEnvelope({ ...request, deliverBy: Date.now() + 24 * 60 * 60 * 1000 })
-    const wrapped = sealed.wrappedKeys[0]
-    if (!wrapped || sealed.wrappedKeys.length !== 1) throw new Error('Select one verified recipient.')
-    const transfer = readTransfer(sealed.payload)
-    this.write(session, 3, transferBody(sealed.payload, wrapped.wrappedKey))
-    const record: DirectSentItem = {
-      transferId: sealed.id, recipientId: request.recipientId, projectName: sealed.projectName,
-      secretNames: sealed.secretNames, createdAt: transfer.createdAt, deliverBy: transfer.deliverBy,
-      state: 'pending', receivedAt: null, error: null
-    }
-    this.sent.set(record.transferId, record)
-    this.receiptTimers.set(record.transferId, setTimeout(() => {
-      const saved = this.sent.get(record.transferId)
-      if (saved?.state === 'pending') {
-        saved.state = 'manual'
-        void this.persistSent()
-        this.changed()
+    if (this.sending.has(request.recipientId)) throw new Error('A Direct transfer to this peer is already active. Wait for it to finish.')
+    if (this.sending.size >= 4) throw new Error('Wait for an active Direct transfer to finish.')
+    this.sending.add(request.recipientId)
+    try {
+      const sealed = await this.sharing.prepareEnvelope({ ...request, deliverBy: Date.now() + 24 * 60 * 60 * 1000 })
+      const wrapped = sealed.wrappedKeys[0]
+      if (!wrapped || sealed.wrappedKeys.length !== 1) throw new Error('Select one verified recipient.')
+      const transfer = readTransfer(sealed.payload)
+      this.write(session, 3, transferBody(sealed.payload, wrapped.wrappedKey))
+      const record: DirectSentItem = {
+        transferId: sealed.id, recipientId: request.recipientId, projectName: sealed.projectName,
+        secretNames: sealed.secretNames, createdAt: transfer.createdAt, deliverBy: transfer.deliverBy,
+        state: 'pending', receivedAt: null, error: null
       }
-    }, receiptTimeout))
-    await this.persistSent()
-    this.changed()
+      this.sent.set(record.transferId, record)
+      this.receiptTimers.set(record.transferId, setTimeout(() => {
+        const saved = this.sent.get(record.transferId)
+        if (saved?.state === 'pending') {
+          saved.state = 'manual'
+          void this.persistSent()
+          this.changed()
+        }
+      }, receiptTimeout))
+      await this.persistSent()
+      this.changed()
+    } finally {
+      this.sending.delete(request.recipientId)
+    }
   }
 
   async import(input: unknown): Promise<DirectImportResult> {
@@ -225,7 +249,10 @@ export class HyperswarmTransport {
     const receiptSent = session?.ready === true
     if (session?.ready) this.write(session, 4, accepted.receipt)
     else {
-      this.pendingReceipts.set(record.transferId, accepted.receipt)
+      this.pendingReceipts.set(record.transferId, {
+        receipt: accepted.receipt, senderName: record.senderName,
+        projectName: record.projectName, receivedAt: accepted.receivedAt
+      })
       await this.persistReceipts()
     }
     this.incoming.delete(record.transferId)
@@ -253,6 +280,11 @@ export class HyperswarmTransport {
 
   private connection(socket: HyperswarmSocket, info: HyperswarmPeerInfo): void {
     if (!this.started || !this.swarm) {
+      socket.destroy()
+      return
+    }
+    const sessions = [...this.sessions]
+    if (sessions.filter((session) => session.ready).length >= 32 || sessions.filter((session) => !session.ready).length >= 8) {
       socket.destroy()
       return
     }
@@ -352,10 +384,10 @@ export class HyperswarmTransport {
       }
     }, pingInterval)
     this.byPeer.set(session.peerId, session)
-    for (const [transferId, receipt] of this.pendingReceipts) {
+    for (const [transferId, pending] of this.pendingReceipts) {
       const sent = this.sent.get(transferId)
       if (sent?.recipientId === session.peerId) {
-        this.write(session, 4, receipt)
+        this.write(session, 4, pending.receipt)
         this.pendingReceipts.delete(transferId)
       }
     }
@@ -396,11 +428,7 @@ export class HyperswarmTransport {
   }
 
   private write(session: Session, kind: number, body: Buffer): void {
-    const frame = Buffer.allocUnsafe(5 + body.length)
-    frame.writeUInt32BE(body.length + 1, 0)
-    frame[4] = kind
-    body.copy(frame, 5)
-    session.socket.write(frame)
+    session.socket.write(encodeFrame(kind, body))
   }
 
   private close(session: Session): void {
@@ -450,7 +478,7 @@ export class HyperswarmTransport {
     const [sent, incoming, receipts] = await Promise.all([
       readJson(this.sentPath(), sentSchema),
       readJson(this.incomingPath(), incomingSchema),
-      readJson(this.receiptsPath(), z.record(z.uuidv4(), z.string()))
+      readJson(this.receiptsPath(), z.record(z.uuidv4(), pendingReceiptSchema))
     ])
     if (sent) for (const item of sent) {
       if (item.state === 'pending' && item.createdAt + receiptTimeout <= Date.now()) item.state = 'manual'
@@ -459,7 +487,11 @@ export class HyperswarmTransport {
     if (incoming) for (const item of incoming) {
       this.incoming.set(item.transferId, { ...item, payload: Buffer.from(item.payload, 'base64'), wrappedKey: Buffer.from(item.wrappedKey, 'base64') })
     }
-    if (receipts) for (const [id, value] of Object.entries(receipts)) this.pendingReceipts.set(id, Buffer.from(value, 'base64'))
+    if (receipts) for (const [id, value] of Object.entries(receipts)) {
+      this.pendingReceipts.set(id, typeof value === 'string'
+        ? { receipt: Buffer.from(value, 'base64'), senderName: 'Verified device', projectName: 'Received transfer', receivedAt: Date.now() }
+        : { ...value, receipt: Buffer.from(value.receipt, 'base64') })
+    }
   }
 
   private async persistSent(): Promise<void> {
@@ -473,47 +505,13 @@ export class HyperswarmTransport {
   }
 
   private async persistReceipts(): Promise<void> {
-    await writeJson(this.receiptsPath(), Object.fromEntries([...this.pendingReceipts].map(([id, value]) => [id, value.toString('base64')])))
+    await writeJson(this.receiptsPath(), Object.fromEntries([...this.pendingReceipts].map(([id, value]) =>
+      [id, { ...value, receipt: value.receipt.toString('base64') }])))
   }
 
   private sentPath(): string { return join(this.root, 'direct-sent.json') }
   private incomingPath(): string { return join(this.root, 'direct-inbox.json') }
   private receiptsPath(): string { return join(this.root, 'direct-receipts.json') }
-}
-
-class FrameReader {
-  private buffer = Buffer.alloc(0)
-
-  push(chunk: Buffer): { kind: number; body: Buffer }[] {
-    this.buffer = Buffer.concat([this.buffer, chunk])
-    const frames: { kind: number; body: Buffer }[] = []
-    while (this.buffer.length >= 4) {
-      const length = this.buffer.readUInt32BE(0)
-      if (length < 1 || length > frameBodyLimit) throw new Error('The Direct frame is too large.')
-      if (this.buffer.length < 4 + length) break
-      const body = this.buffer.subarray(4, 4 + length)
-      frames.push({ kind: body[0] ?? -1, body: body.subarray(1) })
-      this.buffer = this.buffer.subarray(4 + length)
-    }
-    return frames
-  }
-}
-
-function transferBody(payload: Buffer, wrappedKey: Buffer): Buffer {
-  const body = Buffer.allocUnsafe(4 + payload.length + wrappedKey.length)
-  body.writeUInt32BE(payload.length, 0)
-  payload.copy(body, 4)
-  wrappedKey.copy(body, 4 + payload.length)
-  return body
-}
-
-function readTransferBody(body: Buffer): { payload: Buffer; wrappedKey: Buffer } {
-  if (body.length < 5) throw new Error('The Direct transfer is incomplete.')
-  const length = body.readUInt32BE(0)
-  if (length === 0 || length > transferLimit || body.length <= 4 + length) throw new Error('The Direct transfer is invalid.')
-  const wrappedKey = body.subarray(4 + length)
-  if (wrappedKey.length === 0 || wrappedKey.length > wrappedKeyLimit) throw new Error('The Direct wrapped key is invalid.')
-  return { payload: body.subarray(4, 4 + length), wrappedKey }
 }
 
 function requireSend(input: unknown): DirectSendInput {

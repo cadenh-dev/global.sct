@@ -10,6 +10,7 @@ import { SharingView } from './SharingView'
 import { AgentAccessView } from './AgentAccessView'
 import { CardsView } from './CardsView'
 import { UnlockView } from './UnlockView'
+import { ShareConfirmation } from './ShareConfirmation'
 import type { Loaded, SharingTab, UpdateProjects, UpdateSecrets } from './types'
 import type { VaultStatus } from '../../shared/vault'
 import type { PendingLink } from '../../shared/transport'
@@ -40,7 +41,10 @@ export function App() {
   if (status.value.locked) {
     return <UnlockView status={status.value} onUnlocked={(value) => setStatus({ state: 'ready', value })} />
   }
-  return route.view === 'agent' ? <AgentAccessView /> : <DesktopApp route={route} isMac={isMac} />
+  return <>
+    {route.view === 'agent' ? <AgentAccessView /> : <DesktopApp route={route} isMac={isMac} />}
+    <ShareConfirmation />
+  </>
 }
 
 function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>; isMac: boolean }) {
@@ -79,7 +83,8 @@ function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>
 
   useEffect(() => {
     if (!pendingLink) return
-    const target = pendingLink.kind === 'pairing' ? '#/sharing/devices' : '#/sharing/link'
+    const target = pendingLink.kind === 'pairing' ? '#/sharing/devices'
+      : pendingLink.kind === 'connect' ? '#/sharing/webrtc' : '#/sharing/link'
     if (window.location.hash !== target) window.location.hash = target
   }, [pendingLink])
 
@@ -139,7 +144,7 @@ function parseRoute(hash: string, isMac: boolean): Route {
   if (view === 'cards' && isMac) return { view: 'cards' }
   if (view === 'agent') return { view: 'agent' }
   if (view === 'sharing') {
-    if (id === 'devices' || id === 'secrets' || id === 'receive' || id === 'relay' || id === 'link' || id === 'direct') {
+    if (id === 'devices' || id === 'secrets' || id === 'receive' || id === 'relay' || id === 'link' || id === 'direct' || id === 'webrtc' || id === 'send') {
       return { view: 'sharing', tab: id, projectId: projectId ? decodeURIComponent(projectId) : undefined }
     }
     return { view: 'sharing', projectId: id ? decodeURIComponent(id) : undefined }

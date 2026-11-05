@@ -143,6 +143,27 @@ The `SCT_RELAY` environment variable selects the relay:
 | `off` | No relay connection. The UI tests use this value. |
 | `<server URL>/<database>` | Another relay, for example `http://127.0.0.1:3000/sct-relay-test` |
 
+## Mailbox consent
+
+The **Send** tab calls this mode Mailbox. The **Relay** tab configures it and shows its activity.
+Mailbox stores one encrypted server copy until the recipient imports it.
+The **Send** tab shows Mailbox only when all of these conditions are true:
+
+- The relay is configured and registered.
+- At least one relay device is verified.
+- You select **Allow an encrypted copy on the Mailbox server for this send**.
+
+The permission checkbox starts off for each new operation.
+global.sct never selects Mailbox because a Direct connection failed.
+A device that you paired through Link, Direct, or AirDrop needs a separate relay pairing.
+Mailbox never stores secret values, private keys, or plaintext metadata.
+The share dialog shows the recipient, project, secret names, and the Mailbox mode before you enter the passphrase.
+The main process holds the operation. A changed window cannot select another recipient or secret set.
+
+Remote demo tasks stay on Mailbox.
+A task does not use Direct, WebRTC, or Link.
+The recipient still approves each task on its own device.
+
 ## Pairing
 
 Two devices must pair before they share secrets. Pairing uses the same device keys as AirDrop.
@@ -178,6 +199,8 @@ Each peer in `getRelayState` has a trust state:
 Before a device sends a secret, the relay pair must be `Verified` and the peer trust state must be `verified`.
 The recipient applies the same rule to the sender before it opens a transfer.
 
+The **Send** tab uses the same verified relay peers as the **Relay** tab.
+The share confirmation is the same for Mailbox, Link, Direct, WebRTC, and AirDrop.
 The **Relay** tab uses the preload operations `requestRelayPair`, `confirmRelayPair`, and `removeRelayPair`.
 `confirmRelayPair` takes the code on the screen. It fails if the current code is different, for example after a key change.
 
@@ -185,7 +208,9 @@ The **Relay** tab uses the preload operations `requestRelayPair`, `confirmRelayP
 
 On the **Relay** tab, the sender selects a source project, a verified relay recipient, and secrets.
 As an option, the sender sets **Access expires**.
-The **Allow command injection only** option is on by default. Then the sender selects **Queue encrypted transfer**.
+The **Allow command injection only** option is on by default.
+Then the sender selects **Queue encrypted transfer** and enters the vault passphrase.
+The **Send** tab offers the same Mailbox operation with the other delivery modes.
 The main process reads the selected values and creates one signed encrypted transfer.
 The main process sets the delivery deadline to 7 days minus 1 minute after the queue time.
 The 1-minute margin lets the relay accept a sender clock that is slightly ahead of the relay clock.

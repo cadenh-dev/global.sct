@@ -1,17 +1,23 @@
-import { createHash, diffieHellman, hkdfSync, randomUUID, sign, verify } from 'node:crypto'
+import { createHash, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, randomUUID, sign, verify } from 'node:crypto'
 import { mkdir, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod/v4'
-import { createIdentity, decodeIdentity, decryptTransfer, describeDevice, encodeIdentity, encryptTransfer,
+import { createIdentity, decodeIdentity, decryptTransfer, describeDevice, encodeIdentity, encryptTransfer, exportPublic,
   pairingCode, publicKey, readDeviceCard, readEnvelope, readObject, readPairingLink, transferLimit } from './transfer'
 import type { DeviceCard, DeviceIdentity, TransferEnvelope } from './transfer'
 import { openExpiryNotice, openMessage, openTransfer as openRelayEnvelope, readTransfer, sealExpiryNotice, sealMessage, sealReceipt,
   sealTransfer, verifyTransferReceipt } from './envelope'
+import { open as openSealed, seal as sealData } from './seal'
 import type { OpenedMessage, RelayPeerKeys, RelaySelf, SealedTransfer } from './envelope'
 import type { RelayMessageContents, RelayTransfer } from '../shared/envelope'
 import type { Vault } from './vault'
 import type { RelayTransferInput } from '../shared/relay'
+import { linkLimit } from '../shared/transport'
 import type { DeliveryMode, EnvelopeTransferInput, TransferReceipt } from '../shared/transport'
+import { connectContents, connectOuter } from '../shared/connect'
+import type { ConnectContents } from '../shared/connect'
+import type { ShareSummary } from '../shared/share'
+import { decodeConnectLink } from './connect-link'
 import type { LinkImportResult, LinkPreview, LinkRecord, LinkSendInput, LinkState } from '../shared/transport'
 import { decodeReceiptLink, decodeTransferLink, encodeReceiptLink, encodeTransferLink, readLinkRecords } from './transport-link'
 import type { PairingPreview, SharingDevice, SharingState, TransferPreview } from '../shared/sharing'
@@ -22,6 +28,10 @@ interface Receipt {
   digest: string
   projectId: string
   complete: boolean
+  // A completed import keeps its signed receipt, so a duplicate can return the same bytes after a restart.
+  receivedAt?: number
+  secretCount?: number
+  receipt?: string
 }
 
 export interface RelayTransferPreview {
@@ -103,6 +113,85 @@ export class Sharing {
   async directVerify(peerId: unknown, message: Buffer, signature: Buffer): Promise<boolean> {
     const peer = (await this.readPeers()).find((card) => describeDevice(card).id === peerId)
     return peer ? verify(null, message, publicKey(peer.signingKey, 'ed25519'), signature) : false
+  }
+
+  connectSeal(peerId: unknown, contents: ConnectContents,
+    options: { sessionId?: string; now?: number; createdAt?: number; expiresAt?: number } = {}):
+    Promise<{ link: string; sessionId: string; createdAt: number; expiresAt: number; digest: string }> {
+    return this.serialize(async () => {
+      const content = connectContents.parse(contents)
+      if (content.kind === 'answer' && !content.offerDigest) throw new Error('The WebRTC answer has no offer digest.')
+      if (content.kind === 'answer' && (!options.sessionId || options.createdAt === undefined || options.expiresAt === undefined)) {
+        throw new Error('The WebRTC answer has no offer session.')
+      }
+      if (content.kind === 'offer' && content.offerDigest) throw new Error('The WebRTC offer has an answer digest.')
+      const self = await this.getIdentity()
+      const senderId = describeDevice(self.card).id
+      const peer = requirePeer(await this.readPeers(), peerId, 'Verify the WebRTC peer before you connect.')
+      const recipientId = describeDevice(peer).id
+      const sessionId = content.kind === 'offer' ? randomUUID() : z.uuidv4().parse(options.sessionId)
+      const now = options.now ?? Date.now()
+      const createdAt = content.kind === 'offer' ? now : z.number().int().nonnegative().parse(options.createdAt)
+      const expiresAt = content.kind === 'offer' ? now + 5 * 60 * 1000 : z.number().int().nonnegative().parse(options.expiresAt)
+      if (expiresAt <= now) throw new Error('The WebRTC offer expired before the answer. Create a new offer.')
+      const ephemeral = generateKeyPairSync('x25519')
+      const shared = diffieHellman({ privateKey: ephemeral.privateKey, publicKey: publicKey(peer.encryptionKey, 'x25519') })
+      const key = Buffer.from(hkdfSync('sha256', shared, Buffer.from(sessionId), Buffer.from(`sct-connect-v1/${senderId}/${recipientId}`), 32))
+      const ephemeralKey = exportPublic(ephemeral.publicKey)
+      try {
+        const rawIv = randomBytes(12)
+        const iv = rawIv.toString('base64')
+        const aad = connectAad({ format: 'sct-connect', version: 1, sessionId, senderId, recipientId, createdAt, expiresAt, ephemeralKey, iv })
+        const sealed = sealData(key, Buffer.from(JSON.stringify(content)), aad, rawIv)
+        const signature = sign(null, Buffer.concat([aad, sealed.tag, sealed.ciphertext]), self.signingKey).toString('base64')
+        const outer = { format: 'sct-connect' as const, version: 1 as const, sessionId, senderId, recipientId, createdAt, expiresAt,
+          ephemeralKey, iv, tag: sealed.tag.toString('base64'), ciphertext: sealed.ciphertext.toString('base64'), signature }
+        const bytes = Buffer.from(JSON.stringify(outer))
+        const link = `global-sct://connect/v1/${bytes.toString('base64url')}`
+        if (link.length > linkLimit) throw new Error('The WebRTC connection link is too large.')
+        return { link, sessionId, createdAt, expiresAt, digest: createHash('sha256').update(bytes).digest('hex') }
+      } finally {
+        key.fill(0)
+        shared.fill(0)
+      }
+    })
+  }
+
+  connectOpen(link: unknown, now = Date.now()): Promise<{ senderId: string; sessionId: string; createdAt: number; expiresAt: number; contents: ConnectContents; digest: string }> {
+    return this.serialize(async () => {
+      const decoded = decodeConnectLink(link)
+      const outer = connectOuter.parse(decoded.outer)
+      const self = await this.getIdentity()
+      const selfId = describeDevice(self.card).id
+      if (outer.recipientId !== selfId) throw new Error('This WebRTC link belongs to another device.')
+      if (outer.createdAt > now + 60_000 || outer.expiresAt <= now || outer.expiresAt - outer.createdAt > 5 * 60 * 1000) {
+        throw new Error('This WebRTC link expired or has invalid times.')
+      }
+      const peer = (await this.readPeers()).find((card) => describeDevice(card).id === outer.senderId)
+      if (!peer) throw new Error('The WebRTC sender is not a verified peer.')
+      const aad = connectAad(outer)
+      if (!verify(null, Buffer.concat([aad, Buffer.from(outer.tag, 'base64'), Buffer.from(outer.ciphertext, 'base64')]),
+        publicKey(peer.signingKey, 'ed25519'), Buffer.from(outer.signature, 'base64'))) {
+        throw new Error('The WebRTC link signature is invalid.')
+      }
+      const shared = diffieHellman({ privateKey: self.encryptionKey, publicKey: publicKey(outer.ephemeralKey, 'x25519') })
+      const key = Buffer.from(hkdfSync('sha256', shared, Buffer.from(outer.sessionId), Buffer.from(`sct-connect-v1/${outer.senderId}/${outer.recipientId}`), 32))
+      try {
+        const plaintext = openSealed(key, { iv: Buffer.from(outer.iv, 'base64'), tag: Buffer.from(outer.tag, 'base64'),
+          ciphertext: Buffer.from(outer.ciphertext, 'base64') }, aad)
+        try {
+          return { senderId: outer.senderId, sessionId: outer.sessionId, createdAt: outer.createdAt, expiresAt: outer.expiresAt,
+            contents: connectContents.parse(JSON.parse(plaintext.toString('utf8'))), digest: decoded.digest }
+        } finally {
+          plaintext.fill(0)
+        }
+      } catch {
+        throw new Error('Cannot open this WebRTC link.')
+      } finally {
+        key.fill(0)
+        shared.fill(0)
+      }
+    })
   }
 
   async prepareRelayTransfer(identity: string, recipient: RelayPeerKeys, input: RelayTransferInput): Promise<SealedTransfer> {
@@ -191,16 +280,21 @@ export class Sharing {
       const [self, sender] = await Promise.all([this.deviceSelf(), this.envelopeSender(payload)])
       const opened = openRelayEnvelope(self, sender, payload, wrappedKey)
       const preview = relayPreview(opened)
+      const saved = (await this.readReceipts()).find((entry) => entry.id === opened.transfer.id)
+      if (saved && (saved.digest !== opened.digest || saved.projectId !== projectId)) {
+        throw new Error('This transfer was already imported into another project. Select its original destination.')
+      }
       const receivedAt = Date.now()
       try {
         const secrets = await this.vault.importSecrets(projectId, opened.contents.secrets,
           `envelope:${opened.transfer.id}:${opened.digest}`, () => beforeWrite(preview), opened.contents.grant)
-        return {
-          ...preview,
-          secrets,
-          receivedAt,
-          receipt: sealReceipt(self, sender, opened.transfer, { status: 'received', receivedAt, secretCount: secrets.length }, receivedAt)
+        if (saved?.complete && saved.receipt && saved.receivedAt !== undefined && saved.projectId === projectId) {
+          return { ...preview, secrets, receivedAt: saved.receivedAt, receipt: Buffer.from(saved.receipt, 'base64') }
         }
+        const receipt = sealReceipt(self, sender, opened.transfer,
+          { status: 'received', receivedAt, secretCount: secrets.length }, receivedAt)
+        await this.saveReceipt(opened.transfer.id, opened.digest, projectId, receivedAt, secrets.length, receipt)
+        return { ...preview, secrets, receivedAt, receipt }
       } finally {
         opened.contents.secrets.length = 0
       }
@@ -213,6 +307,14 @@ export class Sharing {
       const recipient = deviceKeys(requirePeer(await this.readPeers(), recipientId, 'This receipt comes from a device that is not verified.'))
       return verifyTransferReceipt(await this.deviceSelf(), recipient, transferId, receipt, mode)
     })
+  }
+
+  describeSend(input: unknown, mode: 'link' | 'direct' | 'webrtc'): Promise<ShareSummary> {
+    return this.serialize(async () => this.describeSelection(requireLinkSend(input), mode))
+  }
+
+  describeExport(input: unknown): Promise<ShareSummary> {
+    return this.serialize(async () => this.describeSelection(requireExport(input), 'airdrop'))
   }
 
   async createLink(input: unknown): Promise<LinkRecord> {
@@ -496,8 +598,22 @@ export class Sharing {
     if (!Array.isArray(data.receipts) || !data.receipts.every((entry: unknown): entry is Receipt =>
       typeof entry === 'object' && entry !== null && 'id' in entry && typeof entry.id === 'string' &&
       'digest' in entry && typeof entry.digest === 'string' && 'projectId' in entry && typeof entry.projectId === 'string' &&
-      'complete' in entry && typeof entry.complete === 'boolean')) throw new Error('The import receipt list is invalid.')
+      'complete' in entry && typeof entry.complete === 'boolean' &&
+      (!('receivedAt' in entry) || typeof entry.receivedAt === 'number') &&
+      (!('secretCount' in entry) || typeof entry.secretCount === 'number') &&
+      (!('receipt' in entry) || typeof entry.receipt === 'string'))) throw new Error('The import receipt list is invalid.')
     return data.receipts
+  }
+
+  private async saveReceipt(id: string, digest: string, projectId: string, receivedAt: number, secretCount: number,
+    receipt: Buffer): Promise<void> {
+    const receipts = await this.readReceipts()
+    const saved = receipts.find((entry) => entry.id === id)
+    if (saved && (saved.digest !== digest || saved.projectId !== projectId)) {
+      throw new Error('This import is bound to a different transfer or destination project.')
+    }
+    const record: Receipt = { id, digest, projectId, complete: true, receivedAt, secretCount, receipt: receipt.toString('base64') }
+    await this.writeJson('receipts.json', { receipts: [...receipts.filter((entry) => entry.id !== id), record] })
   }
 
   private async readJson(name: string): Promise<Record<string, unknown> | undefined> {
@@ -518,6 +634,19 @@ export class Sharing {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
       throw error
     }
+  }
+
+  private async describeSelection(request: { projectId: string; secretIds: string[]; recipientId: string },
+    mode: ShareSummary['mode']): Promise<ShareSummary> {
+    const project = await this.vault.project(request.projectId)
+    const ids = new Set(request.secretIds)
+    const secretNames = (await this.vault.listProjectSecrets(request.projectId))
+      .filter((secret) => ids.has(secret.id)).map((secret) => secret.name)
+    if (secretNames.length !== ids.size || request.secretIds.length !== ids.size) {
+      throw new Error('The selected secrets are unavailable. Refresh the project and try again.')
+    }
+    const peer = requirePeer(await this.readPeers(), request.recipientId, 'Verify the recipient device before sharing secrets.')
+    return { mode, recipient: describeDevice(peer).name, project: project.name, secretNames }
   }
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -543,6 +672,15 @@ function requireLinkSend(input: unknown): LinkSendInput {
   return parsed.data
 }
 
+function requireExport(input: unknown): { projectId: string; secretIds: string[]; recipientId: string } {
+  const parsed = z.strictObject({
+    projectId: z.string().min(1), secretIds: z.array(z.string().min(1)).min(1).max(1000),
+    recipientId: z.string().regex(/^[0-9a-f]{64}$/)
+  }).safeParse(input)
+  if (!parsed.success) throw new Error('Select a project, secrets, and a verified recipient.')
+  return parsed.data
+}
+
 function requireLinkImport(input: unknown): { link: string; projectId: string } {
   const parsed = z.strictObject({ link: z.string(), projectId: z.string().min(1) }).safeParse(input)
   if (!parsed.success) throw new Error('Paste an import link and select a destination project.')
@@ -553,6 +691,12 @@ function requireLinkReceipt(input: unknown): { transferId: string; link: string 
   const parsed = z.strictObject({ transferId: z.uuidv4(), link: z.string() }).safeParse(input)
   if (!parsed.success) throw new Error('Select a sent link and paste its receipt link.')
   return parsed.data
+}
+
+function connectAad(input: { format: 'sct-connect'; version: 1; sessionId: string; senderId: string; recipientId: string;
+  createdAt: number; expiresAt: number; ephemeralKey: string; iv: string }): Buffer {
+  return Buffer.from(JSON.stringify(['sct-connect', 1, input.sessionId, input.senderId, input.recipientId,
+    input.createdAt, input.expiresAt, input.ephemeralKey, input.iv]))
 }
 
 function relayPreview(opened: ReturnType<typeof openRelayEnvelope>): RelayTransferPreview {

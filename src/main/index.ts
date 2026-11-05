@@ -24,8 +24,12 @@ import { readThemePreference, writeThemePreference } from './preferences'
 import { getProtocolStatus, registerProtocol, removeProtocol } from './protocol-registration'
 import { protocolLinksFromArguments, readProtocolLink } from './protocol'
 import { HyperswarmTransport } from './transport-hyperswarm'
+import { WebRtcTransport } from './transport-webrtc'
+import { WebRtcConfig } from './webrtc-config'
+import { ShareGate } from './share-gate'
 import type { Reply, ThemePreference, ThemeVariant } from '../shared/api'
 import type { DirectState } from '../shared/direct'
+import type { WebRtcState } from '../shared/webrtc'
 
 let mainWindow: BrowserWindow | null = null
 app.setName('global.sct')
@@ -38,6 +42,8 @@ const primaryInstance = !desktopMode || app.requestSingleInstanceLock()
 const incomingFiles: string[] = []
 let sharing: Sharing | undefined
 let direct: HyperswarmTransport | undefined
+let webrtc: WebRtcTransport | undefined
+let shareGate: ShareGate | undefined
 let openingFiles = false
 let pendingUnlock: (() => void) | undefined
 let desktopStarted: Promise<void> | undefined
@@ -277,6 +283,9 @@ app.whenReady().then(async () => {
   if (launchArguments[0] === 'agent' || launchArguments[0] === 'mcp') {
     app.dock?.hide()
     await unlockVault(vault)
+    shareGate = new ShareGate((passphrase) => vault.verifySharePassphrase(passphrase),
+      () => mainWindow?.webContents.send('share:changed'))
+    registerShareGate(shareGate)
     app.exit(await runAgentSession(projects, vault))
     return
   }
@@ -335,14 +344,20 @@ function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
     } else {
       await startDesktop(vault, projects)
       await direct?.start()
+      await webrtc?.start()
     }
     return status
   })
   handle('vault:lock', async () => {
+    shareGate?.clear()
     await direct?.stop()
+    webrtc?.stop()
     return vault.lock()
   })
-  handle('vault:forget', () => vault.forget())
+  handle('vault:forget', () => {
+    shareGate?.clear()
+    return vault.forget()
+  })
   handle('vault:location', () => vault.location())
 }
 
@@ -381,6 +396,9 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   }
   const service = new Sharing(join(app.getPath('userData'), 'sharing'), vault, hostname().slice(0, 100))
   sharing = service
+  shareGate = new ShareGate((passphrase) => vault.verifySharePassphrase(passphrase),
+    () => mainWindow?.webContents.send('share:changed'))
+  registerShareGate(shareGate)
   await service.cleanOutbox()
   direct = new HyperswarmTransport(service, join(app.getPath('userData'), 'direct'),
     () => mainWindow?.webContents.send('direct:changed'))
@@ -388,6 +406,14 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
     await direct.start()
   } catch (error) {
     console.error('The Direct transport could not start.', error)
+  }
+  const ice = new WebRtcConfig(vault)
+  webrtc = new WebRtcTransport(service, ice, join(app.getPath('userData'), 'webrtc'),
+    () => mainWindow?.webContents.send('webrtc:changed'))
+  try {
+    await webrtc.start()
+  } catch (error) {
+    console.error('The WebRTC transport could not start.', error)
   }
   const { Relay, relayServer } = await import('./relay-connection')
   // Only this process writes relay files and runs remote tasks. Agent sessions open a passive relay.
@@ -412,21 +438,36 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
     clearInterval(cleanupTimer)
     relay.stop()
     void direct?.stop()
+    webrtc?.stop()
   })
   handle('relay:state', () => relay.state())
   handle('relay:request-pair', (identity) => relay.requestPair(identity))
   handle('relay:confirm-pair', (input) => relay.confirmPair(input))
   handle('relay:remove-pair', (pairId) => relay.removePair(pairId))
-  handle('relay:queue-transfer', (input) => relay.queueTransfer(input))
+  handle('relay:queue-transfer', async (input) =>
+    requireShareGate().run(await relay.describeTransfer(input), () => relay.queueTransfer(input)))
   handle('relay:accept-transfer', (input) => relay.acceptRelayTransfer(input))
   handle('relay:queue-task', (grantId) => relay.queueTask(grantId))
   handle('relay:respond-task', (input) => relay.respondTask(input))
   handle('relay:hide-activity', (input) => relay.hideActivity(input))
   handle('relay:hide-all-activity', () => relay.hideAllActivity())
   handle('direct:state', () => direct?.state() ?? emptyDirect())
-  handle('direct:send', (input) => requireDirect().send(input))
+  handle('direct:send', async (input) =>
+    requireShareGate().run(await service.describeSend(input, 'direct'), () => requireDirect().send(input)))
   handle('direct:import', (input) => requireDirect().import(input))
   handle('direct:verify-receipt', (input) => requireDirect().verifyReceipt(input))
+  handle('webrtc:state', () => webrtc?.state() ?? emptyWebRtc())
+  handle('webrtc:ice', () => ice.get())
+  handle('webrtc:save-ice', (input) => ice.save(input))
+  handle('webrtc:preview-link', (link) => requireWebRtc().previewLink(link))
+  handle('webrtc:create-offer', (peerId) => requireWebRtc().createOffer(peerId))
+  handle('webrtc:accept-offer', (link) => requireWebRtc().acceptOffer(link))
+  handle('webrtc:accept-answer', (link) => requireWebRtc().acceptAnswer(link))
+  handle('webrtc:close', () => requireWebRtc().close())
+  handle('webrtc:send', async (input) =>
+    requireShareGate().run(await service.describeSend(input, 'webrtc'), () => requireWebRtc().send(input)))
+  handle('webrtc:import', (input) => requireWebRtc().import(input))
+  handle('webrtc:verify-receipt', (input) => requireWebRtc().verifyReceipt(input))
   handle('projects:list', () => projects.list())
   handle('projects:add', (input) => vault.addProject(input))
   handle('projects:rename', (input) => vault.renameProject(input))
@@ -488,6 +529,7 @@ async function runAgentSession(projects: ProjectStore, vault: Vault): Promise<nu
         changed: () => mainWindow?.webContents.send('agent:changed'),
         sharing: getSharing,
         shareFile: sendToNearbyMac,
+        approveShare: (summary, execute) => requireShareGate().run(summary, execute),
         caller,
         relayState: async () => (await getRelay()).state(),
         requestRemoteDemo: async (grantId) => (await getRelay()).requestTask(grantId),
@@ -530,7 +572,8 @@ app.on('window-all-closed', () => {
 })
 
 function registerSharing(service: Sharing): void {
-  handle('sharing:create-link', (input) => service.createLink(input))
+  handle('sharing:create-link', async (input) =>
+    requireShareGate().run(await service.describeSend(input, 'link'), () => service.createLink(input)))
   handle('sharing:preview-link', (link) => service.previewLink(link))
   handle('sharing:import-link', (input) => service.importLink(input))
   handle('sharing:verify-link-receipt', (input) => service.verifyLinkReceipt(input))
@@ -565,7 +608,11 @@ function registerSharing(service: Sharing): void {
     await direct?.refresh()
     return peer
   })
-  handle('sharing:send', async (input) => sendToNearbyMac(await service.exportSecrets(input)))
+  handle('sharing:send', async (input) => {
+    if (process.platform !== 'darwin') throw new Error('Sending to a nearby Mac requires macOS.')
+    return requireShareGate().run(await service.describeExport(input), async () =>
+      sendToNearbyMac(await service.exportSecrets(input)))
+  })
   handle('sharing:pick-transfer', async () => {
     const path = await pickDirectory({ title: 'Choose a received global.sct transfer', properties: ['openFile'], defaultPath: app.getPath('downloads'),
       filters: [{ name: 'global.sct transfer', extensions: ['sct-transfer'] }] })
@@ -612,13 +659,34 @@ function sharingChanged(): void {
   mainWindow?.webContents.send('sharing:changed')
 }
 
+function requireShareGate(): ShareGate {
+  if (!shareGate) throw new Error('The share confirmation is not ready.')
+  return shareGate
+}
+
+function registerShareGate(gate: ShareGate): void {
+  handle('share:current', () => gate.current())
+  handle('share:confirm', (input) => gate.confirm(input))
+  handle('share:cancel', () => gate.cancel())
+}
+
 function requireDirect(): HyperswarmTransport {
   if (!direct) throw new Error('Direct sharing is not ready.')
   return direct
 }
 
 function emptyDirect(): DirectState {
-  return { connection: 'off', peers: [], incoming: [], sent: [], error: null }
+  return { connection: 'off', peers: [], incoming: [], sent: [], receipts: [], error: null }
+}
+
+function requireWebRtc(): WebRtcTransport {
+  if (!webrtc) throw new Error('WebRTC sharing is not ready.')
+  return webrtc
+}
+
+function emptyWebRtc(): WebRtcState {
+  return { connection: 'off', peers: [], peerId: null, offerLink: null, answerLink: null, route: null,
+    incoming: [], sent: [], receipts: [], error: null }
 }
 
 async function openIncomingFiles(): Promise<void> {

@@ -201,6 +201,9 @@ Use the [explicit migration](fork-storage-migration.md) to preserve an existing 
 | D18 | The SpacetimeDB database | Decided: keep it | Phase 2 | Maincloud holds the current relay data |
 | D19 | The product names | Decided: `global.sct` app and MCP server. Keep `sct` CLI and `@sct/env` | Phase 1 | One selected `sct` command per PATH |
 
+D6, D7, and D11 are implemented as of 2026-11-05.
+The [implementation plan](implementation-plan.md#status-2026-11-05) records the Windows results and the open platform checks.
+
 ## Effects of the clean break
 
 1. The new build reads no file from the current vault.

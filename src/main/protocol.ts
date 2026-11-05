@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { linkLimit } from '../shared/transport'
 import type { PendingLink } from '../shared/transport'
+import { connectOuter } from '../shared/connect'
 import { readReceipt, readTransfer } from './envelope'
 import { readPairingLink } from './transfer'
+import { decodeConnectLink } from './connect-link'
 import { decodeReceiptLink, decodeTransferLink } from './transport-link'
 
 type Route = 'pair' | 'import' | 'receipt' | 'connect'
@@ -19,8 +21,11 @@ const schemes = ['global-sct://', 'sct://'] as const
 export function readProtocolLink(input: unknown): PendingLink {
   if (typeof input !== 'string') throw invalidLink()
   const route = routeOf(input)
-  if (route === 'connect') throw new Error('Direct connection links are not supported yet.')
   if (input.length > linkLimit) throw new Error('The link exceeds 16,384 characters. Paste a shorter link.')
+  if (route === 'connect') {
+    connectOuter.parse(decodeConnectLink(input).outer)
+    return { id: randomUUID(), kind: 'connect', link: input }
+  }
   const kind = route === 'pair' ? 'pairing' : route === 'import' ? 'import' : 'receipt'
   if (kind === 'pairing') {
     readPairingLink(input)
@@ -48,5 +53,5 @@ function routeOf(link: string): Route {
 }
 
 function invalidLink(): Error {
-  return new Error('The link is invalid. Open a global-sct://pair/v1/, global-sct://import/, or global-sct://receipt/ link.')
+  return new Error('The link is invalid. Open a global-sct://pair/v1/, global-sct://import/, global-sct://receipt/, or global-sct://connect/v1/ link.')
 }

@@ -19,6 +19,7 @@ import { relayInboxFinished, relaySentFinished, relayTaskFinished } from '../sha
 import type { RelayAcceptInput, RelayActivityKey, RelayConnection, RelayDeliveryState, RelayInboxItem, RelayPeer, RelayQueueInput,
   RelaySentItem, RelayState, RelayTaskDecision, RelayTaskItem } from '../shared/relay'
 import type { TransferReceipt } from '../shared/transport'
+import type { ShareSummary } from '../shared/share'
 import { relayReceiptState } from './transport'
 
 export interface RelayServer {
@@ -489,6 +490,28 @@ export class Relay {
     }
     if (this.connection && this.status === 'connected') await this.processPending(this.connection)
     this.changed()
+  }
+
+  // The share confirmation reads the recipient and secret names without preparing the envelope.
+  describeTransfer(value: unknown): Promise<ShareSummary> {
+    return this.serialize(async () => {
+      this.requireWriter()
+      const input = requireQueueInput(value)
+      const identity = this.cache.identity
+      if (!identity) throw new Error('Connect this device to the relay before you queue a transfer.')
+      const peer = this.cache.peers.find((saved) => saved.identity === input.recipient)
+      if (!peer || peer.status !== 'Verified' || describePeer(peer, await this.deviceCard(), identity, this.pins).trust !== 'verified') {
+        throw new Error('Select a verified relay recipient.')
+      }
+      const project = await this.vault.project(input.projectId)
+      const ids = new Set(input.secretIds)
+      const secretNames = (await this.vault.listProjectSecrets(input.projectId))
+        .filter((secret) => ids.has(secret.id)).map((secret) => secret.name)
+      if (secretNames.length !== ids.size || input.secretIds.length !== ids.size) {
+        throw new Error('The selected secrets are unavailable. Refresh the project and try again.')
+      }
+      return { mode: 'mailbox', recipient: peer.name, project: project.name, secretNames }
+    })
   }
 
   // Returns the message ID, so the window can follow the delivery state of this transfer.

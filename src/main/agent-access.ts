@@ -12,12 +12,15 @@ import { requireExternalVault } from './vault'
 import type { Sharing } from './sharing'
 import type { RelayState } from '../shared/relay'
 import type { Project } from '../shared/projects'
+import type { ShareSummary } from '../shared/share'
 
 interface AgentServices {
   review: () => Promise<void>
   changed: () => void
   sharing: () => Promise<Sharing>
   shareFile: (path: string) => Promise<void>
+  // A secret share waits for the app passphrase dialog. The closure stays in the main process.
+  approveShare: <T>(summary: ShareSummary, execute: () => Promise<T>) => Promise<T>
   relayState: () => Promise<RelayState>
   // Writes a task request for the desktop app to send. Returns the task ID.
   requestRemoteDemo: (grantId: string) => Promise<string>
@@ -32,6 +35,7 @@ interface PendingRequest {
   submission: AgentInput
   stdinValue?: string
   pairingToken?: string
+  shareSummary?: ShareSummary
   controller: AbortController
   timer: NodeJS.Timeout
   finish: (outcome: AgentOutcome) => void
@@ -171,6 +175,9 @@ export class AgentAccess {
       const recipient = (await (await this.services.sharing()).state()).peers.find((peer) => peer.id === submission.input.recipientId)
       if (!recipient) throw new Error('Verify the recipient first.')
       detail = `Encrypt the selected secrets for ${recipient.name} (${recipient.fingerprint}). Choose that device in the picker. Delivery remains unconfirmed.`
+      const shareSummary: ShareSummary = { mode: 'airdrop', recipient: recipient.name, project: project.name,
+        secretNames: selectedSecrets.map((secret) => secret.name) }
+      return { view: { project, secrets: selectedSecrets, detail }, shareSummary }
     } else if (submission.operation === 'run_demo') {
       detail = `Run the fixed environment demo with ${stdinValue !== undefined ? 'a value from stdin' : 'the selected saved secret'}. The child can read its input. Return no process logs.`
     } else detail = submission.operation === 'delete_secret' ? 'Permanently delete this saved secret.' : 'Read this secret’s metadata. Return no value.'
@@ -208,10 +215,13 @@ export class AgentAccess {
         return { path, status: 'public-device-card' }
       }
       case 'send_secrets_to': {
-        const path = await (await this.services.sharing()).exportSecrets({ ...submission.input, projectId: requireProject(request).id })
-        requireActive(request)
-        await this.services.shareFile(path)
-        return { path, recipientId: submission.input.recipientId, status: 'awaiting-transport' }
+        if (!request.shareSummary) throw new Error('The share summary is unavailable.')
+        return this.services.approveShare(request.shareSummary, async () => {
+          const path = await (await this.services.sharing()).exportSecrets({ ...submission.input, projectId: requireProject(request).id })
+          requireActive(request)
+          await this.services.shareFile(path)
+          return { path, recipientId: submission.input.recipientId, status: 'awaiting-transport' }
+        })
       }
       case 'relay_status': {
         const state = await this.services.relayState()

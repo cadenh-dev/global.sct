@@ -9,8 +9,8 @@ export interface Sealed {
   ciphertext: Buffer
 }
 
-export function seal(key: Buffer, plaintext: Buffer, data: Buffer): Sealed {
-  const iv = randomBytes(ivLength)
+export function seal(key: Buffer, plaintext: Buffer, data: Buffer, iv = randomBytes(ivLength)): Sealed {
+  if (iv.length !== ivLength) throw new Error('The AES-GCM IV must be 12 bytes.')
   const cipher = createCipheriv('aes-256-gcm', key, iv).setAAD(data)
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()])
   return { iv, tag: cipher.getAuthTag(), ciphertext }

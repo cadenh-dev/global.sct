@@ -35,11 +35,19 @@ export interface DirectIncomingItem {
   error: string | null
 }
 
+export interface DirectPendingReceipt {
+  transferId: string
+  senderName: string
+  projectName: string
+  receiptLink: string
+}
+
 export interface DirectState {
   connection: DirectConnection
   peers: DirectPeer[]
   incoming: DirectIncomingItem[]
   sent: DirectSentItem[]
+  receipts: DirectPendingReceipt[]
   error: string | null
 }
 

@@ -11,14 +11,17 @@ global.sct runs on Windows and Linux. The macOS-only features stay on macOS.
 | Agent Access | Yes | Yes | Yes |
 | Device pairing by link or file | Yes | Yes | Yes |
 | Direct sharing | Yes | Yes | Yes |
+| WebRTC sharing | Yes | Yes | Yes |
 | Link sharing | Yes | Yes | Yes |
 | Relay sharing | Yes | Yes | Yes, with libsecret |
 | AirDrop sharing | Yes | No | No |
 | Wallet cards | Yes | No | No |
 | Caller signature check | Apple code signature | Authenticode signer | No code signature. The caller is unverified |
 
-On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** tabs. Use **Verify devices** to pair devices without the relay. Use **Direct** to send while both apps are online, **Link** to send without a relay, or **Relay** to send through the relay.
+On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** tabs. Use **Verify devices** to pair devices without the relay. Use the **Send** tab to choose Direct, WebRTC, Link, or Mailbox.
 Direct needs outbound UDP. Both apps must be open and unlocked. The Windows and Linux packages include the Hyperswarm native modules.
+WebRTC uses manual offer and answer links. It needs no inbound port and no signalling server. A public STUN server is optional. A TURN server can forward traffic when a direct path is blocked.
+Every send asks for the vault passphrase. The share gate is the same on all platforms.
 
 ## Requirements
 
@@ -103,6 +106,9 @@ Verify the metadata with the real Claude Code build before release. A certificat
 - On Windows, file access uses the folder ACL. Keep the vault in a folder that only your account can access.
 - A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
 - The existing Playwright suite now unlocks the vault, but it still uses macOS and POSIX assumptions. `tests/platform.spec.ts` is the Windows smoke test.
+- WebRTC with TURN, public STUN, and cross-network paths is not verified on this Windows host. The direct no-server path is verified between two app instances.
+- The share gate waits for the vault passphrase. An automated UI test must enter the passphrase or cancel the dialog.
+- The Windows `tests/app.spec.ts` secret test still reaches an interactive `cmd.exe` step, and `tests/sharing.spec.ts` still expects the disabled **Send secrets** tab. These are test-platform issues, not product failures. See [the remaining plan](remaining-features-plan.md#windows-ui-test-findings-2026-11-04).
 
 ## Checks
 
@@ -110,12 +116,22 @@ Run these commands after a code change:
 
 ```sh
 bun run typecheck
+bun run typecheck:tsc
 bun run check
 bun run build:sdk
 bun run react-doctor
+bun run test
 bun run test:ui
 ```
 
 The Windows and Linux package jobs run on their own check runners. They build unsigned packages only.
 The Playwright tests need a graphical session. The Windows smoke test runs on the Windows check runner.
+
+### Windows result (2026-11-05)
+
+- `bun run check`, `bun run typecheck:tsc`, `bun run test`, and `bun run build` passed. The unit suite had 39 passes and 3 skips.
+- React Doctor returned 100/100.
+- A temporary two-window Playwright check passed. It paired two vaults, rejected a wrong passphrase, accepted the correct passphrase, cancelled a share, and completed a 60,000-character WebRTC transfer with an import and receipt. The check file was not committed.
+- The Windows package includes Hyperswarm and Sodium. The `.node` files are in `app.asar.unpacked`.
+- macOS, Linux, TURN, public STUN, and cross-network checks are open.
 The existing suite now unlocks the vault, but it still uses macOS and POSIX assumptions. It needs platform gating before it can run on all platforms.

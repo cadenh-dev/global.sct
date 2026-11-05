@@ -37,12 +37,30 @@ The client views filter rows with the caller identity.
 The envelope and vault tests searched stored bytes and renderer data for test values.
 They found no plaintext secret or private key in those outputs.
 
+## Windows check (2026-11-05)
+
+The project owner ran a temporary two-window Playwright check on Windows x64.
+The check file was deleted after the run, because new tests need approval.
+
+The check did these steps:
+
+1. It paired two independent vaults with the device-card link and the pairing code.
+2. It created a Link with a wrong passphrase, then with the correct passphrase.
+3. It cancelled a second Link share and confirmed that no link was created.
+4. It connected two apps with a WebRTC offer link and answer link.
+5. It sent a 60,000-character secret over the WebRTC data channel.
+6. The recipient imported the secret and returned the signed receipt.
+7. The sender showed the transfer as `received`.
+
+The check did not test TURN, public STUN, a live Mailbox server, macOS, or Linux.
+
 ## Application checks
 
-- `bun run test`: 38 passed.
-- `bun run check`: passed.
-- Electron Playwright: 3 passed.
-- React Doctor: no issues. The score service was unavailable.
+- `bun run test`: 39 passed, 3 skipped.
+- `bun run check`, `bun run typecheck:tsc`, and `bun run build`: passed.
+- Electron Playwright: the temporary two-window WebRTC and share-gate check passed.
+- React Doctor: 100/100.
+- The existing Windows UI suite keeps two test-platform failures. See [Windows and Linux](windows-linux.md#limits).
 
 The local full build reached the native AirDrop helper.
 That helper did not compile because the installed Swift compiler and macOS SDK versions differ.
@@ -57,4 +75,8 @@ The TypeScript, SDK, main, preload, renderer, demo, and Electron test builds pas
 - The sender selects the local access deadline.
 - The app checks local access at import and before each use.
 - The app runs local cleanup at startup, each minute, and after system resume.
+- A WebRTC offer or answer link expires after five minutes.
+- A WebRTC connection starts within 30 seconds after the answer.
+- A share confirmation expires after two minutes.
+- The gate releases one operation and is not saved.
 

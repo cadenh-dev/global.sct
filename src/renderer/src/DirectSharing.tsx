@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import type { Project } from '../../shared/projects'
 import type { SecretMetadata } from '../../shared/secrets'
 import type { DirectImportResult, DirectSentItem, DirectState } from '../../shared/direct'
 import { errorText } from './operation'
+import { PendingReceipts } from './PendingReceipts'
 import { SecretSelection } from './SecretSelection'
 import type { Loaded, Run, UpdateSecrets } from './types'
 
@@ -44,6 +45,7 @@ export function DirectSharing({ active, projectId, projects, secrets, updateSecr
         busy={busy} run={run} refresh={refresh} />
       <DirectIncoming state={state.value} projects={projects} busy={busy} run={run}
         refresh={refresh} updateSecrets={updateSecrets} />
+      <PendingReceipts receipts={state.value.receipts} busy={busy} run={run} />
       <DirectSent state={state.value} busy={busy} run={run} refresh={refresh} />
     </>}
   </>
@@ -132,17 +134,15 @@ function DirectIncoming({ state, projects, busy, run, refresh, updateSecrets }: 
         <p className="field-help">Deliver before {new Date(item.deliverBy).toLocaleString()}.
           {item.accessExpiresAt === null ? ' Access does not expire.' : ` Access expires ${new Date(item.accessExpiresAt).toLocaleString()}.`}
           {item.injectionOnly ? ' Injection only.' : ' Resharing is allowed.'}</p>
-        <form onSubmit={(event) => { void importItem(event, item.transferId, item.senderName) }}>
-          <fieldset disabled={busy || projects.state !== 'ready'}>
-            <label htmlFor={`direct-destination-${item.transferId}`}>Destination project</label>
-            <select id={`direct-destination-${item.transferId}`} value={destinations[item.transferId] ?? ''} required
-              onChange={(event) => setDestinations((current) => ({ ...current, [item.transferId]: event.target.value }))}>
-              <option value="">Choose a local project</option>
-              {projects.state === 'ready' && projects.value.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-            </select>
-            <div className="form-actions"><button type="submit" disabled={!destinations[item.transferId]}>Import and send receipt</button></div>
-          </fieldset>
-        </form>
+        <ItemForm id={`direct-destination-${item.transferId}`} label="Destination project"
+          disabled={busy || projects.state !== 'ready'} actionLabel="Import and send receipt"
+          actionDisabled={!destinations[item.transferId]} onSubmit={(event) => { void importItem(event, item.transferId, item.senderName) }}>
+          <select id={`direct-destination-${item.transferId}`} value={destinations[item.transferId] ?? ''} required
+            onChange={(event) => setDestinations((current) => ({ ...current, [item.transferId]: event.target.value }))}>
+            <option value="">Choose a local project</option>
+            {projects.state === 'ready' && projects.value.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+          </select>
+        </ItemForm>
       </li>)}
     </ul>}
     {imported && <>
@@ -157,6 +157,24 @@ function DirectIncoming({ state, projects, busy, run, refresh, updateSecrets }: 
       }}>Copy receipt link</button></div>
     </>}
   </section>
+}
+
+function ItemForm({ id, label, disabled, actionLabel, actionDisabled, onSubmit, children }: {
+  id: string
+  label: string
+  disabled: boolean
+  actionLabel: string
+  actionDisabled: boolean
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  children: ReactNode
+}) {
+  return <form onSubmit={onSubmit}>
+    <fieldset disabled={disabled}>
+      <label htmlFor={id}>{label}</label>
+      {children}
+      <div className="form-actions"><button type="submit" disabled={actionDisabled}>{actionLabel}</button></div>
+    </fieldset>
+  </form>
 }
 
 function DirectSent({ state, busy, run, refresh }: {
@@ -186,14 +204,12 @@ function DirectSent({ state, busy, run, refresh }: {
         <p>{item.secretNames.join(', ')}</p>
         <p>State: {item.state}.</p>
         {item.error && <p className="error" role="alert">{item.error}</p>}
-        {(item.state === 'manual' || item.state === 'failed') && <form onSubmit={(event) => { void verify(event, item) }}>
-          <fieldset disabled={busy}>
-            <label htmlFor={`direct-receipt-${item.transferId}`}>Paste receipt link</label>
-            <textarea className="link-text" id={`direct-receipt-${item.transferId}`} value={receipts[item.transferId] ?? ''}
-              spellCheck={false} onChange={(event) => setReceipts((current) => ({ ...current, [item.transferId]: event.target.value }))} />
-            <div className="form-actions"><button type="submit" disabled={!receipts[item.transferId]}>Verify receipt</button></div>
-          </fieldset>
-        </form>}
+        {(item.state === 'manual' || item.state === 'failed') && <ItemForm id={`direct-receipt-${item.transferId}`}
+          label="Paste receipt link" disabled={busy} actionLabel="Verify receipt"
+          actionDisabled={!receipts[item.transferId]} onSubmit={(event) => { void verify(event, item) }}>
+          <textarea className="link-text" id={`direct-receipt-${item.transferId}`} value={receipts[item.transferId] ?? ''}
+            spellCheck={false} onChange={(event) => setReceipts((current) => ({ ...current, [item.transferId]: event.target.value }))} />
+        </ItemForm>}
       </li>)}
     </ul>}
   </section>

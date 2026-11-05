@@ -106,6 +106,10 @@ The screenshots are 1200 × 800 on Windows.
 | Sharing | ![Cream sharing](media/themes/cream/sharing.png) | ![Terminal sharing](media/themes/terminal/sharing.png) |
 | Storage | ![Cream storage](media/themes/cream/storage.png) | ![Terminal storage](media/themes/terminal/storage.png) |
 
+The new **Send**, **WebRTC**, **Direct**, network-settings, connection-link, and share-gate screens use the same role tokens and components.
+Screenshots for those screens are open under task 4.6.
+They are not claimed as evidence until the project owner takes them in both variants.
+
 ## What stays the same
 
 - Wallet pass colors in `src/main/cards.ts` and the app icon in `build/icon.svg` use the Terminal colors in both variants.

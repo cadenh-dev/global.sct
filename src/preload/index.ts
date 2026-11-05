@@ -9,6 +9,9 @@ import type { AgentRequestView } from '../shared/agent'
 import type { UnlockInput, VaultStatus } from '../shared/vault'
 import type { LinkImportResult, LinkPreview, LinkRecord, LinkState, PendingLink, TransferReceipt } from '../shared/transport'
 import type { DirectImportResult, DirectReceiptInput, DirectSendInput, DirectState } from '../shared/direct'
+import type { WebRtcIceConfig, WebRtcIceInput, WebRtcImportInput, WebRtcReceiptInput, WebRtcSendInput, WebRtcState } from '../shared/webrtc'
+import type { ShareConfirmInput, ShareRequestView } from '../shared/share'
+import type { WebRtcLinkPreview } from '../shared/connect'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   const reply: Reply<T> = await ipcRenderer.invoke(channel, ...args)
@@ -61,6 +64,14 @@ const api: SctAPI = {
   unlockVault: (input: UnlockInput) => invoke<VaultStatus>('vault:unlock', input),
   lockVault: () => invoke<VaultStatus>('vault:lock'),
   forgetDevice: () => invoke<VaultStatus>('vault:forget'),
+  getShareRequest: () => invoke<ShareRequestView | null>('share:current'),
+  confirmShare: (input: ShareConfirmInput) => invoke<void>('share:confirm', input),
+  cancelShare: () => invoke<void>('share:cancel'),
+  onShareChanged: (listener) => {
+    const changed = () => listener()
+    ipcRenderer.on('share:changed', changed)
+    return () => { ipcRenderer.removeListener('share:changed', changed) }
+  },
   getSharingState: () => invoke<SharingState>('sharing:state'),
   createLink: (input) => invoke<LinkRecord>('sharing:create-link', input),
   previewLink: (link) => invoke<LinkPreview>('sharing:preview-link', link),
@@ -76,6 +87,22 @@ const api: SctAPI = {
     const changed = () => listener()
     ipcRenderer.on('direct:changed', changed)
     return () => { ipcRenderer.removeListener('direct:changed', changed) }
+  },
+  getWebRtcState: () => invoke<WebRtcState>('webrtc:state'),
+  getWebRtcIce: () => invoke<WebRtcIceConfig>('webrtc:ice'),
+  saveWebRtcIce: (input: WebRtcIceInput) => invoke<WebRtcIceConfig>('webrtc:save-ice', input),
+  previewWebRtcLink: (link: string) => invoke<WebRtcLinkPreview>('webrtc:preview-link', link),
+  createWebRtcOffer: (peerId: string) => invoke<string>('webrtc:create-offer', peerId),
+  acceptWebRtcOffer: (link: string) => invoke<string>('webrtc:accept-offer', link),
+  acceptWebRtcAnswer: (link: string) => invoke<void>('webrtc:accept-answer', link),
+  closeWebRtc: () => invoke<void>('webrtc:close'),
+  sendWebRtc: (input: WebRtcSendInput) => invoke<void>('webrtc:send', input),
+  importWebRtc: (input: WebRtcImportInput) => invoke<DirectImportResult>('webrtc:import', input),
+  verifyWebRtcReceipt: (input: WebRtcReceiptInput) => invoke<TransferReceipt>('webrtc:verify-receipt', input),
+  onWebRtcChanged: (listener) => {
+    const changed = () => listener()
+    ipcRenderer.on('webrtc:changed', changed)
+    return () => { ipcRenderer.removeListener('webrtc:changed', changed) }
   },
   shareDeviceCard: () => invoke<void>('sharing:device-card'),
   copyPairingLink: () => invoke<void>('sharing:copy-pairing-link'),

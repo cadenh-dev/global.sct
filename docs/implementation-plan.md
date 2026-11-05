@@ -283,7 +283,7 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.10 | All | Show the receipt state for each mode in the activity list. Build the UI with the delivery code, so that you can test from two app windows. | `src/renderer/src/SharingView.tsx`, `src/renderer/src/SharingMotion.tsx` |
 | 2.11 | All | Change [docs/sharing.md](sharing.md), [docs/relay.md](relay.md), and [docs/architecture.md](architecture.md) for the three modes. | Docs |
 
-### Status (2026-11-04)
+### Status (2026-11-05)
 
 | Order | Result |
 |---|---|
@@ -291,11 +291,13 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.2 | Done. The main process verifies the relay receipt and maps it to `TransferReceipt` with mode `mailbox`. Each sent row carries the shared receipt state. |
 | 2.3 | Done. Pairing uses a link, a saved file, or a pasted link. The Windows smoke test covers the flow. macOS and Linux are not run here. |
 | 2.4 | Done. Link mode uses `global-sct://import/` and `global-sct://receipt/` links with the current envelope. The link limit is 16,384 characters. A manual receipt link verifies the import. The Link tab and saved records work on all platforms. A two-device check is not done here. |
-| 2.5 | Partly done. The app accepts pairing, import, and receipt links from the OS, validates them, holds one pending link, and fills the matching screen. Windows second-instance routing is verified. Packaged registration and macOS/Linux registration are not run. |
+| 2.5 | Done. The app accepts pairing, import, receipt, and connection links from the OS, validates them, holds one pending link, and fills the matching screen. Windows second-instance routing is verified. Packaged registration and macOS/Linux registration are not run. |
 | 2.6 | Partly done. Hyperswarm Direct sends and verifies a receipt between two Windows app instances. The Windows package includes Hyperswarm and its native closure. macOS/Linux and packaged Direct are not run. |
-| 2.7-2.9 | Open. |
-| 2.10 | Partly done. Relay, Link, and Direct rows show the receipt state. The live relay display is not run. |
-| 2.11 | Open. |
+| 2.7 | Done on Windows. Signed and sealed offer and answer links, the hidden window, chunked transfer, receipt, manual fallback, SDP checks, and the connection deadline work between two app instances. A 60,000-character secret completed an import and receipt. TURN and cross-network checks are not run. |
+| 2.8 | Done. The relay is the Mailbox mode. The send gate, verified relay peers, and explicit server-copy permission guard it. A live relay transfer is not run here. |
+| 2.9 | Done. The **Send** tab selects Direct, WebRTC, Link, or Mailbox from the current sessions. Mailbox needs the permission checkbox. |
+| 2.10 | Done. Relay, Link, Direct, and WebRTC rows show the receipt state. The live relay display is not run. |
+| 2.11 | Done. This document, [sharing](sharing.md), [relay](relay.md), and [architecture](architecture.md) record the three modes and the remaining platform checks. |
 
 A possible shape for the shared types. All names are proposals:
 
@@ -463,6 +465,12 @@ Change the color theme after the other work (C18).
 | 4.4 | C16 | Apply the gate to agent operations that send secrets, including `send_secrets_to`. Keep local metadata and runtime approval unchanged. | `src/main/agent-access.ts` |
 | 4.5 | C18 | Change only the role-token values in the token declarations. Add no literal color outside them. | `src/renderer/src/styles.css` |
 | 4.6 | C18 | Take screenshots of each screen before and after the change. | Docs |
+
+Status (2026-11-05):
+
+- 4.1 to 4.4 are done in the main process. The gate checks the vault passphrase, holds the operation, and releases it once. Link, Direct, WebRTC, Mailbox, AirDrop, and agent `send_secrets_to` use it.
+- 4.5 is done. The new screens use the existing role tokens.
+- 4.6 is open. Screenshots of the new Send, WebRTC, connection-link, receipt, and share-gate states are not taken.
 
 ### Key decisions
 

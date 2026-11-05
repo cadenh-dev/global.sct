@@ -123,6 +123,10 @@ The window shows the operation, project, selected secret names, request ID, and 
 The default deadline is two minutes. A caller can request up to five minutes from submission.
 Refusal, expiry, or disconnection prevents a pending request from receiving approval.
 Approval applies to one request only. It cannot authorize another task or secret selection.
+A `send_secrets_to` request that the user approves then enters the share gate.
+The share dialog shows the recipient, project, and secret names, and asks for the vault passphrase.
+The agent never receives or supplies the passphrase.
+The share gate releases one operation and expires after two minutes.
 
 The agent cannot approve through CLI input, MCP, or a tool response.
 Host approval in an MCP client does not replace the local global.sct decision.
@@ -213,6 +217,7 @@ Exchange cards and complete local pairing on both Macs for sharing in both direc
 
 Sending encrypts the selected secrets for one verified recipient and opens the AirDrop picker.
 The user must choose that same recipient in macOS.
+The agent approval and the share passphrase are two separate local steps.
 `awaiting-transport` does not prove delivery, receipt, or import.
 The recipient accepts the file and imports it through the desktop app.
 

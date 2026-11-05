@@ -31,7 +31,18 @@ See [Agent Access](agent-access.md).
 
 The AirDrop sharing flow encrypts selected secrets for one verified device and sends the file through AirDrop.
 Device pairing uses a device card link or file, so it works on macOS, Windows, and Linux.
-See [sharing](sharing.md). Relay sharing below is the second transport. The **Relay** tab of **Sharing** uses it.
+See [sharing](sharing.md). Relay sharing below is the Mailbox transport. The **Relay** tab of **Sharing** configures it, and the **Send** tab selects it.
+
+## Delivery boundary and share gate
+
+One main-process share gate holds each outgoing operation until the vault passphrase check succeeds.
+The gate stores the project, secret IDs, recipient IDs, mode, deadlines, and access restrictions as a closure.
+The renderer receives a summary only.
+The authorization is consumed before dispatch, is never saved, and expires after two minutes.
+Link, Direct, WebRTC, Mailbox, AirDrop, and agent secret shares use the same gate.
+Receipt acknowledgments and public device cards do not use the gate.
+The envelope, receipt, and import rules stay in the main process.
+See [sharing](sharing.md#confirm-every-share).
 
 ## Direct sharing
 
@@ -40,7 +51,20 @@ The discovery topic is derived from the two verified X25519 keys and the UTC day
 Each connection authenticates both device cards with fresh nonces and Ed25519 signatures before a transfer is offered.
 The main process keeps the encrypted records and the receipt state.
 The renderer receives metadata only.
+Both Direct transports use the same binary framing and the same encrypted envelope and receipt contract.
+An imported Direct transfer writes its completion metadata and encrypted receipt before the app sends the receipt.
+A restart can rebuild the receipt link from that record.
 See [sharing](sharing.md#direct-mode).
+
+WebRTC is the manual Direct path.
+The main process signs and seals one offer link and one answer link for the verified peer.
+A hidden sandboxed window holds the `RTCPeerConnection` and one reliable ordered data channel.
+The visible window receives connection links, route labels, and metadata only.
+The hidden window receives the selected ICE servers and TURN credentials.
+This is the one approved exception to the ciphertext-and-SDP-only boundary.
+TURN credentials stay in the vault's `.internal` area and never go to the visible renderer.
+The main process validates one application section and one SHA-256 DTLS fingerprint before it accepts an SDP.
+See [sharing](sharing.md#webrtc-mode).
 
 ## Link sharing
 
@@ -48,9 +72,10 @@ Link mode encrypts selected secrets for one verified device and encodes the enve
 `global-sct://import/...` string. The recipient imports the link and returns an `global-sct://receipt/...` string.
 The main process keeps the link records in the vault sharing folder.
 The renderer receives the ciphertext links and metadata only.
-The main process also accepts `global-sct://pair/v1/`, `global-sct://import/`, and `global-sct://receipt/` links from the operating system.
-It validates one link, holds it in memory, and opens the matching screen. Nothing imports until the user reviews it.
-The `global-sct://connect/v1/` route is reserved for WebRTC.
+The main process also accepts `global-sct://pair/v1/`, `global-sct://import/`, `global-sct://receipt/`, and
+`global-sct://connect/v1/` links from the operating system.
+It validates one link, holds it in memory, and opens the matching screen. Nothing imports or connects until the user reviews it.
+A connection link decrypts only after the vault unlocks and the sender signature passes.
 See [sharing](sharing.md#link-mode).
 
 ## Mock Wallet cards
@@ -61,6 +86,7 @@ See [mock Wallet cards](wallet-cards.md).
 
 ## Relay sharing (Phase 2)
 
+The user-facing name for relay delivery is Mailbox.
 Cloud-hosted SpacetimeDB stores ciphertext and minimal routing metadata. See [relay setup](relay.md).
 Devices keep pending ciphertext, cached activity, and durable delivery records.
 
