@@ -89,6 +89,22 @@ This proves the TURN configuration, credential storage, relay policy, route labe
 It does not prove public STUN, a remote TURN server, or a cross-network path.
 Those checks need separate network conditions.
 
+## Linux arm64 check (2026-11-05)
+
+An Oracle server ran Ubuntu 24.04 on ARM64.
+The server had Bun 1.4.4, Node 22.18.0, and Xvfb.
+
+- `bun run check`, `bun run typecheck:tsc`, and `bun run react-doctor` passed. React Doctor returned 100/100.
+- `bun run test` passed all 42 tests.
+- `bun run package:linux` produced `dist/global.sct-linux-arm64`.
+- The packaged CLI printed `0.1.0` under Xvfb.
+- The theme UI test passed under Xvfb.
+- The Linux signal test found a real bug. The launcher returned 130 instead of the child exit code 37. Commit `55b99f5` fixes the POSIX signal result.
+
+This covers Linux ARM64 only.
+The Linux x64/glibc release target is still open.
+The portable package needs `chrome-sandbox` owned by root with mode 4755.
+
 ## VS Code host check (2026-11-05)
 
 The Windows host has VS Code 1.143.1.

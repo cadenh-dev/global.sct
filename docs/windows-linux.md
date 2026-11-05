@@ -127,6 +127,36 @@ bun run test:ui
 The Windows and Linux package jobs run on their own check runners. They build unsigned packages only.
 The Playwright tests need a graphical session. The Windows smoke test runs on the Windows check runner.
 
+### Linux arm64 result (2026-11-05)
+
+The Oracle server ran Ubuntu 24.04 on ARM64 with Bun 1.4.4 and Node 22.18.0.
+
+- `bun run check` and `bun run typecheck:tsc` passed.
+- `bun run test` passed all 42 tests.
+- `bun run react-doctor` returned 100/100.
+- `bun run package:linux` produced `dist/global.sct-linux-arm64`.
+- The packaged CLI printed `0.1.0` under Xvfb.
+- The theme UI test passed under Xvfb.
+- The signal test found a real bug: the launcher returned `128 + signal` even when the child handled the signal and exited with its own code. Commit `55b99f5` fixes this. The test now passes on Linux.
+
+The portable Linux package needs this step before it starts:
+
+```sh
+sudo chown root:root chrome-sandbox
+sudo chmod 4755 chrome-sandbox
+```
+
+Without that step, Electron stops with a sandbox helper error. Do not use `--no-sandbox` for a release check.
+
+The server is ARM64. The Linux x64/glibc release target is still open.
+
+Two `app.spec.ts` checks do not pass on this headless server:
+
+- The first test expects the Electron `sandboxed` metric. Linux does not report that field.
+- The second test exceeds the default 30-second timeout.
+
+These are test-platform issues. They do not show a product failure. Do not change the tests without approval.
+
 ### Windows result (2026-11-05)
 
 - `bun run check`, `bun run typecheck:tsc`, `bun run test`, and `bun run build` passed. The unit suite had 39 passes and 3 skips.
