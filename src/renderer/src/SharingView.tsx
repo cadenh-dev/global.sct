@@ -584,7 +584,7 @@ function RelayActivity({ state, projects, busy, run, updateProjects, updateSecre
         {state.sent.length > 0 && <table>
           <caption>Sent transfers</caption>
           <thead><tr><th scope="col">Transfer</th><th scope="col">Recipient</th><th scope="col">Delivery</th>
-            <th scope="col">Delivery deadline</th><th scope="col">Recipient access</th><th scope="col">Remote demo</th>
+            <th scope="col">Receipt</th><th scope="col">Delivery deadline</th><th scope="col">Recipient access</th><th scope="col">Remote demo</th>
             <th scope="col"><span className="sr-only">Delete</span></th></tr></thead>
           <tbody>{state.sent.map((item) => <RelayActivityRow key={`${item.messageId}/${item.recipient}`} item={item} state={state}
             busy={busy} run={run} />)}</tbody>
@@ -810,6 +810,7 @@ function RelayActivityRow({ item, state, busy, run }: { item: RelaySentItem; sta
       <span className="delivery-state" data-state={item.state}>{item.state}</span>
       {item.error && <span className="delivery-error">{item.error}</span>}
     </td>
+    <td>{relayReceiptText(item)}</td>
     <td>{item.deliverBy ? formatTime(item.deliverBy) : 'Not cached'}</td>
     <td>{relayAccessText(item)}</td>
     <td>{usable ? <button type="button" className="secondary" disabled={busy || state.connection !== 'connected'} onClick={() => {
@@ -821,6 +822,13 @@ function RelayActivityRow({ item, state, busy, run }: { item: RelaySentItem; sta
     <td>{relaySentFinished(item) && <DeleteActivity activity={{ kind: 'sent', messageId: item.messageId, peer: item.recipient }}
       label={`Delete transfer ${shortId(item.messageId)}`} busy={busy} run={run} />}</td>
   </tr>
+}
+
+function relayReceiptText(item: RelaySentItem): string {
+  if (item.receiptState.state === 'received') return 'Verified'
+  if (item.receiptState.state === 'pending') return 'Waiting'
+  if (item.receiptState.state === 'expired') return 'Expired'
+  return 'Failed'
 }
 
 function relayAccessText(item: RelaySentItem): string {

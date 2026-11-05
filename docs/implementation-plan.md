@@ -293,7 +293,9 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.4 | Done. Link mode uses `global-sct://import/` and `global-sct://receipt/` links with the current envelope. The link limit is 16,384 characters. A manual receipt link verifies the import. The Link tab and saved records work on all platforms. A two-device check is not done here. |
 | 2.5 | Partly done. The app accepts pairing, import, and receipt links from the OS, validates them, holds one pending link, and fills the matching screen. Windows second-instance routing is verified. Packaged registration and macOS/Linux registration are not run. |
 | 2.6 | Partly done. Hyperswarm Direct sends and verifies a receipt between two Windows app instances. The Windows package includes Hyperswarm and its native closure. macOS/Linux and packaged Direct are not run. |
-| 2.7-2.11 | Open. |
+| 2.7-2.9 | Open. |
+| 2.10 | Partly done. Relay, Link, and Direct rows show the receipt state. The live relay display is not run. |
+| 2.11 | Open. |
 
 A possible shape for the shared types. All names are proposals:
 
