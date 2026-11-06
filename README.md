@@ -12,8 +12,6 @@ Existing installations: follow the [storage migration guide](docs/fork-storage-m
 - **Agent Access.** Coding agents use secrets through a CLI and an MCP server. Each request opens a local approval window. Agents never receive secret values.
 
 
-Demo video: https://youtu.be/kQwLTeVe2OE
-
 This project is a fork of [omavashia2005/.sct](https://github.com/omavashia2005/.sct).
 
 ## Download
