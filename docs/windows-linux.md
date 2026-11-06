@@ -168,7 +168,7 @@ The full x64 suite also passed on CachyOS:
 
 - `bun run check` passed with no errors or warnings.
 - `bun run typecheck:tsc` passed.
-- `bun run test` passed all 42 tests in 15.21 seconds.
+- `bun run test` passed all 42 tests in 15.15 seconds.
 - `bun run react-doctor` returned 100/100.
 
 The Linux x64 release target now has package, unit suite, and Direct P2P evidence.

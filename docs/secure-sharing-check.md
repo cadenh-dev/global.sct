@@ -110,7 +110,7 @@ The CachyOS x64 unit suite passed:
 
 - `bun run check`: no errors or warnings.
 - `bun run typecheck:tsc`: no errors.
-- `bun run test`: 42 passed, 0 failed, in 15.21 seconds.
+- `bun run test`: 42 passed, 0 failed, in 15.15 seconds.
 - `bun run react-doctor`: 100/100.
 
 A CachyOS x64 app and the Windows x64 app completed a Hyperswarm Direct transfer.
