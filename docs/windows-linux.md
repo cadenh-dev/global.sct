@@ -148,9 +148,25 @@ sudo chmod 4755 chrome-sandbox
 
 Without that step, Electron stops with a sandbox helper error. Do not use `--no-sandbox` for a release check.
 
-The server is ARM64. The Linux x64/glibc release target is still open.
+The server is ARM64. The Linux x64/glibc target is checked separately on CachyOS.
 
-Two `app.spec.ts` checks do not pass on this headless server:
+### Linux x64 result (CachyOS, 2026-11-05)
+
+CachyOS x64 is an Arch-based glibc Linux system.
+
+- `bun run package:linux` produced `dist/global.sct-linux-x64`.
+- The packaged app started after the sandbox helper was made root-owned with mode 4755.
+- The CachyOS app paired with the Windows x64 app through the device cards.
+- The Hyperswarm Direct peer came online.
+- Windows sent one synthetic secret. CachyOS imported it into its test project and returned the signed receipt.
+- The Windows app showed `received`.
+- The temporary two-machine test passed in 1.6 minutes. The test files were removed.
+
+The direct WebRTC offer and answer did not connect on that network without STUN or TURN. The local TURN-only check passed on Windows. Public STUN, remote TURN, and cross-network WebRTC remain open.
+
+The full x64 unit suite and `bun run check` were not run on CachyOS. The ARM64 server ran the full suite.
+
+Two `app.spec.ts` checks do not pass on the headless ARM64 server:
 
 - The first test expects the Electron `sandboxed` metric. Linux does not report that field.
 - The second test exceeds the default 30-second timeout.
@@ -169,5 +185,5 @@ These are test-platform issues. They do not show a product failure. Do not chang
 - A temporary two-window Playwright check passed against the live Maincloud relay. The apps connected, registered, paired relay devices, queued a Mailbox transfer, imported it, and returned the signed receipt. The check file was not committed.
 - A temporary two-window WebRTC check passed through a local TURN-only server. The connection showed **Direct via TURN** and completed a transfer and receipt. Public STUN and a remote TURN server are not run.
 - The Windows package includes Hyperswarm and Sodium. The `.node` files are in `app.asar.unpacked`.
-- macOS, Linux x64, public STUN, remote TURN, and cross-network checks are open.
+- macOS, public STUN, remote TURN, and cross-network WebRTC checks are open.
 The existing suite now unlocks the vault, but it still uses macOS and POSIX assumptions. It needs platform gating before it can run on all platforms.

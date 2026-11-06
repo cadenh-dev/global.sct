@@ -102,8 +102,23 @@ The server had Bun 1.4.4, Node 22.18.0, and Xvfb.
 - The Linux signal test found a real bug. The launcher returned 130 instead of the child exit code 37. Commit `55b99f5` fixes the POSIX signal result.
 
 This covers Linux ARM64 only.
-The Linux x64/glibc release target is still open.
+The CachyOS x64 run covers the Linux x64 package and Direct P2P below.
+The full x64 unit suite is still open.
 The portable package needs `chrome-sandbox` owned by root with mode 4755.
+
+## CachyOS x64 Direct P2P (2026-11-05)
+
+A CachyOS x64 app and the Windows x64 app completed a Hyperswarm Direct transfer.
+The two apps paired through the device-card link and compared the same code.
+The Windows app found the CachyOS peer online.
+Windows sent one synthetic secret.
+CachyOS imported it into its test project and returned the signed receipt.
+Windows showed `received`.
+The temporary test passed in 1.6 minutes.
+
+A direct WebRTC offer and answer did not connect on that network without STUN or TURN.
+The TURN-only path passed with a local TURN server on Windows.
+Public STUN, remote TURN, and cross-network WebRTC remain open.
 
 ## VS Code host check (2026-11-05)
 
