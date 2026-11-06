@@ -101,12 +101,17 @@ The server had Bun 1.4.4, Node 22.18.0, and Xvfb.
 - The theme UI test passed under Xvfb.
 - The Linux signal test found a real bug. The launcher returned 130 instead of the child exit code 37. Commit `55b99f5` fixes the POSIX signal result.
 
-This covers Linux ARM64 only.
-The CachyOS x64 run covers the Linux x64 package and Direct P2P below.
-The full x64 unit suite is still open.
+The CachyOS x64 run covers the Linux x64 package, the full unit suite, and Direct P2P below.
 The portable package needs `chrome-sandbox` owned by root with mode 4755 when unprivileged user namespaces are disabled. CachyOS had them enabled, so it did not need the setuid step.
 
 ## CachyOS x64 Direct P2P (2026-11-05)
+
+The CachyOS x64 unit suite passed:
+
+- `bun run check`: no errors or warnings.
+- `bun run typecheck:tsc`: no errors.
+- `bun run test`: 42 passed, 0 failed, in 15.21 seconds.
+- `bun run react-doctor`: 100/100.
 
 A CachyOS x64 app and the Windows x64 app completed a Hyperswarm Direct transfer.
 The two apps paired through the device-card link and compared the same code.

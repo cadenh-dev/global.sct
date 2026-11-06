@@ -164,7 +164,14 @@ CachyOS x64 is an Arch-based glibc Linux system.
 
 The direct WebRTC offer and answer did not connect on that network without STUN or TURN. The local TURN-only check passed on Windows. Public STUN, remote TURN, and cross-network WebRTC remain open.
 
-The full x64 unit suite and `bun run check` were not run on CachyOS. The ARM64 server ran the full suite.
+The full x64 suite also passed on CachyOS:
+
+- `bun run check` passed with no errors or warnings.
+- `bun run typecheck:tsc` passed.
+- `bun run test` passed all 42 tests in 15.21 seconds.
+- `bun run react-doctor` returned 100/100.
+
+The Linux x64 release target now has package, unit suite, and Direct P2P evidence.
 
 Two `app.spec.ts` checks do not pass on the headless ARM64 server:
 
