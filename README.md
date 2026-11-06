@@ -14,6 +14,8 @@ Existing installations: follow the [storage migration guide](docs/fork-storage-m
 
 Demo video: https://youtu.be/kQwLTeVe2OE
 
+This project is a fork of [omavashia2005/.sct](https://github.com/omavashia2005/.sct).
+
 ## Download
 
 Releases use versioned Git tags such as `v0.1.0-beta.1`. They are unsigned beta builds until signing is available.
