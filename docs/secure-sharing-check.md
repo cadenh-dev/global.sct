@@ -104,7 +104,7 @@ The server had Bun 1.4.4, Node 22.18.0, and Xvfb.
 This covers Linux ARM64 only.
 The CachyOS x64 run covers the Linux x64 package and Direct P2P below.
 The full x64 unit suite is still open.
-The portable package needs `chrome-sandbox` owned by root with mode 4755.
+The portable package needs `chrome-sandbox` owned by root with mode 4755 when unprivileged user namespaces are disabled. CachyOS had them enabled, so it did not need the setuid step.
 
 ## CachyOS x64 Direct P2P (2026-11-05)
 

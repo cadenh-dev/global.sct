@@ -146,7 +146,7 @@ sudo chown root:root chrome-sandbox
 sudo chmod 4755 chrome-sandbox
 ```
 
-Without that step, Electron stops with a sandbox helper error. Do not use `--no-sandbox` for a release check.
+Without that step, Electron stops with a sandbox helper error when unprivileged user namespaces are disabled. Do not use `--no-sandbox` for a release check. CachyOS had unprivileged user namespaces enabled, so it did not need the setuid step.
 
 The server is ARM64. The Linux x64/glibc target is checked separately on CachyOS.
 
@@ -155,7 +155,7 @@ The server is ARM64. The Linux x64/glibc target is checked separately on CachyOS
 CachyOS x64 is an Arch-based glibc Linux system.
 
 - `bun run package:linux` produced `dist/global.sct-linux-x64`.
-- The packaged app started after the sandbox helper was made root-owned with mode 4755.
+- The packaged app started under Wayland with unprivileged user namespaces. The setuid sandbox step was not needed on this system.
 - The CachyOS app paired with the Windows x64 app through the device cards.
 - The Hyperswarm Direct peer came online.
 - Windows sent one synthetic secret. CachyOS imported it into its test project and returned the signed receipt.
