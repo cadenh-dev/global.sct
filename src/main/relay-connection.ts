@@ -1,12 +1,10 @@
-import { AsyncEntry } from '@napi-rs/keyring'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { watch } from 'node:fs'
 import type { FSWatcher } from 'node:fs'
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Identity, Timestamp } from 'spacetimedb'
 import { DbConnection } from './relay'
-import { decodeFile, encodeFile, open, seal } from './seal'
 import { clockSkew, deliveryLimit, readTransfer } from './envelope'
 import type { RelayPeerKeys, SealedTransfer } from './envelope'
 import type { RelayTransferPreview, Sharing } from './sharing'
@@ -14,13 +12,21 @@ import { readDeviceCard, relayPairingCode } from './transfer'
 import type { DeviceCard } from './transfer'
 import type { SecretMetadata } from '../shared/secrets'
 import type { GrantCleanupOutcome, Vault } from './vault'
-import type { RelayMessageKind, RelayTaskOutcome } from '../shared/envelope'
+import type { RelayMessageKind } from '../shared/envelope'
 import { relayInboxFinished, relaySentFinished, relayTaskFinished } from '../shared/relay'
-import type { RelayAcceptInput, RelayActivityKey, RelayConnection, RelayDeliveryState, RelayInboxItem, RelayPeer, RelayQueueInput,
+import type { RelayActivityKey, RelayConnection, RelayDeliveryState, RelayInboxItem, RelayPeer,
   RelaySentItem, RelayState, RelayTaskDecision, RelayTaskItem } from '../shared/relay'
+import type { RelayTaskOutcome } from '../shared/envelope'
 import type { TransferReceipt } from '../shared/transport'
 import type { ShareSummary } from '../shared/share'
 import { relayReceiptState } from './transport'
+import { RelayCache } from './relay-cache'
+import type { SealedName } from './relay-cache'
+import type { CachedInboxItem, CachedPeer, CachedSentItem, Cache, CachedExpiryNotice, Pin } from './relay-cache'
+import type { OutboundTransfer, ReceivedTransfer, ReceivedTask, ReceivedResult, TaskRequest, PendingResult } from './relay-tasks'
+import { openReceivedResult, openReceivedTask, taskApprovalPeriod, taskRefusal } from './relay-tasks'
+import { requireAcceptInput, requireActivityKey, requireConfirmation, requireMessageId, requirePairId,
+  requireQueueInput, requireTaskDecision } from './relay-input'
 
 export interface RelayServer {
   uri: string
@@ -39,72 +45,14 @@ export interface RelayWriter {
   cleanupGrants: () => Promise<GrantCleanupOutcome[]>
 }
 
-interface CachedPeer {
-  pairId: string
-  identity: string
-  initiator: string
-  name: string
-  status: RelayPeer['status']
-  encryptionPublicKey: string
-  signingPublicKey: string
-}
 
-interface CachedSentItem {
-  messageId: string
-  recipient: string
-  status: 'Pending' | 'Received'
-  deliverBy: string
-  receivedAt: string | null
-  receipt: string | null
-}
-
+const liveServer: RelayServer = { uri: 'https://maincloud.spacetimedb.com', database: 'sct-relay' }
+const emptyCache: Cache = { identity: null, updatedAt: null, peers: [], inbox: [], sent: [], expiryNotices: [] }
+const retentionPeriod = 30 * 24 * 60 * 60 * 1000
+const pendingUnchanged: PendingResult = { changed: false, failed: false }
+const pendingChanged: PendingResult = { changed: true, failed: false }
+const pendingFailed: PendingResult = { changed: true, failed: true }
 type VerifiedReceipt = { receipt: TransferReceipt; error: null } | { receipt: null; error: string }
-
-interface CachedInboxItem {
-  messageId: string
-  sender: string
-  createdAt: string
-  deliverBy: string
-  payload: string
-  wrappedKey: string
-}
-
-interface CachedExpiryNotice {
-  id: string
-  correlationId: string
-  sender: string
-  notice: string
-  createdAt: string
-  retainUntil: string
-}
-
-// The cache keeps the relay rows of the last connection. Inbox payloads and wrapped keys stay ciphertext.
-interface Cache {
-  identity: string | null
-  updatedAt: string | null
-  peers: CachedPeer[]
-  inbox: CachedInboxItem[]
-  sent: CachedSentItem[]
-  expiryNotices: CachedExpiryNotice[]
-}
-
-// Transfers, tasks, and results use the same outbox, retries, and deadlines.
-interface OutboundTransfer {
-  messageId: string
-  kind: RelayMessageKind
-  // Tasks only: the transfer whose grant the task uses, and the approval deadline.
-  grantId: string | null
-  approveBy: number | null
-  // Results only: the task that the result answers.
-  taskId: string | null
-  recipient: string
-  createdAt: number
-  deliverBy: number
-  payload: string
-  wrappedKey: string
-  accessExpiresAt: number | null
-  error: string | null
-}
 
 interface OutboundExpiryNotice {
   id: string
@@ -117,96 +65,6 @@ interface OutboundExpiryNotice {
   error: string | null
 }
 
-interface ReceivedTransfer {
-  messageId: string
-  digest: string
-  sender: string
-  createdAt: string
-  deliverBy: number
-  projectName: string
-  secretNames: string[]
-  accessExpiresAt: number | null
-  injectionOnly: boolean
-  destinationProjectId: string
-  receivedAt: number | null
-  secrets: SecretMetadata[]
-  receipt: string | null
-  complete: boolean
-  acknowledged: boolean
-  error: string | null
-}
-
-// claimed: the approved run started. A claim without an outcome after a restart becomes uncertain.
-type ReceivedTaskState = 'awaiting-approval' | 'claimed' | RelayTaskOutcome
-
-interface ReceivedTask {
-  messageId: string
-  digest: string
-  sender: string
-  createdAt: string
-  deliverBy: number
-  grantId: string
-  approveBy: number
-  state: ReceivedTaskState
-  exitCode: number | null
-  secretPresent: boolean | null
-  finishedAt: number | null
-  // Why the task did not complete. The result does not contain this text.
-  reason: string | null
-  // The user reviewed an uncertain outcome, so its result can go to the sender.
-  reviewed: boolean
-  receipt: string
-  acknowledged: boolean
-  // A problem with the delivery receipt or the result. A later pending run tries again.
-  error: string | null
-}
-
-interface ReceivedResult {
-  messageId: string
-  digest: string
-  sender: string
-  deliverBy: number
-  taskId: string
-  status: RelayTaskOutcome
-  exitCode: number | null
-  secretPresent: boolean | null
-  finishedAt: number
-  receipt: string
-  acknowledged: boolean
-  error: string | null
-}
-
-// A task request from an agent session. The desktop app seals it into the outbox and then deletes the file.
-interface TaskRequest {
-  id: string
-  grantId: string
-  createdAt: number
-  approveBy: number
-}
-
-interface PendingResult {
-  changed: boolean
-  failed: boolean
-}
-
-// The keys of a peer at the time both users compared the pairing code.
-interface Pin {
-  identity: string
-  encryptionKey: string
-  signingKey: string
-}
-
-const liveServer: RelayServer = { uri: 'https://maincloud.spacetimedb.com', database: 'sct-relay' }
-const magic = Buffer.from('SCR1')
-const emptyCache: Cache = { identity: null, updatedAt: null, peers: [], inbox: [], sent: [], expiryNotices: [] }
-const retentionPeriod = 30 * 24 * 60 * 60 * 1000
-const pendingUnchanged: PendingResult = { changed: false, failed: false }
-const pendingChanged: PendingResult = { changed: true, failed: false }
-const pendingFailed: PendingResult = { changed: true, failed: true }
-// A remote task waits up to this long for local approval.
-const taskApprovalPeriod = 24 * 60 * 60 * 1000
-type SealedName = 'cache' | 'peers' | 'outbox' | 'received' | 'notices' | 'tasks' | 'results' | 'hidden'
-
 // SCT_RELAY=off turns the relay off. SCT_RELAY=<server URL>/<database> selects another relay, such as a local test server.
 export function relayServer(setting = process.env.SCT_RELAY): RelayServer | undefined {
   if (setting === 'off') return undefined
@@ -218,6 +76,7 @@ export function relayServer(setting = process.env.SCT_RELAY): RelayServer | unde
 }
 
 export class Relay {
+  private readonly sealed: RelayCache
   private connection: DbConnection | undefined
   private cache: Cache = emptyCache
   private outbox: OutboundTransfer[] = []
@@ -243,13 +102,14 @@ export class Relay {
   private saving: Promise<void> = Promise.resolve()
   private pending: Promise<void> = Promise.resolve()
 
-  constructor(private readonly server: RelayServer | undefined, private readonly directory: string,
+  constructor(private readonly server: RelayServer | undefined, directory: string,
     private readonly crypto: () => Promise<RelayCrypto>,
     private readonly changed: () => void,
     private readonly vault: Vault,
     private readonly writer?: RelayWriter,
-    private readonly service = '.sct-relay') {
+    service = '.sct-relay') {
     this.status = server ? 'connecting' : 'off'
+    this.sealed = new RelayCache(() => this.serverName(), directory, vault, service)
   }
 
   async start(): Promise<void> {
@@ -290,8 +150,8 @@ export class Relay {
     await beforeRequests?.()
     if (this.writer) {
       // Agent sessions add request files while the app runs.
-      await mkdir(this.requestDirectory(), { recursive: true, mode: 0o700 })
-      this.watcher = watch(this.requestDirectory(), () => { void this.importRequests() })
+      await mkdir(this.sealed.requestDirectory(), { recursive: true, mode: 0o700 })
+      this.watcher = watch(this.sealed.requestDirectory(), () => { void this.importRequests() })
       await this.importRequests()
     }
     void this.connect()
@@ -360,16 +220,7 @@ export class Relay {
     const request = { id: randomUUID(), grantId: requireMessageId(grantId), createdAt: now, approveBy: now + taskApprovalPeriod }
     await this.load()
     await this.grantRecipient(request.grantId)
-    const file = join(this.requestDirectory(), `${request.id}.sct`)
-    await mkdir(this.requestDirectory(), { recursive: true, mode: 0o700 })
-    const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
-    const key = await this.sealedKey('requests')
-    try {
-      await writeFile(temporary, encodeFile(magic, seal(key, Buffer.from(JSON.stringify(request)), this.requestData(request.id))), { mode: 0o600 })
-      await rename(temporary, file)
-    } finally {
-      key.fill(0)
-    }
+    await this.sealed.writeRequest(request)
     return request.id
   }
 
@@ -380,7 +231,7 @@ export class Relay {
       const remaining: Relay['requests'] = []
       let requests: TaskRequest[]
       try {
-        requests = await this.readRequests()
+        requests = await this.sealed.readRequests()
       } catch (error) {
         this.error = `Cannot read the agent task requests. ${message(error)}`
         this.changed()
@@ -390,7 +241,7 @@ export class Relay {
         try {
           if (request.approveBy <= Date.now()) throw new Error('The approval deadline passed before the app could send this task.')
           await this.queueTaskRequest(request)
-          await rm(join(this.requestDirectory(), `${request.id}.sct`), { force: true })
+          await rm(join(this.sealed.requestDirectory(), `${request.id}.sct`), { force: true })
         } catch (error) {
           remaining.push({ request, error: message(error) })
         }
@@ -674,7 +525,7 @@ export class Relay {
     if (this.writer && token !== savedToken) {
       const bytes = Buffer.from(token)
       try {
-        await this.vault.writeInternal(this.tokenName(), bytes)
+        await this.vault.writeInternal(this.sealed.tokenName(), bytes)
       } catch (error) {
         this.error = `Cannot save the relay token. This device gets a new relay identity at the next start. ${message(error)}`
         this.changed()
@@ -989,33 +840,14 @@ export class Relay {
   private async openTask(identity: string, incoming: CachedInboxItem): Promise<ReceivedTask> {
     const [crypto, sender] = await Promise.all([this.crypto(), this.verifiedPeer(incoming.sender)])
     const receivedAt = Date.now()
-    const opened = await crypto.openRelayMessage(identity, sender, 'task', Buffer.from(incoming.payload, 'base64'),
-      Buffer.from(incoming.wrappedKey, 'base64'))
-    const refusal = taskRefusal(this.received.find((item) => item.messageId === opened.contents.grantId),
-      sender.identity, opened.contents.approveBy, receivedAt)
-    return {
-      messageId: incoming.messageId, digest: opened.digest, sender: sender.identity, createdAt: incoming.createdAt,
-      deliverBy: opened.transfer.deliverBy, grantId: opened.contents.grantId, approveBy: opened.contents.approveBy,
-      state: refusal?.state ?? 'awaiting-approval', exitCode: null, secretPresent: null,
-      finishedAt: refusal ? receivedAt : null, reason: refusal?.reason ?? null, reviewed: false,
-      receipt: (await crypto.sealRelayMessageReceipt(identity, sender, opened.transfer, receivedAt)).toString('base64'),
-      acknowledged: false, error: null
-    }
+    return openReceivedTask(identity, incoming, crypto, sender,
+      (grantId) => this.received.find((item) => item.messageId === grantId), receivedAt)
   }
 
   private async openResult(identity: string, incoming: CachedInboxItem): Promise<ReceivedResult> {
     const [crypto, sender] = await Promise.all([this.crypto(), this.verifiedPeer(incoming.sender)])
-    const opened = await crypto.openRelayMessage(identity, sender, 'result', Buffer.from(incoming.payload, 'base64'),
-      Buffer.from(incoming.wrappedKey, 'base64'))
-    if (!this.outbox.some((item) => item.kind === 'task' && item.messageId === opened.contents.taskId && item.recipient === sender.identity)) {
-      throw new Error('This result answers no task that this device sent to that device.')
-    }
-    return {
-      messageId: incoming.messageId, digest: opened.digest, sender: sender.identity, deliverBy: opened.transfer.deliverBy,
-      ...opened.contents,
-      receipt: (await crypto.sealRelayMessageReceipt(identity, sender, opened.transfer, Date.now())).toString('base64'),
-      acknowledged: false, error: null
-    }
+    return openReceivedResult(identity, incoming, crypto, sender,
+      (taskId, recipient) => this.outbox.some((item) => item.kind === 'task' && item.messageId === taskId && item.recipient === recipient))
   }
 
   // Each outcome gets one result with one ID. Retries publish that same result.
@@ -1160,7 +992,7 @@ export class Relay {
       this.readSealed<{ pins: Pin[] }>('peers', { pins: [] }),
       // An unreadable list shows every row again.
       this.readSealed<{ keys: string[] }>('hidden', { keys: [] }),
-      this.readRequests()
+      this.sealed.readRequests()
     ])
     // Files from earlier versions contain transfers only.
     this.outbox = outbox.transfers.map((transfer) => ({ ...transfer, kind: transfer.kind ?? 'transfer', grantId: transfer.grantId ?? null,
@@ -1231,43 +1063,6 @@ export class Relay {
     return items.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
   }
 
-  private async readRequests(): Promise<TaskRequest[]> {
-    let names: string[]
-    try {
-      names = await readdir(this.requestDirectory())
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
-      throw error
-    }
-    const key = await this.sealedKey('requests')
-    try {
-      const requests = await Promise.all(names.map(async (name): Promise<TaskRequest | null> => {
-        const id = /^([0-9a-f-]{36})\.sct$/.exec(name)?.[1]
-        if (!id) return null
-        try {
-          const sealed = decodeFile(magic, await readFile(join(this.requestDirectory(), name)))
-          // The authenticated data contains the ID, so a renamed file does not open.
-          const request: unknown = sealed && JSON.parse(open(key, sealed, this.requestData(id)).toString('utf8'))
-          return isTaskRequest(request) && request.id === id ? request : null
-        } catch {
-          // A file that does not open did not come from this app. It cannot start a task.
-          return null
-        }
-      }))
-      return requests.filter((request): request is TaskRequest => request !== null)
-    } finally {
-      key.fill(0)
-    }
-  }
-
-  private requestDirectory(): string {
-    return join(this.directory, `requests-${createHash('sha256').update(this.serverName()).digest('hex').slice(0, 16)}`)
-  }
-
-  private requestData(id: string): Buffer {
-    return Buffer.from(`relay-request/${this.serverName()}/${id}`)
-  }
-
   private async pruneRetained(now = Date.now()): Promise<void> {
     const outbox = this.outbox.filter((transfer) =>
       Math.max(transfer.deliverBy, transfer.accessExpiresAt ?? 0) + retentionPeriod > now)
@@ -1290,111 +1085,26 @@ export class Relay {
     const results = this.results.filter((result) => result.deliverBy + retentionPeriod > now)
     if (results.length !== this.results.length) await this.saveResults(results)
     for (const { request } of this.requests.filter(({ request }) => request.createdAt + retentionPeriod <= now)) {
-      await rm(join(this.requestDirectory(), `${request.id}.sct`), { force: true })
+      await rm(join(this.sealed.requestDirectory(), `${request.id}.sct`), { force: true })
     }
     this.requests = this.requests.filter(({ request }) => request.createdAt + retentionPeriod > now)
   }
 
-  private async readToken(): Promise<string | undefined> {
-    const saved = await this.vault.readInternal(this.tokenName())
-    if (saved === null) return undefined
-    try { return saved.toString('utf8') } finally { saved.fill(0) }
-  }
-
-  // An unreadable file returns the empty value. The cache refills from the next subscription.
   private async readSealed<T>(name: SealedName, empty: T): Promise<T> {
-    try {
-      const key = await this.sealedKey(name)
-      try {
-        const sealed = decodeFile(magic, await readFile(this.sealedFile(name)))
-        if (!sealed) return empty
-        // GCM authenticates the contents, so only this app can produce them.
-        return JSON.parse(open(key, sealed, this.sealedData(name)).toString('utf8')) as T
-      } finally {
-        key.fill(0)
-      }
-    } catch {
-      return empty
-    }
+    return this.sealed.read(name, empty)
   }
 
   private async writeSealed(name: SealedName, value: unknown): Promise<void> {
-    const key = await this.sealedKey(name)
-    try {
-      const file = this.sealedFile(name)
-      await mkdir(this.directory, { recursive: true, mode: 0o700 })
-      // The app and agent sessions share this folder, so each write uses its own temporary file.
-      const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
-      await writeFile(temporary, encodeFile(magic, seal(key, Buffer.from(JSON.stringify(value)), this.sealedData(name))), { mode: 0o600 })
-      await rename(temporary, file)
-    } finally {
-      key.fill(0)
-    }
+    await this.sealed.write(name, value)
   }
 
-  private async sealedKey(name: SealedName | 'requests'): Promise<Buffer> {
-    const internalName = `relay/cache/${name}/${createHash('sha256').update(this.serverName()).digest('hex')}`
-    const saved = await this.vault.readInternal(internalName)
-    if (saved) return saved
-    return this.moveOldKey(name, internalName)
-  }
-
-  private async moveOldKey(name: SealedName | 'requests', internalName: string): Promise<Buffer> {
-    let oldKey: number[] | null = null
-    try { oldKey = await this.entry(`${name}/${this.serverName()}`).getSecret() } catch { /* The old OS item can be unavailable. */ }
-    if (oldKey) {
-      const key = Buffer.from(oldKey)
-      let returnKey = false
-      try {
-        const existing = await this.vault.writeInternalIfAbsent(internalName, key)
-        if (existing) {
-          key.fill(0)
-          try { await this.entry(`${name}/${this.serverName()}`).deletePassword() } catch { /* The vault copy is already durable. */ }
-          return existing
-        }
-        try { await this.entry(`${name}/${this.serverName()}`).deletePassword() } catch { /* The vault copy is already durable. */ }
-        returnKey = true
-        return key
-      } finally {
-        oldKey.fill(0)
-        if (!returnKey) key.fill(0)
-      }
-    }
-    const key = randomBytes(32)
-    try {
-      const existing = await this.vault.writeInternalIfAbsent(internalName, key)
-      if (existing) {
-        key.fill(0)
-        return existing
-      }
-      return key
-    } catch (error) {
-      key.fill(0)
-      throw error
-    }
-  }
-
-  // Each relay server has its own identity, so each server has its own files. A test server cannot replace the files of the live relay.
-  private sealedFile(name: SealedName): string {
-    return join(this.directory, `${name}-${createHash('sha256').update(this.serverName()).digest('hex').slice(0, 16)}.sct`)
-  }
-
-  private sealedData(name: SealedName): Buffer {
-    return Buffer.from(`relay-${name}/${this.serverName()}`)
+  private async readToken(): Promise<string | undefined> {
+    return this.sealed.readToken()
   }
 
   private serverName(): string {
     const server = requireServer(this.server)
     return `${server.uri}/${server.database}`
-  }
-
-  // The token name stays inside the internal-name grammar. The hash selects one token for each relay server.
-  private tokenName(): string {
-    return `relay/token/${createHash('sha256').update(this.serverName()).digest('hex')}`
-  }
-
-  private entry(account: string): AsyncEntry {
-    return new AsyncEntry(this.service, account)
   }
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -1433,37 +1143,6 @@ function messageKind(payload: string): RelayMessageKind | null {
 function deliveryState(item: OutboundTransfer, sent: CachedSentItem | undefined, receiptError: string | null, now: number): RelayDeliveryState {
   return receiptError ? 'failed' : sent?.status === 'Received' ? 'received' : item.deliverBy <= now ? 'expired'
     : sent ? 'sent' : item.error ? 'failed' : 'queued'
-}
-
-// A task can use only an imported grant from its own sender, before the grant and approval deadlines.
-function taskRefusal(grant: ReceivedTransfer | undefined, sender: string, approveBy: number,
-  now: number): { state: 'refused' | 'expired'; reason: string } | null {
-  if (!grant || !grant.complete || grant.sender !== sender) {
-    return { state: 'refused', reason: 'This task names no imported grant from its sender.' }
-  }
-  if (grant.accessExpiresAt !== null && grant.accessExpiresAt <= now) return { state: 'expired', reason: 'The grant of this task expired.' }
-  if (approveBy <= now) return { state: 'expired', reason: 'The approval deadline passed.' }
-  return null
-}
-
-function requireTaskDecision(value: unknown): RelayTaskDecision {
-  if (typeof value !== 'object' || value === null || !('messageId' in value) || !('digest' in value) || !('decision' in value) ||
-    typeof value.digest !== 'string' || !/^[0-9a-f]{64}$/.test(value.digest) ||
-    (value.decision !== 'approve' && value.decision !== 'refuse' && value.decision !== 'report')) {
-    throw new Error('Select a task and a local decision.')
-  }
-  return { messageId: requireMessageId(value.messageId), digest: value.digest, decision: value.decision }
-}
-
-function requireMessageId(value: unknown): string {
-  if (typeof value !== 'string' || !isMessageId(value)) throw new Error('The message ID is invalid.')
-  return value
-}
-
-function isTaskRequest(value: unknown): value is TaskRequest {
-  return typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string' && isMessageId(value.id) &&
-    'grantId' in value && typeof value.grantId === 'string' && isMessageId(value.grantId) &&
-    'createdAt' in value && Number.isSafeInteger(value.createdAt) && 'approveBy' in value && Number.isSafeInteger(value.approveBy)
 }
 
 function normalizeCache(cache: Cache): Cache {
@@ -1535,54 +1214,6 @@ function activityKey({ kind, messageId, peer }: RelayActivityKey): string {
   return `${kind}/${messageId}/${peer}`
 }
 
-// The caller checks that the key matches a finished row, so this check needs only the field types.
-function requireActivityKey(input: unknown): RelayActivityKey {
-  if (typeof input !== 'object' || input === null || !('kind' in input) || !('messageId' in input) || !('peer' in input) ||
-    (input.kind !== 'inbox' && input.kind !== 'sent' && input.kind !== 'task') ||
-    typeof input.messageId !== 'string' || typeof input.peer !== 'string') {
-    throw new Error('Select a delivery activity row.')
-  }
-  return { kind: input.kind, messageId: input.messageId, peer: input.peer }
-}
-
-function requireConfirmation(input: unknown): { pairId: string; code: string } {
-  if (typeof input !== 'object' || input === null || !('code' in input) || typeof input.code !== 'string' || !('pairId' in input)) {
-    throw new Error('Select a pair and its pairing code.')
-  }
-  return { pairId: requirePairId(input.pairId), code: input.code }
-}
-
-function requirePairId(pairId: unknown): string {
-  if (typeof pairId !== 'string' || !/^[0-9]{1,20}$/.test(pairId)) throw new Error('The pair ID is invalid.')
-  return pairId
-}
-
-function requireQueueInput(value: unknown): RelayQueueInput {
-  if (typeof value !== 'object' || value === null || !('projectId' in value) || typeof value.projectId !== 'string' ||
-    !('secretIds' in value) || !Array.isArray(value.secretIds) || !value.secretIds.every((id) => typeof id === 'string') ||
-    !('recipient' in value) || typeof value.recipient !== 'string' || !/^[0-9a-f]{64}$/.test(value.recipient) ||
-    !('accessExpiresAt' in value) || (value.accessExpiresAt !== null && !Number.isSafeInteger(value.accessExpiresAt)) ||
-    !('injectionOnly' in value) || typeof value.injectionOnly !== 'boolean') {
-    throw new Error('Select a project, secrets, verified recipient, and a valid access deadline.')
-  }
-  return {
-    projectId: value.projectId,
-    secretIds: value.secretIds,
-    recipient: value.recipient,
-    accessExpiresAt: value.accessExpiresAt as number | null,
-    injectionOnly: value.injectionOnly
-  }
-}
-
-function requireAcceptInput(value: unknown): RelayAcceptInput {
-  if (typeof value !== 'object' || value === null || !('messageId' in value) ||
-    typeof value.messageId !== 'string' || !isMessageId(value.messageId) ||
-    !('projectId' in value) || typeof value.projectId !== 'string' || !value.projectId) {
-    throw new Error('Select a relay transfer and a destination project.')
-  }
-  return { messageId: value.messageId, projectId: value.projectId }
-}
-
 function receivedTransfer(incoming: CachedInboxItem, preview: RelayTransferPreview, projectId: string): ReceivedTransfer {
   return {
     messageId: preview.messageId,
@@ -1643,10 +1274,6 @@ function describeReceived(saved: ReceivedTransfer): RelayInboxItem {
     receivedAt: saved.receivedAt === null ? null : new Date(saved.receivedAt).toISOString(),
     error: saved.error
   }
-}
-
-function isMessageId(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)
 }
 
 function requireServer(server: RelayServer | undefined): RelayServer {
