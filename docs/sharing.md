@@ -131,6 +131,7 @@ No signalling server exists.
 
 The offer and answer links are signed and encrypted for the verified peer.
 Each link expires after five minutes.
+Candidate gathering has a 10-second limit. At the limit, the app continues with the candidates that are ready.
 The connection starts within 30 seconds after the answer.
 The app sends framed data in chunks and stops an oversized or incomplete transfer.
 The sender receives the signed receipt over the same data channel.
