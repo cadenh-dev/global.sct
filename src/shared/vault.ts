@@ -1,9 +1,19 @@
-// The vault header holds no secret. The passphrase derives the master key from it.
-export interface VaultHeader {
+// The vault header holds no plaintext secret. Version 2 wraps the master key.
+export type VaultHeader = VaultHeaderV1 | VaultHeaderV2
+
+export interface VaultHeaderV1 {
   version: 1
   kdf: ScryptParams
   salt: string
   verifier: SealedField
+}
+
+export interface VaultHeaderV2 {
+  version: 2
+  kdf: ScryptParams
+  salt: string
+  verifier: SealedField
+  wrappedKey: SealedField
 }
 
 export interface ScryptParams {

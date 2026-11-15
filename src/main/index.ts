@@ -353,6 +353,7 @@ function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
     }
     return status
   })
+  handle('vault:change-passphrase', (input) => vault.changePassphrase(input))
   handle('vault:lock', async () => {
     shareGate?.clear()
     await direct?.stop()

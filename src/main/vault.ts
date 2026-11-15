@@ -1,7 +1,8 @@
 import { writeFileAtomic } from './atomic-write.ts'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { cp, link, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { z } from 'zod/v4'
 import { isProjectName } from './projects.ts'
 import type { ProjectStore } from './projects.ts'
 import type { Project } from '../shared/projects.ts'
@@ -10,7 +11,7 @@ import type { RelayGrant } from '../shared/envelope.ts'
 import type { SealedField, UnlockInput, VaultStatus } from '../shared/vault.ts'
 import type { TransferSecret } from './transfer.ts'
 import { decodeFile, encodeFile, open, seal } from './seal.ts'
-import { createVaultHeader, decodeSealed, deriveMasterKey, encodeSealed, readVaultHeader,
+import { createVaultHeader, createWrappedVaultHeader, decodeSealed, encodeSealed, openMasterKey, readVaultHeader,
   verifyPassphrase as checkPassphrase, writeVaultHeader } from './vault-header.ts'
 import type { SecretStore } from './key-store.ts'
 
@@ -25,6 +26,10 @@ const cleanupFileName = 'grant-cleanup.sct'
 const internalDirectoryName = '.internal'
 const cleanupData = Buffer.from('grant-cleanup')
 const minimumPassphraseLength = 8
+const passphraseChangeSchema = z.object({
+  currentPassphrase: z.string().min(1).max(1024),
+  nextPassphrase: z.string().min(1).max(1024)
+})
 
 interface StoredSecret {
   id: string
@@ -93,19 +98,29 @@ export class Vault {
       const file = this.headerFile()
       const saved = await readVaultHeader(file)
       if (saved) {
-        const masterKey = await deriveMasterKey(passphrase, saved.kdf, saved.salt)
-        if (!checkPassphrase(masterKey, saved)) {
-          masterKey.fill(0)
-          throw new Error('The passphrase is not correct. Try again.')
+        const masterKey = await openMasterKey(passphrase, saved)
+        let keepMasterKey = false
+        try {
+          if (!checkPassphrase(masterKey, saved)) throw new Error('The passphrase is not correct. Try again.')
+          if (saved.version === 1) await writeVaultHeader(file, await createWrappedVaultHeader(passphrase, masterKey))
+          this.setMasterKey(masterKey)
+          keepMasterKey = true
+        } finally {
+          if (!keepMasterKey) masterKey.fill(0)
         }
-        this.setMasterKey(masterKey)
       } else {
         if (passphrase.length < minimumPassphraseLength) {
           throw new Error(`Use a passphrase of at least ${minimumPassphraseLength} characters.`)
         }
         const { header, masterKey } = await createVaultHeader(passphrase)
-        await writeVaultHeader(file, header)
-        this.setMasterKey(masterKey)
+        let keepMasterKey = false
+        try {
+          await writeVaultHeader(file, header)
+          this.setMasterKey(masterKey)
+          keepMasterKey = true
+        } finally {
+          if (!keepMasterKey) masterKey.fill(0)
+        }
       }
       if (remember && !(await this.store.available())) {
         this.setMasterKey(null)
@@ -134,13 +149,18 @@ export class Vault {
       if (!header) return false
       const stored = await this.store.read()
       if (!stored) return false
-      if (!checkPassphrase(stored, header)) {
-        stored.fill(0)
-        await this.store.clear()
-        return false
+      let keepStored = false
+      try {
+        if (!checkPassphrase(stored, header)) {
+          await this.store.clear()
+          return false
+        }
+        this.setMasterKey(stored)
+        keepStored = true
+        return true
+      } finally {
+        if (!keepStored) stored.fill(0)
       }
-      this.setMasterKey(stored)
-      return true
     })
   }
 
@@ -151,11 +171,32 @@ export class Vault {
       if (typeof input !== 'string' || input.length === 0 || input.length > 1024) throw new Error('Enter your vault passphrase.')
       const header = await readVaultHeader(this.headerFile())
       if (!header) throw new Error('The vault header is unavailable. Unlock the vault and try again.')
-      const masterKey = await deriveMasterKey(input, header.kdf, header.salt)
+      const masterKey = await openMasterKey(input, header)
       try {
         if (!checkPassphrase(masterKey, header)) throw new Error('The passphrase is not correct. Try again.')
       } finally {
         masterKey.fill(0)
+      }
+    })
+  }
+
+  changePassphrase(input: unknown): Promise<void> {
+    return this.serialize(async () => {
+      const { currentPassphrase, nextPassphrase } = requirePassphraseChange(input)
+      const currentKey = this.requireKey()
+      const header = await readVaultHeader(this.headerFile())
+      if (!header) throw new Error('The vault header is unavailable. Unlock the vault and try again.')
+      const openedKey = await openMasterKey(currentPassphrase, header)
+      try {
+        if (!timingSafeEqual(openedKey, currentKey) || !checkPassphrase(openedKey, header)) {
+          throw new Error('The passphrase is not correct. Try again.')
+        }
+        if (nextPassphrase.length < minimumPassphraseLength) {
+          throw new Error(`Use a new passphrase of at least ${minimumPassphraseLength} characters.`)
+        }
+        await writeVaultHeader(this.headerFile(), await createWrappedVaultHeader(nextPassphrase, currentKey))
+      } finally {
+        openedKey.fill(0)
       }
     })
   }
@@ -577,14 +618,16 @@ export class Vault {
   private async readStatus(): Promise<VaultStatus> {
     const [header, rememberAvailable] = await Promise.all([readVaultHeader(this.headerFile()), this.store.available()])
     const remembered = rememberAvailable ? await this.store.read() : null
-    const status = {
-      initialized: header !== null,
-      locked: this.masterKey === null,
-      rememberAvailable,
-      rememberEnabled: remembered !== null
+    try {
+      return {
+        initialized: header !== null,
+        locked: this.masterKey === null,
+        rememberAvailable,
+        rememberEnabled: remembered !== null
+      }
+    } finally {
+      remembered?.fill(0)
     }
-    remembered?.fill(0)
-    return status
   }
 
   private headerFile(): string {
@@ -863,6 +906,12 @@ function requireUnlockInput(input: unknown): UnlockInput {
   }
   if (typeof remember !== 'boolean') throw new Error('Choose whether to remember this device.')
   return { passphrase, remember }
+}
+
+function requirePassphraseChange(input: unknown): { currentPassphrase: string; nextPassphrase: string } {
+  const parsed = passphraseChangeSchema.safeParse(input)
+  if (!parsed.success) throw new Error('Enter your current passphrase and a new passphrase.')
+  return parsed.data
 }
 
 function requireSecretInput(input: unknown): { projectId: string; name: string; value: string } {

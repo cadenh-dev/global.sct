@@ -37,6 +37,11 @@ export interface ProtocolStatus {
   detail: string
 }
 
+export interface ChangePassphraseInput {
+  currentPassphrase: string
+  nextPassphrase: string
+}
+
 export interface SctAPI extends SharingAPI, RelayAPI, AgentAPI, CardsAPI, DirectAPI, WebRtcAPI, ShareAPI {
   platform: SctPlatform
   // The variant at window creation. onThemeChanged reports later changes.
@@ -63,6 +68,7 @@ export interface SctAPI extends SharingAPI, RelayAPI, AgentAPI, CardsAPI, Direct
   chooseVaultLocation: () => Promise<string | null>
   getVaultStatus: () => Promise<VaultStatus>
   unlockVault: (input: UnlockInput) => Promise<VaultStatus>
+  changePassphrase: (input: ChangePassphraseInput) => Promise<void>
   lockVault: () => Promise<VaultStatus>
   forgetDevice: () => Promise<VaultStatus>
 }
