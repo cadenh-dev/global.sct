@@ -4,6 +4,7 @@
 - A physical iPhone test must confirm that Wallet accepts a pass sent through AirDrop. [Wallet cards](wallet-cards.md#known-risk)
 - Factory integration remains open. [Architecture](architecture.md#post-mvp)
 - The Windows and Linux packages still need signing. [README](../README.md#known-limitations)
+- A Mac test must confirm the package that `bun run package:mac` signs with the `global.sct Development` identity. CI covers only the ad-hoc signature. [macOS signing](macos-signing.md#ci-release-builds)
 - The Windows caller check does not pin a certificate thumbprint. [README](../README.md#known-limitations)
 - A direct Windows MCP client cannot start `sct.cmd`. [README](../README.md#known-limitations)
 - The Windows Playwright suite still has macOS and POSIX assumptions. [Windows and Linux](windows-linux.md)
