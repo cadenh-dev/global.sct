@@ -136,7 +136,7 @@ Rules:
 - The Windows and Linux packages are unsigned. Signing waits on D12 and D13.
 - The Windows caller check uses the Authenticode signer and product metadata. It does not pin a certificate thumbprint yet.
 - A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
-- The existing Playwright suite now unlocks the vault, but it still uses macOS and POSIX assumptions. `tests/platform.spec.ts` is the Windows smoke test.
+- The Windows check runner runs the Playwright suite. It excludes the test `manages secrets per project without rendering stored values`, as the Linux job and the macOS job do.
 
 ## Docs
 
