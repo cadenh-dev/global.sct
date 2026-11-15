@@ -170,6 +170,7 @@ The server exposes the operations above as tools.
 It also exposes each workflow as a prompt with the operation name and a Markdown resource at `global-sct://skills/<operation>`.
 MCP `run_demo` requires a saved `secretId`. MCP does not accept a plaintext credential value.
 See [the Claude Code demo project](../examples/claude-code/README.md) for a configuration that allows only the `sct` server.
+See [the Factory Droid demo project](../examples/factory/README.md) for a Droid configuration that loads `list_secrets`, `describe_secret`, and `run_demo` only. No Droid run has confirmed it.
 Claude Code permission decisions apply first. Each allowed call still requires the local global.sct decision.
 PR #48 checked discovery, approval, refusal, expiry, reused approvals, rejected inputs, and transcripts through Claude Code 2.1.287.
 

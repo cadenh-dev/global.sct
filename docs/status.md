@@ -2,7 +2,7 @@
 
 - The vault has no retry limit or delay after a failed unlock. [Storage design](storage-design.md#7-decisions-and-remaining-questions)
 - A physical iPhone test must confirm that Wallet accepts a pass sent through AirDrop. [Wallet cards](wallet-cards.md#known-risk)
-- Factory integration remains open. [Architecture](architecture.md#post-mvp)
+- A Droid run must confirm the Factory demo project. [Factory Droid demo project](../examples/factory/README.md)
 - The Windows and Linux packages still need signing. [README](../README.md#known-limitations)
 - The Windows caller check does not pin a certificate thumbprint. [README](../README.md#known-limitations)
 - A direct Windows MCP client cannot start `sct.cmd`. [README](../README.md#known-limitations)

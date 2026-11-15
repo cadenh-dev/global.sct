@@ -95,4 +95,4 @@ These terms describe Phase 2 relay delivery and the remote demo tasks of issue #
 
 **Redaction** — Deleting recognized secret values from output. It does not make arbitrary output safe.
 
-**Droid** — Factory's coding agent. Its integration is post-MVP work in #23.
+**Droid** — Factory's coding agent. Its integration is post-MVP work in #23. See the [Factory Droid demo project](../examples/factory/README.md).
