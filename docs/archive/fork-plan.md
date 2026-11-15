@@ -29,14 +29,14 @@ The chat has 12 pages and 10 user prompts.
 
 | Proposal | Evidence in this repository |
 |---|---|
-| Secrets never enter the project folder. | `sct run` builds the child environment in [`launch.ts`](../src/main/launch.ts). |
-| Each secret value has its own Keychain key. | [`vault.ts`](../src/main/vault.ts) creates one key for each value, and one file key for each project. |
+| Secrets never enter the project folder. | `sct run` builds the child environment in [`launch.ts`](../../src/main/launch.ts). |
+| Each secret value has its own Keychain key. | [`vault.ts`](../../src/main/vault.ts) creates one key for each value, and one file key for each project. |
 | A project read starts one Keychain read for each value. | `withProjectSecrets` starts all reads together with `Promise.allSettled`. |
-| The caller check uses macOS tools. | [`caller.ts`](../src/main/caller.ts) runs `/bin/ps` and `/usr/bin/codesign`. |
-| The build and the CLI install are macOS-only. | [`install-cli.ts`](../scripts/install-cli.ts) writes a POSIX script to `~/.local/bin`. The package path contains `global.sct-darwin-${process.arch}`. |
+| The caller check uses macOS tools. | [`caller.ts`](../../src/main/caller.ts) runs `/bin/ps` and `/usr/bin/codesign`. |
+| The build and the CLI install are macOS-only. | [`install-cli.ts`](../../scripts/install-cli.ts) writes a POSIX script to `~/.local/bin`. The package path contains `global.sct-darwin-${process.arch}`. |
 | AirDrop is macOS-only. | `native/airdrop.swift` compiles with `swiftc` in the `build:airdrop` script. |
-| The relay is a central service. | `packages/relay` and [`relay-connection.ts`](../src/main/relay-connection.ts) use SpacetimeDB Maincloud. |
-| Agent approval opens a local window. | [`mcp.ts`](../src/main/mcp.ts) and [`agent-access.ts`](../src/main/agent-access.ts) use the approval window. |
+| The relay is a central service. | `packages/relay` and [`relay-connection.ts`](../../src/main/relay-connection.ts) use SpacetimeDB Maincloud. |
+| Agent approval opens a local window. | [`mcp.ts`](../../src/main/mcp.ts) and [`agent-access.ts`](../../src/main/agent-access.ts) use the approval window. |
 | The project has 10 agent skills. | `skills/` holds 10 folders. |
 
 ## Proposals that are wrong
@@ -45,7 +45,7 @@ These statements in the chat do not match the code.
 Correct the record before you plan work.
 
 1. **"`seal.ts` talks to the macOS Keychain to wrap the keys."**
-   [`seal.ts`](../src/main/seal.ts) holds AES-256-GCM helpers only.
+   [`seal.ts`](../../src/main/seal.ts) holds AES-256-GCM helpers only.
    It imports `node:crypto` and nothing else.
 
 2. **"The vault uses the macOS `security` CLI."**
@@ -148,7 +148,7 @@ These values do:
 | Link scheme | `global-sct://` | Pairing, transfer, receipt, and MCP resource encoders |
 
 The fork now uses a separate identity. This replaces the earlier D5 and D19 decisions to retain the upstream identity.
-Use the [explicit migration](fork-storage-migration.md) to preserve an existing vault and its project records.
+Use the [explicit migration](../fork-storage-migration.md) to preserve an existing vault and its project records.
 
 ## Recorded decisions
 
@@ -169,7 +169,7 @@ Use the [explicit migration](fork-storage-migration.md) to preserve an existing 
 | 2026-11-04 | Use versioned Git tags and unsigned beta releases until signing is available | D13 is closed. D12 is deferred |
 | 2026-11-04 | Close Q7, D6, D7, D8, D14, D15, and the C12 form | The link uses the current envelope. The transport order is Link, Hyperswarm, WebRTC. The extension uses the CLI only. The theme has two variants. See [docs/implementation-plan.md](implementation-plan.md#7-cross-phase-decision-summary) |
 | 2026-11-04 | Theme setting: Light (Cream), Dark (Terminal), or System. Cream is the default | Q12 is closed. The setting is an Appearance section on the Storage page. AGENTS.md lists both variants |
-| 2026-11-04 | Cream uses the colors of the user's reference screenshot, with a dark forest green accent | Q13 is closed. Both variants use the same selected-tab style. See [docs/theme.md](theme.md) |
+| 2026-11-04 | Cream uses the colors of the user's reference screenshot, with a dark forest green accent | Q13 is closed. Both variants use the same selected-tab style. See [docs/theme.md](../theme.md) |
 | 2026-11-04 | Add `sct run --interactive` for shells | Q11 is closed. The VS Code terminal uses `sct run --interactive -- <shell>` |
 | 2026-11-04 | Delegate the remaining technical choices | The remaining feature specification closes protocol choices P1–P6, D11, Q9, and Q10. It selects transport limits, receipt recovery, and the TURN credential exception. Implementation remains separate |
 | 2026-11-03 | Keep Wallet cards on macOS only | C17 enters scope |

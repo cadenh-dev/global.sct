@@ -144,7 +144,7 @@ Rules:
 - [Sharing](docs/sharing.md) and [relay setup](docs/relay.md)
 - [Windows and Linux](docs/windows-linux.md) and [Windows/Linux signing](docs/windows-linux-signing.md)
 - [Agent Access](docs/agent-access.md) and the [Claude Code demo project](examples/claude-code/README.md)
-- [Architecture](docs/architecture.md), [vault storage](docs/storage.md), and the [glossary](docs/glossary.md)
-- [Fork plan and change assessment](docs/fork-plan.md)
+- [Architecture](docs/architecture.md), [vault storage](docs/storage.md), the [glossary](docs/glossary.md), and [open status](docs/status.md)
+- [Fork plan and change assessment](docs/archive/fork-plan.md)
 
 Contributors and agents follow [AGENTS.md](AGENTS.md).
