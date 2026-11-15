@@ -1,4 +1,6 @@
 import { packager } from '@electron/packager'
+import { flipFuses, FuseV1Options, FuseVersion } from '@electron/fuses'
+import { join } from 'node:path'
 import electron from 'electron/package.json'
 import { stageDependencies } from './stage-dependencies'
 
@@ -16,7 +18,11 @@ const [output] = await packager({
   electronVersion: electron.version,
   platform: 'win32',
   arch: process.arch,
-  extraResource: ['out/demo', 'skills'],
+  afterExtract: [async ({ buildPath }) => { await flipFuses(join(buildPath, 'electron.exe'), { version: FuseVersion.V1,
+    [FuseV1Options.RunAsNode]: false, [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+    [FuseV1Options.EnableNodeCliInspectArguments]: false, [FuseV1Options.OnlyLoadAppFromAsar]: true
+  }) }],
+  extraResource: ['skills'],
   // Windows cannot load a native library from inside the archive.
   asar: { unpack: '*.node' },
   overwrite: true

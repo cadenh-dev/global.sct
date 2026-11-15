@@ -68,7 +68,7 @@ The extension host never receives a secret value.
 - No secret value in the extension host.
 - The app remains the source of truth for the vault, projects, pairing, and sharing.
 - The CLI remains the only bridge between the extension and the app.
-- Remove `ELECTRON_RUN_AS_NODE` from every CLI child process.
+- Keep `ELECTRON_RUN_AS_NODE` disabled by the packaged executable fuse.
 - A locked vault shows the app approval or unlock step. The panel does not store the passphrase.
 - The panel does not refresh automatically. The user selects Refresh.
 

@@ -35,7 +35,8 @@ let mainWindow: BrowserWindow | null = null
 app.setName('global.sct')
 if (process.platform === 'win32') app.setAppUserModelId('app.global-sct.desktop')
 const launchArguments = process.argv.slice(process.defaultApp ? 2 : 1)
-const cliLaunch = ['run', '_env', 'agent', 'mcp', 'skills', '--version'].includes(launchArguments[0])
+const cliCommands = ['run', '_env', 'agent', 'mcp', 'skills', '_demo', '--version']
+const cliLaunch = cliCommands.includes(launchArguments[0])
 const desktopMode = !cliLaunch
 const initialProtocolLinks = desktopMode ? protocolLinksFromArguments(launchArguments) : []
 const primaryInstance = !desktopMode || app.requestSingleInstanceLock()
@@ -52,6 +53,10 @@ let desktopReady = false
 let pendingLink: PendingLink | null = null
 
 if (!primaryInstance) app.exit(0)
+
+if (launchArguments[0] === '_demo') {
+  app.exit(launchArguments.length === 1 && Object.hasOwn(process.env, 'SCT_DEMO_TOKEN') ? 0 : 1)
+}
 
 // macOS can deliver a document before the app and its renderer are ready.
 app.on('open-file', (event, path) => {
@@ -308,7 +313,7 @@ app.whenReady().then(async () => {
   desktopReady = true
   for (const link of initialProtocolLinks) acceptProtocolLink(link)
 }).catch((error: unknown) => {
-  if (['run', '_env', 'agent', 'mcp', 'skills', '--version'].includes(launchArguments[0])) {
+  if (cliCommands.includes(launchArguments[0])) {
     console.error(error instanceof Error ? error.message : 'The project command could not start.')
     app.exit(1)
   } else {
@@ -420,7 +425,7 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   const relay = new Relay(relayServer(), join(app.getPath('userData'), 'relay'), async () => service,
     () => mainWindow?.webContents.send('relay:changed'), vault, {
       runTask: async (projectId, grantId) => demoOutcome(await vault.withGrantSecrets(projectId, grantId,
-        (project, values) => startFixedDemo(project, values, process.execPath, demoFile()))),
+        (project, values) => startFixedDemo(project, values, process.execPath))),
       cleanupGrants: () => vault.cleanupExpiredGrants()
     })
   await relay.start()
@@ -533,8 +538,7 @@ async function runAgentSession(projects: ProjectStore, vault: Vault): Promise<nu
         caller,
         relayState: async () => (await getRelay()).state(),
         requestRemoteDemo: async (grantId) => (await getRelay()).requestTask(grantId),
-        executable: process.execPath,
-        demo: demoFile()
+        executable: process.execPath
       })
       return access
     })().catch((error: unknown) => { loading = undefined; throw error })
@@ -556,10 +560,6 @@ async function runAgentSession(projects: ProjectStore, vault: Vault): Promise<nu
     if (relay) (await relay.catch(() => undefined))?.stop()
     mainWindow?.destroy()
   }
-}
-
-function demoFile(): string {
-  return app.isPackaged ? join(process.resourcesPath, 'demo', 'index.cjs') : join(__dirname, '../demo/index.cjs')
 }
 
 function skillsDirectory(): string {

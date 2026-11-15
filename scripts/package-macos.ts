@@ -1,4 +1,5 @@
 import { packager } from '@electron/packager'
+import { flipFuses, FuseV1Options, FuseVersion } from '@electron/fuses'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import electron from 'electron/package.json'
@@ -47,7 +48,11 @@ const [output] = await packager({
   electronVersion: electron.version,
   platform: 'darwin',
   arch: process.arch,
-  extraResource: ['out/demo', 'out/airdrop', 'skills'],
+  afterExtract: [async ({ buildPath }) => { await flipFuses(join(buildPath, 'Electron.app'), { version: FuseVersion.V1,
+    [FuseV1Options.RunAsNode]: false, [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+    [FuseV1Options.EnableNodeCliInspectArguments]: false, [FuseV1Options.OnlyLoadAppFromAsar]: true
+  }) }],
+  extraResource: ['out/airdrop', 'skills'],
   // macOS cannot load a native library from inside the archive.
   asar: { unpack: '*.node' },
   overwrite: true,
