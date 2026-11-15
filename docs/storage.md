@@ -42,6 +42,7 @@ The passphrase is not stored. A wrong passphrase fails the verifier, and global.
 ## Unlock
 
 The app asks for the passphrase at each start, unless "Remember this device" stored the key.
+Select **Storage**, then select **Lock vault** to lock it by hand. A lock stops Direct, WebRTC, and the relay. It also stops grant cleanup. Unlock the vault to restore these services and run grant cleanup once.
 The paths `sct run`, `sct _env`, and `sct mcp` open one unlock window when the vault is locked.
 The master key stays in main-process memory. It never reaches the renderer.
 

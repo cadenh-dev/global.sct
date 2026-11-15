@@ -577,12 +577,14 @@ export class Vault {
   private async readStatus(): Promise<VaultStatus> {
     const [header, rememberAvailable] = await Promise.all([readVaultHeader(this.headerFile()), this.store.available()])
     const remembered = rememberAvailable ? await this.store.read() : null
-    return {
+    const status = {
       initialized: header !== null,
       locked: this.masterKey === null,
       rememberAvailable,
       rememberEnabled: remembered !== null
     }
+    remembered?.fill(0)
+    return status
   }
 
   private headerFile(): string {

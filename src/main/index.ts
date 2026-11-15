@@ -48,6 +48,7 @@ let shareGate: ShareGate | undefined
 let openingFiles = false
 let pendingUnlock: (() => void) | undefined
 let desktopStarted: Promise<void> | undefined
+let desktopSession: { lock: () => Promise<void>; unlock: () => Promise<void> } | undefined
 let themePreference: Promise<ThemePreference> | undefined
 let desktopReady = false
 let pendingLink: PendingLink | null = null
@@ -348,8 +349,7 @@ function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
       resume()
     } else {
       await startDesktop(vault, projects)
-      await direct?.start()
-      await webrtc?.start()
+      await desktopSession?.unlock()
     }
     return status
   })
@@ -357,6 +357,7 @@ function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
     shareGate?.clear()
     await direct?.stop()
     webrtc?.stop()
+    await desktopSession?.lock()
     return vault.lock()
   })
   handle('vault:forget', () => {
@@ -434,10 +435,24 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   const cleanExpiredGrants = async () => {
     await relay.queueGrantExpiryNotifications(await vault.cleanupExpiredGrants())
   }
+  let locked = false
+  desktopSession = {
+    lock: async () => { locked = true; relay.pause() },
+    unlock: async () => {
+      if (!locked) return
+      await direct?.start()
+      await webrtc?.start()
+      await relay.resume()
+      await cleanExpiredGrants()
+      locked = false
+    }
+  }
   const cleanupTimer = setInterval(() => {
+    if (locked) return
     void cleanExpiredGrants().catch((error: unknown) => console.error('Scheduled grant cleanup failed.', error))
   }, 60_000)
   powerMonitor.on('resume', () => {
+    if (locked) return
     void cleanExpiredGrants().catch((error: unknown) => console.error('Resume grant cleanup failed.', error))
   })
   app.on('will-quit', () => {

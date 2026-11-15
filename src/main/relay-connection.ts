@@ -254,21 +254,16 @@ export class Relay {
 
   async start(): Promise<void> {
     if (!this.server) return
-    this.cache = normalizeCache(await this.readSealed('cache', emptyCache))
-    await this.load()
-    if (this.writer) {
-      // The app stopped during these runs, so global.sct cannot know whether the process finished. The user must review them.
-      if (this.tasks.some((task) => task.state === 'claimed')) {
-        await this.saveTasks(this.tasks.map((task) => task.state === 'claimed'
-          ? { ...task, state: 'uncertain', error: 'The app stopped during this run. Review it before global.sct sends the result.' } : task))
+    await this.startConnection(async () => {
+      if (this.writer) {
+        // The app stopped during these runs, so global.sct cannot know whether the process finished. The user must review them.
+        if (this.tasks.some((task) => task.state === 'claimed')) {
+          await this.saveTasks(this.tasks.map((task) => task.state === 'claimed'
+            ? { ...task, state: 'uncertain', error: 'The app stopped during this run. Review it before global.sct sends the result.' } : task))
+        }
+        await this.pruneRetained()
       }
-      await this.pruneRetained()
-      // Agent sessions add request files while the app runs.
-      await mkdir(this.requestDirectory(), { recursive: true, mode: 0o700 })
-      this.watcher = watch(this.requestDirectory(), () => { void this.importRequests() })
-      await this.importRequests()
-    }
-    void this.connect()
+    })
   }
 
   stop(): void {
@@ -277,6 +272,29 @@ export class Relay {
     clearTimeout(this.retry)
     clearTimeout(this.deliveryRetry)
     this.connection?.disconnect()
+  }
+
+  pause(): void {
+    this.stop()
+  }
+
+  async resume(): Promise<void> {
+    this.stopped = false
+    if (!this.server) return
+    await this.startConnection()
+  }
+
+  private async startConnection(beforeRequests?: () => Promise<void>): Promise<void> {
+    this.cache = normalizeCache(await this.readSealed('cache', emptyCache))
+    await this.load()
+    await beforeRequests?.()
+    if (this.writer) {
+      // Agent sessions add request files while the app runs.
+      await mkdir(this.requestDirectory(), { recursive: true, mode: 0o700 })
+      this.watcher = watch(this.requestDirectory(), () => { void this.importRequests() })
+      await this.importRequests()
+    }
+    void this.connect()
   }
 
   async state(): Promise<RelayState> {
