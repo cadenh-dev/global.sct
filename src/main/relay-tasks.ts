@@ -3,7 +3,7 @@ import type { RelayMessageKind, RelayTaskOutcome } from '../shared/envelope'
 import type { RelayPeerKeys } from './envelope'
 import type { Sharing } from './sharing'
 import type { CachedInboxItem } from './relay-cache'
-import { z } from 'zod/v4'
+import { isMessageId } from './relay-input'
 
 // Transfers, tasks, and results use the same outbox, retries, and deadlines.
 export interface OutboundTransfer {
@@ -90,13 +90,6 @@ export interface TaskRequest {
   approveBy: number
 }
 
-const taskRequestSchema = z.object({
-  id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
-  grantId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
-  createdAt: z.number().safe().int(),
-  approveBy: z.number().safe().int()
-})
-
 export interface PendingResult {
   changed: boolean
   failed: boolean
@@ -148,5 +141,7 @@ export async function openReceivedResult(identity: string, incoming: CachedInbox
 }
 
 export function isTaskRequest(value: unknown): value is TaskRequest {
-  return taskRequestSchema.safeParse(value).success
+  return typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string' && isMessageId(value.id) &&
+    'grantId' in value && typeof value.grantId === 'string' && isMessageId(value.grantId) &&
+    'createdAt' in value && Number.isSafeInteger(value.createdAt) && 'approveBy' in value && Number.isSafeInteger(value.approveBy)
 }
