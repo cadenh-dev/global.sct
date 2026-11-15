@@ -27,7 +27,7 @@ import { HyperswarmTransport } from './transport-hyperswarm'
 import { WebRtcTransport } from './transport-webrtc'
 import { WebRtcConfig } from './webrtc-config'
 import { ShareGate } from './share-gate'
-import type { Reply, ThemePreference, ThemeVariant } from '../shared/api'
+import type { IpcChannels, IpcEvents, Reply, ThemePreference, ThemeVariant } from '../shared/api'
 import type { DirectState } from '../shared/direct'
 import type { WebRtcState } from '../shared/webrtc'
 
@@ -124,7 +124,7 @@ async function offerPendingLink(next: PendingLink): Promise<void> {
 }
 
 function pendingLinkChanged(): void {
-  mainWindow?.webContents.send('protocol:pending-link')
+  if (mainWindow) sendToRenderer(mainWindow, 'protocol:pending-link')
 }
 
 function showMainWindow(): void {
@@ -144,8 +144,11 @@ function reportLinkError(error: unknown): void {
   else void app.whenReady().then(() => dialog.showErrorBox('Cannot open this link', message))
 }
 
-function handle(channel: string, operation: (...args: unknown[]) => unknown): void {
-  ipcMain.handle(channel, async (event: IpcMainInvokeEvent, ...args: unknown[]): Promise<Reply<unknown>> => {
+function handle<C extends keyof IpcChannels>(
+  channel: C,
+  operation: (...args: IpcChannels[C]['args']) => IpcChannels[C]['result'] | Promise<IpcChannels[C]['result']>
+): void {
+  ipcMain.handle(channel, async (event: IpcMainInvokeEvent, ...args: IpcChannels[C]['args']): Promise<Reply<IpcChannels[C]['result']>> => {
     if (!isAppRequest(event)) return { ok: false, error: 'global.sct rejected this request.' }
     try {
       return { ok: true, value: await operation(...args) }
@@ -153,6 +156,10 @@ function handle(channel: string, operation: (...args: unknown[]) => unknown): vo
       return { ok: false, error: error instanceof Error ? error.message : 'The operation failed.' }
     }
   })
+}
+
+function sendToRenderer<C extends keyof IpcEvents>(window: BrowserWindow, channel: C, ...args: IpcEvents[C]): void {
+  window.webContents.send(channel, ...args)
 }
 
 // Requests come only from the app page in the top frame of the main window. The page check stays if a navigation is not blocked.
@@ -207,7 +214,7 @@ function themeChanged(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
   const variant = themeVariant()
   mainWindow.setBackgroundColor(windowBackground[variant])
-  mainWindow.webContents.send('theme:changed', variant)
+  sendToRenderer(mainWindow, 'theme:changed', variant)
 }
 
 async function createWindow(hash = incomingFiles.length ? '/sharing' : undefined): Promise<BrowserWindow> {
@@ -290,7 +297,7 @@ app.whenReady().then(async () => {
     app.dock?.hide()
     await unlockVault(vault)
     shareGate = new ShareGate((passphrase) => vault.verifySharePassphrase(passphrase),
-      () => mainWindow?.webContents.send('share:changed'))
+      () => { if (mainWindow) sendToRenderer(mainWindow, 'share:changed') })
     registerShareGate(shareGate)
     app.exit(await runAgentSession(projects, vault))
     return
@@ -332,10 +339,10 @@ function requireForkStorage(): void {
 
 function registerVaultHandlers(vault: Vault, projects: ProjectStore): void {
   handle('protocol:status', () => getProtocolStatus())
-  handle('protocol:register', (replace) => registerProtocol(replace === true))
+  handle('protocol:register', (replace: unknown) => registerProtocol(replace === true))
   handle('protocol:remove', () => removeProtocol())
   handle('protocol:pending-link', () => pendingLink)
-  handle('protocol:dismiss-link', (id) => {
+  handle('protocol:dismiss-link', (id: unknown) => {
     if (typeof id !== 'string' || pendingLink?.id !== id) return
     pendingLink = null
     pendingLinkChanged()
@@ -404,11 +411,11 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   const service = new Sharing(join(app.getPath('userData'), 'sharing'), vault, hostname().slice(0, 100))
   sharing = service
   shareGate = new ShareGate((passphrase) => vault.verifySharePassphrase(passphrase),
-    () => mainWindow?.webContents.send('share:changed'))
+    () => { if (mainWindow) sendToRenderer(mainWindow, 'share:changed') })
   registerShareGate(shareGate)
   await service.cleanOutbox()
   direct = new HyperswarmTransport(service, join(app.getPath('userData'), 'direct'),
-    () => mainWindow?.webContents.send('direct:changed'))
+    () => { if (mainWindow) sendToRenderer(mainWindow, 'direct:changed') })
   try {
     await direct.start()
   } catch (error) {
@@ -416,7 +423,7 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   }
   const ice = new WebRtcConfig(vault)
   webrtc = new WebRtcTransport(service, ice, join(app.getPath('userData'), 'webrtc'),
-    () => mainWindow?.webContents.send('webrtc:changed'))
+    () => { if (mainWindow) sendToRenderer(mainWindow, 'webrtc:changed') })
   try {
     await webrtc.start()
   } catch (error) {
@@ -425,7 +432,7 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   const { Relay, relayServer } = await import('./relay-connection')
   // Only this process writes relay files and runs remote tasks. Agent sessions open a passive relay.
   const relay = new Relay(relayServer(), join(app.getPath('userData'), 'relay'), async () => service,
-    () => mainWindow?.webContents.send('relay:changed'), vault, {
+    () => { if (mainWindow) sendToRenderer(mainWindow, 'relay:changed') }, vault, {
       runTask: async (projectId, grantId) => demoOutcome(await vault.withGrantSecrets(projectId, grantId,
         (project, values) => startFixedDemo(project, values, process.execPath, undefined,
           process.defaultApp ? [app.getAppPath()] : []))),
@@ -548,7 +555,7 @@ async function runAgentSession(projects: ProjectStore, vault: Vault): Promise<nu
           mainWindow?.show()
           mainWindow?.focus()
         },
-        changed: () => mainWindow?.webContents.send('agent:changed'),
+        changed: () => { if (mainWindow) sendToRenderer(mainWindow, 'agent:changed') },
         sharing: getSharing,
         shareFile: sendToNearbyMac,
         approveShare: (summary, execute) => requireShareGate().run(summary, execute),
@@ -596,7 +603,7 @@ function registerSharing(service: Sharing): void {
   handle('sharing:import-link', (input) => service.importLink(input))
   handle('sharing:verify-link-receipt', (input) => service.verifyLinkReceipt(input))
   handle('sharing:link-state', () => service.getLinkState())
-  handle('sharing:copy-text', (text) => {
+  handle('sharing:copy-text', (text: unknown) => {
     if (typeof text !== 'string' || text.length > linkLimit) throw new Error('Copy text must contain at most 16,384 characters.')
     clipboard.writeText(text)
   })
@@ -674,7 +681,7 @@ function sendToNearbyMac(path: string): Promise<void> {
 }
 
 function sharingChanged(): void {
-  mainWindow?.webContents.send('sharing:changed')
+  if (mainWindow) sendToRenderer(mainWindow, 'sharing:changed')
 }
 
 function requireShareGate(): ShareGate {
