@@ -129,9 +129,12 @@ function gathered(peer: RTCPeerConnection): Promise<void> {
       cleanup()
       resolve()
     }
+    // An interface that cannot reach the STUN or TURN server, for example a container bridge, keeps gathering open after the limit.
+    // Continue with the candidates that are ready. Fail only when there is no candidate.
     timer = window.setTimeout(() => {
       cleanup()
-      reject(new Error('The WebRTC candidate gathering timed out. Close the connection and retry.'))
+      if (peer.localDescription?.sdp.includes('a=candidate:')) resolve()
+      else reject(new Error('The WebRTC candidate gathering timed out. Close the connection and retry.'))
     }, 10_000)
     peer.addEventListener('icegatheringstatechange', check)
   })
