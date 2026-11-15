@@ -33,7 +33,7 @@ Each transport includes enough UI for a two-window check when its delivery code 
 The final selector depends on both Direct transports and the Mailbox adapter.
 The receipt display can start with Link and Mailbox before Direct exists.
 Local Agent Access and the editor remain independent of the relay.
-Keep GitHub issue IDs and the [architecture prerequisites](architecture.md#implementation-order) unchanged.
+Keep GitHub issue IDs and the [architecture prerequisites](../architecture.md#implementation-order) unchanged.
 
 ## 2.5: Open sct links
 

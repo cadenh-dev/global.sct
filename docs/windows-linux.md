@@ -107,7 +107,7 @@ Verify the metadata with the real Claude Code build before release. A certificat
 - The existing Playwright suite now unlocks the vault, but it still uses macOS and POSIX assumptions. `tests/platform.spec.ts` is the Windows smoke test.
 - WebRTC with TURN, public STUN, and cross-network paths is not verified on this Windows host. The direct no-server path is verified between two app instances.
 - The share gate waits for the vault passphrase. An automated UI test must enter the passphrase or cancel the dialog.
-- The Windows `tests/app.spec.ts` secret test still reaches an interactive `cmd.exe` step, and `tests/sharing.spec.ts` still expects the disabled **Send secrets** tab. These are test-platform issues, not product failures. See [the remaining plan](remaining-features-plan.md#windows-ui-test-findings-2026-11-04).
+- The Windows `tests/app.spec.ts` secret test still reaches an interactive `cmd.exe` step, and `tests/sharing.spec.ts` still expects the disabled **Send secrets** tab. These are test-platform issues, not product failures. See [the remaining plan](archive/remaining-features-plan.md#windows-ui-test-findings-2026-11-04).
 
 ## Checks
 

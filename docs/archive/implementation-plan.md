@@ -17,11 +17,11 @@ It replaces the per-value Keychain items with one vault key that a passphrase un
 It adds peer-to-peer sharing and keeps the relay as an optional mailbox.
 It adds a VS Code client, a user gate, and a later theme change.
 The app is `global.sct`, with identity `app.global-sct.desktop`. It keeps the `sct` CLI and `@sct/env` (updated D5, D19).
-Existing storage uses the [explicit fork migration](fork-storage-migration.md).
+Existing storage uses the [explicit fork migration](../fork-storage-migration.md).
 
 ### Phase names
 
-The fork phases in this document are different from "Phase 2 relay sharing" in [docs/architecture.md](architecture.md).
+The fork phases in this document are different from "Phase 2 relay sharing" in [docs/architecture.md](../architecture.md).
 In this document, "Phase N" always means a fork phase.
 
 ### Phases in order
@@ -68,13 +68,13 @@ Unlock with a passphrase. "Remember this device" is optional.
 | 0.12 Docs | Done for storage and runtime injection |
 | Q2 Sharing identity and relay token | Done. They are in `.internal/` under the master key |
 
-The design is in [docs/storage-design.md](storage-design.md). This section does not repeat it.
+The design is in [docs/storage-design.md](../storage-design.md). This section does not repeat it.
 It lists the tasks, the gaps that the design does not cover, and the checks.
 
 ### Prerequisites
 
 - Decisions D1, D2, D3, D4, and D16 are closed.
-- You answer the five open questions in section 7 of [docs/storage-design.md](storage-design.md).
+- You answer the five open questions in section 7 of [docs/storage-design.md](../storage-design.md).
 - You answer questions Q1 to Q4 in section 5 of this document.
 
 ### Work items
@@ -90,9 +90,9 @@ It lists the tasks, the gaps that the design does not cover, and the checks.
 | 0.7 | C1 | Move the grant-cleanup key from its Keychain item to the master key. See Q2. | `src/main/vault.ts` |
 | 0.8 | C1 | Add the unlock and first-run passphrase screens. Add the "Remember this device" option. Disable the option when `available()` returns `false`, and show the reason. Send no key and no passphrase result back to the renderer. | `src/renderer/src/` (new view), `src/preload/index.ts`, `src/shared/api.ts`, `src/main/index.ts` |
 | 0.9 | C1 | Unlock in the CLI paths. `sct run` asks for the passphrase on the terminal. `sct _env` and `sct mcp` have no terminal. For them, see Q3. | `src/main/index.ts`, `src/main/runtime.ts`, `src/main/agent.ts` |
-| 0.10 | C1 | Time `sct run -- true` with 10 secrets and with 40 secrets. Measure with "remember this device" on and off. Record the results in [docs/storage-design.md](storage-design.md). Do the measurement by hand. Add no test harness. | Docs only |
+| 0.10 | C1 | Time `sct run -- true` with 10 secrets and with 40 secrets. Measure with "remember this device" on and off. Record the results in [docs/storage-design.md](../storage-design.md). Do the measurement by hand. Add no test harness. | Docs only |
 | 0.11 | D4, D16 | Confirm the clean break. Put an `SCT1` file and an old transfer file in the vault folder. Make sure that the build ignores them or rejects them with a clear message. Do this check by hand. | Docs only |
-| 0.12 | C1 | Change [docs/storage.md](storage.md) and [docs/runtime-injection.md](runtime-injection.md) for the new unlock. | Docs |
+| 0.12 | C1 | Change [docs/storage.md](../storage.md) and [docs/runtime-injection.md](../runtime-injection.md) for the new unlock. | Docs |
 
 The main functions show the success path. The validation goes into small named helpers below them:
 
@@ -113,7 +113,7 @@ function decodeHeader(text: string): VaultHeader | undefined {
 ### Key decisions
 
 The closed decisions D1, D2, D3, D4, and D16 control this phase.
-Q1 to Q4 are also closed. See section 7 of [docs/storage-design.md](storage-design.md).
+Q1 to Q4 are also closed. See section 7 of [docs/storage-design.md](../storage-design.md).
 The remaining question is the relay cache keys. A Linux system with no secret service cannot use the relay mailbox until those keys move.
 
 ### Risks
@@ -202,7 +202,7 @@ The existing Playwright suite now unlocks the vault through `tests/ui.ts`. It st
 | 1.8 | C7 | Add `scripts/package-linux.ts` and `scripts/package-windows.ts` with `@electron/packager`. Add `package:linux` and `package:win` scripts. Change the `description` in `package.json`, because it says "for macOS". | `scripts/`, `package.json` |
 | 1.9 | C7 | Add the signing step for each platform from D12. Read credentials only from CI secrets. Put no credential in the repository. | `scripts/package-*.ts`, `.github/workflows/release.yml` |
 | 1.10 | C7 | Add Windows and Linux runners for checks and releases from D13. | `.github/workflows/checks.yml`, `.github/workflows/release.yml` |
-| 1.11 | C7 | Write install and signing docs for Windows and Linux. Keep [docs/macos-signing.md](macos-signing.md) (C14). | `docs/` |
+| 1.11 | C7 | Write install and signing docs for Windows and Linux. Keep [docs/macos-signing.md](../macos-signing.md) (C14). | `docs/` |
 
 ### Key decisions
 
@@ -281,7 +281,7 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.8 | C13 | Put the relay behind the transport interface as the Mailbox mode. Keep the relay module, the SpacetimeDB database, and the relay code. See Q8. | `src/main/relay-connection.ts`, `src/main/index.ts` |
 | 2.9 | All | Add the mode selector to the send screen. Show Direct only when the peer is online. Show Mailbox only when the user permits a server copy. Always show Link. Use the Hallmark Terminal role tokens. | `src/renderer/src/SharingView.tsx`, `src/renderer/src/styles.css` (tokens only), `src/shared/sharing.ts` |
 | 2.10 | All | Show the receipt state for each mode in the activity list. Build the UI with the delivery code, so that you can test from two app windows. | `src/renderer/src/SharingView.tsx`, `src/renderer/src/SharingMotion.tsx` |
-| 2.11 | All | Change [docs/sharing.md](sharing.md), [docs/relay.md](relay.md), and [docs/architecture.md](architecture.md) for the three modes. | Docs |
+| 2.11 | All | Change [docs/sharing.md](../sharing.md), [docs/relay.md](../relay.md), and [docs/architecture.md](../architecture.md) for the three modes. | Docs |
 
 ### Status (2026-11-05)
 
@@ -297,7 +297,7 @@ The order below uses the recommended D6 order: Link, then Hyperswarm, then WebRT
 | 2.8 | Done. The relay is the Mailbox mode. The send gate, verified relay peers, and explicit server-copy permission guard it. A live Maincloud transfer completed pairing, queue, import, and receipt on Windows. |
 | 2.9 | Done. The **Send** tab selects Direct, WebRTC, Link, or Mailbox from the current sessions. Mailbox needs the permission checkbox. |
 | 2.10 | Done. Relay, Link, Direct, and WebRTC rows show the receipt state. The live Maincloud Mailbox check showed the received state on the sender. |
-| 2.11 | Done. This document, [sharing](sharing.md), [relay](relay.md), and [architecture](architecture.md) record the three modes and the remaining platform checks. |
+| 2.11 | Done. This document, [sharing](../sharing.md), [relay](../relay.md), and [architecture](../architecture.md) record the three modes and the remaining platform checks. |
 
 A possible shape for the shared types. All names are proposals:
 
@@ -363,7 +363,7 @@ bun run react-doctor
 bun run test:ui
 ```
 
-Do the two-window check from [docs/secure-sharing-check.md](secure-sharing-check.md) for each mode.
+Do the two-window check from [docs/secure-sharing-check.md](../secure-sharing-check.md) for each mode.
 Phase 2 is done when these conditions are true:
 
 1. All checks pass.
@@ -394,7 +394,7 @@ The extension starts commands with project secrets. It never receives a secret v
 | 3.2 | C11 | Connect to the app through the D14 channel. With the recommended CLI path, start `sct` with fixed arguments, as `@sct/env` starts `sct _env`. | `packages/vscode/src/` |
 | 3.3 | C11 | Show the projects and the secret names for the open folder. Get metadata only, through the local Agent Access request path and its approval window. | `packages/vscode/src/`, `src/main/caller.ts` (add the editor as a known caller, if approved) |
 | 3.4 | C12 | Add the command "Open terminal with project secrets". It opens a VS Code terminal that runs `sct run --interactive -- <shell>`. Only that terminal gets the secrets. | `packages/vscode/src/` |
-| 3.5 | C11 | Write the extension docs. Link them from [docs/agent-access.md](agent-access.md) and [docs/runtime-injection.md](runtime-injection.md). | Docs |
+| 3.5 | C11 | Write the extension docs. Link them from [docs/agent-access.md](../agent-access.md) and [docs/runtime-injection.md](../runtime-injection.md). | Docs |
 
 ### Status (2026-11-04)
 
@@ -404,7 +404,7 @@ The extension starts commands with project secrets. It never receives a secret v
 | 3.2 | Done. The extension starts the shared `sct` executable. |
 | 3.3 | Done. The tree view shows names and IDs only. Live VS Code behavior is unverified. |
 | 3.4 | Done. The terminal command uses `sct run --interactive -- <shell>`. Live VS Code behavior is unverified. |
-| 3.5 | Done. The extension guide is in [docs/vscode.md](vscode.md). It is linked from the Agent Access and runtime injection docs. |
+| 3.5 | Done. The extension guide is in [docs/vscode.md](../vscode.md). It is linked from the Agent Access and runtime injection docs. |
 | Caller identity | Done for `code` and `Code.exe`. Windows uses the Authenticode signer and product name. macOS uses the app signature. macOS is not run here. Linux is unverified. |
 
 ### Key decisions
@@ -548,7 +548,7 @@ Phase 1 runs in parallel. Its builds are necessary only for tests on Windows and
 ## 9. Open questions
 
 Answer these before the phase starts.
-Q1 to Q4 are closed. The decisions are in section 7 of [docs/storage-design.md](storage-design.md).
+Q1 to Q4 are closed. The decisions are in section 7 of [docs/storage-design.md](../storage-design.md).
 
 | ID | Phase | Question |
 |---|---|---|
@@ -560,5 +560,5 @@ Q1 to Q4 are closed. The decisions are in section 7 of [docs/storage-design.md](
 | Q10 | 4 | Closed: confirm app and agent shares with the vault passphrase. Add no reveal action. Exclude receipt acknowledgments. |
 | Q11 | 3 | Closed: a `--interactive` flag on `sct run`. It starts no detached child, does no live restart, and forwards no stop signal. |
 | Q12 | 4 | Closed: the user selects Light (Cream), Dark (Terminal), or System. System follows the OS light or dark setting. Light (Cream) is the default. |
-| Q13 | 4 | Closed: Cream uses the dark forest green from the user's reference (`#216929`). It passes 5.6:1 on cream, so both variants use the same selected-tab style. See [docs/theme.md](theme.md). |
+| Q13 | 4 | Closed: Cream uses the dark forest green from the user's reference (`#216929`). It passes 5.6:1 on cream, so both variants use the same selected-tab style. See [docs/theme.md](../theme.md). |
 | — | All | D6, D7, D8, D11, D13, D14, and D15 are closed. D12 remains deferred. See the remaining feature specification for implementation choices. |

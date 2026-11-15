@@ -1,10 +1,10 @@
 # global.sct architecture and implementation order
 
-global.sct uses Electron, React, and TypeScript. The Electron main process owns every sensitive operation on a Mac.
+global.sct uses Electron, React, and TypeScript. The Electron main process owns every sensitive operation on a device.
 These operations include vault access, the vault key, encryption, child processes, sharing, relay connections, and Agent Access.
 A passphrase derives the master key. The OS secret store only remembers it.
 The sandboxed renderer calls a narrow preload bridge and receives metadata only. The packaged executable has four fuses set: it disables Node execution, Node option variables, and Node inspect arguments, and it loads the app from ASAR only.
-Each Mac keeps its own vault, private keys, cached activity, and pending messages. No local server or separate daemon runs.
+Each device keeps its own vault, private keys, cached activity, and pending messages. No local server or separate daemon runs.
 
 ## Local runtime injection
 
@@ -322,6 +322,8 @@ The passive relay reads the relay rows and the local files. It publishes nothing
 Complete local runtime injection before relay setup. Then develop the relay and local Agent Access independently.
 Only #33 combines both. A ticket starts when its prerequisites pass. GitHub issue IDs stay unchanged.
 
+The issue links point to the upstream repository (omavashia2005/.sct) and serve as historical references. GitHub issues are off in this repository.
+
 ### Local foundation
 
 | Order | Issue | Work | Prerequisites | State |
@@ -374,13 +376,13 @@ These issues have no direct or indirect relay dependency.
 
 | Order | Issue | Work | Prerequisites | State |
 |---|---|---|---|---|
-| 3.8 | [#33](https://github.com/omavashia2005/.sct/issues/33) | Integrate local Agent Access with encrypted relay sharing | #20, #10, #16, #17, #19 | Open |
+| 3.8 | [#33](https://github.com/omavashia2005/.sct/issues/33) | Integrate local Agent Access with encrypted relay sharing | #20, #10, #16, #17, #19 | Built |
 
 ### Post-MVP
 
 | Order | Issue | Work | Prerequisites | State |
 |---|---|---|---|---|
-| 4.1 | [#22](https://github.com/omavashia2005/.sct/issues/22) | Add AirDrop transport for encrypted handoffs | #20, #15, #16, #18 | Open |
+| 4.1 | [#22](https://github.com/omavashia2005/.sct/issues/22) | Add AirDrop transport for encrypted handoffs | #20, #15, #16, #18 | Built |
 | 4.2 | [#23](https://github.com/omavashia2005/.sct/issues/23) | Add Factory integration through the narrow MCP interface | #10, #9, #18 | Open |
 | 4.3 | [#40](https://github.com/omavashia2005/.sct/issues/40) | Create experimental Wallet cards and share them through AirDrop | #24 | Built. The iPhone test is open. |
 

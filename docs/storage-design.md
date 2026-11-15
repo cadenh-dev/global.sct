@@ -3,7 +3,7 @@
 ## 1. Overview and goals
 
 This document designs the new vault storage for `global.sct`.
-It covers Phase 0 only. See [docs/fork-plan.md](fork-plan.md) for the decisions.
+It covers Phase 0 only. See [docs/fork-plan.md](archive/fork-plan.md) for the decisions.
 It does not change any code. It is a design.
 
 ### What changes
