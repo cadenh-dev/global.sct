@@ -9,25 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: ${{ matrix.name }}
-    runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Lint
-            command: bun run lint
-          - name: Bun type check
-            command: bun run typecheck
-          - name: TypeScript compiler
-            command: bun run typecheck:tsc
-          - name: Storage tests
-            command: bun run test
-          - name: Application build
-            command: bun run build
-          - name: Electron UI tests
-            command: bun run test:ui
+  ubuntu-checks:
+    name: Ubuntu checks
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,8 +21,45 @@ jobs:
         with:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
-      - name: ${{ matrix.name }}
-        run: ${{ matrix.command }}
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run typecheck:tsc
+      - run: bun run test
+      - run: bun run build:sdk
+      - run: bun run build:vscode
+      - run: bun run react-doctor
+
+  macos-ui:
+    name: macOS build and UI
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run test:ui
+
+  linux-ui:
+    name: Linux UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: sudo apt-get update && sudo apt-get install --yes xvfb
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      # On Linux, the sct run CLI step opens its own unlock window that the test does not drive.
+      - run: xvfb-run -a bash -lc 'cd tests && bunx playwright test --config ../playwright.config.ts --grep-invert "manages secrets per project without rendering stored values"'
 
   portable:
     name: ${{ matrix.os }} portable checks
@@ -46,7 +67,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -65,11 +86,8 @@ jobs:
       - name: Application build
         run: bun run build
       - name: Windows UI smoke test
-        if: runner.os == 'Windows'
         working-directory: tests
         run: bunx playwright test platform.spec.ts --config ../playwright.config.ts
-      - name: React Doctor
-        run: bun run react-doctor
 
   package:
     name: Package ${{ matrix.os }}
@@ -83,6 +101,8 @@ jobs:
             command: bun run package:win
           - os: ubuntu-latest
             command: bun run package:linux
+          - os: macos-latest
+            command: bun run package:mac
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,21 +111,59 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
+      - run: sudo apt-get update && sudo apt-get install --yes xvfb
+        if: runner.os == 'Linux'
       - run: bun install --frozen-lockfile
       - name: Package
         run: ${{ matrix.command }}
-
-  react-doctor:
-    name: React Doctor
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
-      - run: bun install --frozen-lockfile
-      - name: React Doctor
-        run: bun run react-doctor
+        env:
+          SCT_SIGN: adhoc
+      - name: Check packaged fuses
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            executable=dist/global.sct-linux-x64/sct
+          else
+            executable=dist/global.sct-darwin-arm64/global.sct.app/Contents/MacOS/sct
+          fi
+          set +e
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a timeout 20s env ELECTRON_RUN_AS_NODE=1 "$executable" -e 'process.exit(7)' >/dev/null 2>&1
+          else
+            timeout 20s env ELECTRON_RUN_AS_NODE=1 "$executable" -e 'process.exit(7)' >/dev/null 2>&1
+          fi
+          run_as_node_status=$?
+          set -e
+          if [ "$run_as_node_status" -eq 7 ]; then
+            echo 'RunAsNode fuse check failed.'
+            exit 1
+          fi
+          set +e
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a "$executable" _demo >/dev/null 2>&1
+          else
+            "$executable" _demo >/dev/null 2>&1
+          fi
+          demo_without_token_status=$?
+          set -e
+          if [ "$demo_without_token_status" -ne 1 ]; then
+            echo "Expected _demo to exit 1 without SCT_DEMO_TOKEN; got $demo_without_token_status."
+            exit 1
+          fi
+          if [ "$RUNNER_OS" = Linux ]; then
+            SCT_DEMO_TOKEN=synthetic-value xvfb-run -a "$executable" _demo >/dev/null 2>&1
+          else
+            SCT_DEMO_TOKEN=synthetic-value "$executable" _demo >/dev/null 2>&1
+          fi
+      - name: Check packaged fuses on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $executable = (Resolve-Path 'dist/global.sct-win32-x64/sct.exe').Path
+          $node = Start-Process -FilePath $executable -ArgumentList @('-e', 'process.exit(7)') -Environment @{ ELECTRON_RUN_AS_NODE = '1' } -Wait -PassThru
+          if ($node.ExitCode -eq 7) { throw 'RunAsNode fuse check failed.' }
+          $withoutToken = Start-Process -FilePath $executable -ArgumentList '_demo' -Wait -PassThru
+          if ($withoutToken.ExitCode -ne 1) { throw "Expected _demo to exit 1 without SCT_DEMO_TOKEN; got $($withoutToken.ExitCode)." }
+          $withToken = Start-Process -FilePath $executable -ArgumentList '_demo' -Environment @{ SCT_DEMO_TOKEN = 'synthetic-value' } -Wait -PassThru
+          if ($withToken.ExitCode -ne 0) { throw "Expected _demo to exit 0 with SCT_DEMO_TOKEN; got $($withToken.ExitCode)." }
