@@ -62,8 +62,9 @@ bun run install:cli
 - Windows: the command writes `%LOCALAPPDATA%\Programs\global.sct\bin\sct.cmd`.
 - Linux: the command writes `~/.local/bin/sct`.
 
-Add the folder to `PATH`, then open a new terminal.
-A terminal can start `sct.cmd`. A direct MCP client cannot start a `.cmd` file. Use the full `sct.exe` path, or `cmd /c sct mcp`.
+Add the folder that the command prints to `PATH`, then open a new terminal.
+On Windows, the command prints the folder that contains `sct.exe`. With this folder on `PATH`, a terminal and a direct MCP client can start `sct`.
+A direct MCP client cannot start the `sct.cmd` file, because the client uses no shell. `sct.cmd` stays for terminals that have its folder on `PATH`.
 The installer also writes `sct.json`. The `@sct/env` SDK reads it to start `sct.exe` without a shell. Set `SCT_CLI` to use another executable path.
 
 Check the command. It returns the bundled skill list and exits:
@@ -103,7 +104,6 @@ Verify the metadata with the real Claude Code build before release. A certificat
 - Linux needs `libsecret` for "Remember this device". The passphrase path works without it.
 - The Linux package uses the native packages that Bun selects for the host platform. Treat a musl build as unverified until its package loads the keyring and Hyperswarm native modules.
 - On Windows, file access uses the folder ACL. Keep the vault in a folder that only your account can access.
-- A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
 - The existing Playwright suite now unlocks the vault, but it still uses macOS and POSIX assumptions. `tests/platform.spec.ts` is the Windows smoke test.
 - WebRTC with TURN, public STUN, and cross-network paths is not verified on this Windows host. The direct no-server path is verified between two app instances.
 - The share gate waits for the vault passphrase. An automated UI test must enter the passphrase or cancel the dialog.

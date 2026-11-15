@@ -148,18 +148,20 @@ Configure an MCP client with the installed executable:
 ```
 
 Replace the command path with your installed CLI path. Claude Code also accepts `${HOME}/.local/bin/sct`.
-On Windows, a direct MCP client cannot start the `sct.cmd` shim. Use the full `sct.exe` path, or start the shim through `cmd`:
+On Windows, a direct MCP client cannot start the `sct.cmd` shim. Add the folder that `bun run install:cli` prints to `PATH`. That folder contains `sct.exe`. Then use the command name:
 
 ```json
 {
   "mcpServers": {
     "sct": {
-      "command": "cmd",
-      "args": ["/c", "sct", "mcp"]
+      "command": "sct",
+      "args": ["mcp"]
     }
   }
 }
 ```
+
+The full `sct.exe` path also works as the command.
 
 This configuration contains no credentials and needs no environment settings for local operations.
 The client must connect stdin and stdout through private pipes.

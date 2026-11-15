@@ -52,23 +52,27 @@ if (import.meta.main) {
     await writeFile(join(dirname(destination), 'sct.json'), JSON.stringify({ executable }), { mode: 0o600 })
   }
   console.log(`Installed ${destination}`)
-  if (!(process.env.PATH ?? '').split(delimiter).includes(dirname(destination))) console.log(target.pathHint)
+  if (!(process.env.PATH ?? '').split(delimiter).includes(target.pathFolder)) console.log(target.pathHint)
 }
 
 function cliTarget() {
   if (process.platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA
     if (!localAppData) throw new Error('Cannot find LOCALAPPDATA. Set it before you install the sct command.')
-    const folder = join(localAppData, 'Programs', 'global.sct', 'bin')
+    // A direct MCP client starts programs without a shell, so it cannot start sct.cmd.
+    // With the executable's folder on PATH, the name `sct` starts sct.exe in a terminal and in an MCP client.
+    const pathFolder = resolve(`dist/global.sct-win32-${process.arch}`)
     return {
-      destination: join(folder, 'sct.cmd'),
-      executable: `dist/global.sct-win32-${process.arch}/sct.exe`,
-      pathHint: `Add this folder to PATH, then open a new terminal:\n${folder}`
+      destination: join(localAppData, 'Programs', 'global.sct', 'bin', 'sct.cmd'),
+      executable: join(pathFolder, 'sct.exe'),
+      pathFolder,
+      pathHint: `Add this folder to PATH, then open a new terminal:\n${pathFolder}`
     }
   }
   const destination = join(homedir(), '.local', 'bin', 'sct')
   return {
     destination,
+    pathFolder: dirname(destination),
     executable: process.platform === 'darwin'
       ? `dist/global.sct-darwin-${process.arch}/global.sct.app/Contents/MacOS/sct`
       : `dist/global.sct-linux-${process.arch}/sct`,

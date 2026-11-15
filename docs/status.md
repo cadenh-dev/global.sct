@@ -5,7 +5,6 @@
 - Factory integration remains open. [Architecture](architecture.md#post-mvp)
 - The Windows and Linux packages still need signing. [README](../README.md#known-limitations)
 - The Windows caller check does not pin a certificate thumbprint. [README](../README.md#known-limitations)
-- A direct Windows MCP client cannot start `sct.cmd`. [README](../README.md#known-limitations)
 - The Windows Playwright suite still has macOS and POSIX assumptions. [Windows and Linux](windows-linux.md)
 - The Windows secret test and sharing test still need platform fixes. [Windows and Linux](windows-linux.md)
 - The Linux UI job and the macOS UI job exclude the test `manages secrets per project without rendering stored values`. Its `sct run` step opens a second unlock window that Playwright does not drive. [Test](../tests/app.spec.ts), [Checks workflow](../.github/workflows/checks.yml)
