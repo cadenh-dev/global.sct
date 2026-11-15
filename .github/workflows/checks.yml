@@ -86,9 +86,10 @@ jobs:
         run: bun run test
       - name: Application build
         run: bun run build
-      - name: Windows UI smoke test
+      # The sct run CLI step opens its own unlock window that the test does not drive.
+      - name: Windows UI tests
         working-directory: tests
-        run: bunx playwright test platform.spec.ts --config ../playwright.config.ts
+        run: bunx playwright test --config ../playwright.config.ts --grep-invert "manages secrets per project without rendering stored values"
 
   package:
     name: Package ${{ matrix.os }}

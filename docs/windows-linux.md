@@ -104,10 +104,10 @@ Verify the metadata with the real Claude Code build before release. A certificat
 - Linux needs `libsecret` for "Remember this device". The passphrase path works without it.
 - The Linux package uses the native packages that Bun selects for the host platform. Treat a musl build as unverified until its package loads the keyring and Hyperswarm native modules.
 - On Windows, file access uses the folder ACL. Keep the vault in a folder that only your account can access.
-- The existing Playwright suite now unlocks the vault, but it still uses macOS and POSIX assumptions. `tests/platform.spec.ts` is the Windows smoke test.
+- The Windows check runner runs the Playwright suite. It excludes the test `manages secrets per project without rendering stored values`, as the Linux job and the macOS job do.
 - WebRTC with TURN, public STUN, and cross-network paths is not verified on this Windows host. The direct no-server path is verified between two app instances.
 - The share gate waits for the vault passphrase. An automated UI test must enter the passphrase or cancel the dialog.
-- The Windows `tests/app.spec.ts` secret test still reaches an interactive `cmd.exe` step, and `tests/sharing.spec.ts` still expects the disabled **Send secrets** tab. These are test-platform issues, not product failures. See [the remaining plan](archive/remaining-features-plan.md#windows-ui-test-findings-2026-11-04).
+- The Windows `tests/app.spec.ts` secret test still reaches an interactive `cmd.exe` step. This is a test-platform issue, not a product failure. See [the remaining plan](archive/remaining-features-plan.md#windows-ui-test-findings-2026-11-04). `tests/sharing.spec.ts` passes on Windows.
 
 ## Checks
 
@@ -124,7 +124,7 @@ bun run test:ui
 ```
 
 The Windows and Linux package jobs run on their own check runners. They build unsigned packages only.
-The Playwright tests need a graphical session. The Windows smoke test runs on the Windows check runner.
+The Playwright tests need a graphical session. The Windows check runner runs the suite without the excluded secret test.
 
 ### Linux arm64 result (2026-11-05)
 

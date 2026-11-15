@@ -1,13 +1,12 @@
 # Open status
 
-- The vault has no retry limit or delay after a failed unlock. [Storage design](storage-design.md#7-decisions-and-remaining-questions)
 - A physical iPhone test must confirm that Wallet accepts a pass sent through AirDrop. [Wallet cards](wallet-cards.md#known-risk)
-- Factory integration remains open. [Architecture](architecture.md#post-mvp)
+- A Droid run must confirm the Factory demo project. [Factory Droid demo project](../examples/factory/README.md)
 - The Windows and Linux packages still need signing. [README](../README.md#known-limitations)
+- A Mac test must confirm the package that `bun run package:mac` signs with the `global.sct Development` identity. CI covers only the ad-hoc signature. [macOS signing](macos-signing.md#ci-release-builds)
 - The Windows caller check does not pin a certificate thumbprint. [README](../README.md#known-limitations)
-- The Windows Playwright suite still has macOS and POSIX assumptions. [Windows and Linux](windows-linux.md)
-- The Windows secret test and sharing test still need platform fixes. [Windows and Linux](windows-linux.md)
-- The Linux UI job and the macOS UI job exclude the test `manages secrets per project without rendering stored values`. Its `sct run` step opens a second unlock window that Playwright does not drive. [Test](../tests/app.spec.ts), [Checks workflow](../.github/workflows/checks.yml)
+- On Windows, the excluded secret test also starts `cmd.exe` and stops at its prompt. [Windows and Linux](windows-linux.md)
+- The Linux, macOS, and Windows UI jobs exclude the test `manages secrets per project without rendering stored values`. Its `sct run` step opens a second unlock window that Playwright does not drive. [Test](../tests/app.spec.ts), [Checks workflow](../.github/workflows/checks.yml)
 - Public STUN, remote TURN, and cross-network WebRTC remain unverified. [Windows and Linux](windows-linux.md)
 - macOS and Linux platform checks remain open for Direct, WebRTC, app links, and sharing UI. [Archived implementation plan](archive/implementation-plan.md)
 - Live VS Code verification remains open. [Archived remaining feature plan](archive/remaining-features-plan.md#starting-point)

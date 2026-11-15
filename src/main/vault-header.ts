@@ -95,6 +95,13 @@ export async function createWrappedVaultHeader(passphrase: string, masterKey: Bu
   }
 }
 
+// The vault counts this error as a failed unlock. Other errors from openMasterKey are not passphrase guesses.
+export class IncorrectPassphraseError extends Error {
+  constructor() {
+    super('The passphrase is not correct. Try again.')
+  }
+}
+
 export async function openMasterKey(passphrase: string, header: VaultHeader): Promise<Buffer> {
   const wrappingKey = await deriveMasterKey(passphrase, header.kdf, header.salt)
   try {
@@ -102,7 +109,7 @@ export async function openMasterKey(passphrase: string, header: VaultHeader): Pr
     try {
       opened = open(wrappingKey, decodeSealed(header.wrappedKey), Buffer.from(wrappedKeyData))
     } catch {
-      throw new Error('The passphrase is not correct. Try again.')
+      throw new IncorrectPassphraseError()
     }
     let keepOpened = false
     try {

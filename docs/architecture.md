@@ -383,7 +383,7 @@ These issues have no direct or indirect relay dependency.
 | Order | Issue | Work | Prerequisites | State |
 |---|---|---|---|---|
 | 4.1 | [#22](https://github.com/omavashia2005/.sct/issues/22) | Add AirDrop transport for encrypted handoffs | #20, #15, #16, #18 | Built |
-| 4.2 | [#23](https://github.com/omavashia2005/.sct/issues/23) | Add Factory integration through the narrow MCP interface | #10, #9, #18 | Open |
+| 4.2 | [#23](https://github.com/omavashia2005/.sct/issues/23) | Add Factory integration through the narrow MCP interface | #10, #9, #18 | Built. The Droid checks are open. |
 | 4.3 | [#40](https://github.com/omavashia2005/.sct/issues/40) | Create experimental Wallet cards and share them through AirDrop | #24 | Built. The iPhone test is open. |
 
 Issue #30 was workflow maintenance. Issue #21 stays closed, because demo rehearsal is outside development scope.
