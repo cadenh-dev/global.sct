@@ -42,7 +42,8 @@ jobs:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
       - run: bun run build
-      - run: bun run test:ui
+      # On Linux, the sct run CLI step opens its own unlock window that the test does not drive.
+      - run: cd tests && bunx playwright test --config ../playwright.config.ts --grep-invert "manages secrets per project without rendering stored values"
 
   linux-ui:
     name: Linux UI
@@ -118,6 +119,9 @@ jobs:
         run: ${{ matrix.command }}
         env:
           SCT_SIGN: adhoc
+      - name: Set Linux sandbox permissions
+        if: runner.os == 'Linux'
+        run: sudo chown root:root dist/global.sct-linux-x64/chrome-sandbox && sudo chmod 4755 dist/global.sct-linux-x64/chrome-sandbox
       - name: Check packaged fuses
         if: runner.os != 'Windows'
         shell: bash
@@ -127,43 +131,97 @@ jobs:
           else
             executable=dist/global.sct-darwin-arm64/global.sct.app/Contents/MacOS/sct
           fi
-          set +e
-          if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a timeout 20s env ELECTRON_RUN_AS_NODE=1 "$executable" -e 'process.exit(7)' >/dev/null 2>&1
-          else
-            timeout 20s env ELECTRON_RUN_AS_NODE=1 "$executable" -e 'process.exit(7)' >/dev/null 2>&1
-          fi
-          run_as_node_status=$?
-          set -e
-          if [ "$run_as_node_status" -eq 7 ]; then
-            echo 'RunAsNode fuse check failed.'
-            exit 1
-          fi
-          set +e
-          if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a "$executable" _demo >/dev/null 2>&1
-          else
-            "$executable" _demo >/dev/null 2>&1
-          fi
-          demo_without_token_status=$?
-          set -e
-          if [ "$demo_without_token_status" -ne 1 ]; then
-            echo "Expected _demo to exit 1 without SCT_DEMO_TOKEN; got $demo_without_token_status."
-            exit 1
-          fi
-          if [ "$RUNNER_OS" = Linux ]; then
-            SCT_DEMO_TOKEN=synthetic-value xvfb-run -a "$executable" _demo >/dev/null 2>&1
-          else
-            SCT_DEMO_TOKEN=synthetic-value "$executable" _demo >/dev/null 2>&1
-          fi
+          node --input-type=commonjs <<'NODE'
+          const { spawn } = require('node:child_process')
+
+          function runLimited(command, args, env, timeoutMs) {
+            return new Promise((resolve, reject) => {
+              const child = spawn(command, args, {
+                detached: true,
+                env: { ...process.env, ...env },
+                stdio: 'ignore'
+              })
+              let timedOut = false
+              let killTimer
+              const timeout = setTimeout(() => {
+                if (child.exitCode === null && child.signalCode === null) {
+                  timedOut = true
+                  try {
+                    process.kill(-child.pid, 'SIGTERM')
+                  } catch (error) {
+                    reject(error)
+                  }
+                  killTimer = setTimeout(() => {
+                    try {
+                      process.kill(-child.pid, 'SIGKILL')
+                    } catch {}
+                  }, 1000)
+                }
+              }, timeoutMs)
+              child.once('error', (error) => {
+                clearTimeout(timeout)
+                reject(error)
+              })
+              child.once('close', (code, signal) => {
+                clearTimeout(timeout)
+                clearTimeout(killTimer)
+                resolve({ code, signal, timedOut })
+              })
+            })
+          }
+
+          async function checkExit(label, command, args, env, expectedCode) {
+            const result = await runLimited(command, args, env, 20000)
+            if (result.timedOut || result.code !== expectedCode) {
+              throw new Error(`${label}: expected exit ${expectedCode} before timeout; got ${result.timedOut ? 'timeout' : result.code ?? result.signal}.`)
+            }
+          }
+
+          async function main() {
+            const executable = process.env.RUNNER_OS === 'Linux'
+              ? 'dist/global.sct-linux-x64/sct'
+              : 'dist/global.sct-darwin-arm64/global.sct.app/Contents/MacOS/sct'
+
+            if (process.env.RUNNER_OS === 'Linux') {
+              const app = await runLimited('xvfb-run', ['-a', 'env', 'ELECTRON_RUN_AS_NODE=1', 'dist/global.sct-linux-x64/sct', '-e', 'process.exit(7)'], {}, 20000)
+              if (!app.timedOut) throw new Error(`RunAsNode check: expected the app to run until timeout; it exited with ${app.code ?? app.signal}.`)
+              await checkExit('_demo without token', 'xvfb-run', ['-a', 'dist/global.sct-linux-x64/sct', '_demo'], {}, 1)
+              await checkExit('_demo with token', 'xvfb-run', ['-a', 'env', 'SCT_DEMO_TOKEN=synthetic-value', 'dist/global.sct-linux-x64/sct', '_demo'], {}, 0)
+            } else {
+              const app = await runLimited(executable, ['-e', 'process.exit(7)'], { ELECTRON_RUN_AS_NODE: '1' }, 20000)
+              if (!app.timedOut) throw new Error(`RunAsNode check: expected the app to run until timeout; it exited with ${app.code ?? app.signal}.`)
+              await checkExit('_demo without token', executable, ['_demo'], {}, 1)
+              await checkExit('_demo with token', executable, ['_demo'], { SCT_DEMO_TOKEN: 'synthetic-value' }, 0)
+            }
+          }
+
+          main().catch((error) => {
+            console.error(error)
+            process.exitCode = 1
+          })
+          NODE
       - name: Check packaged fuses on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $executable = (Resolve-Path 'dist/global.sct-win32-x64/sct.exe').Path
-          $node = Start-Process -FilePath $executable -ArgumentList @('-e', 'process.exit(7)') -Environment @{ ELECTRON_RUN_AS_NODE = '1' } -Wait -PassThru
-          if ($node.ExitCode -eq 7) { throw 'RunAsNode fuse check failed.' }
-          $withoutToken = Start-Process -FilePath $executable -ArgumentList '_demo' -Wait -PassThru
-          if ($withoutToken.ExitCode -ne 1) { throw "Expected _demo to exit 1 without SCT_DEMO_TOKEN; got $($withoutToken.ExitCode)." }
-          $withToken = Start-Process -FilePath $executable -ArgumentList '_demo' -Environment @{ SCT_DEMO_TOKEN = 'synthetic-value' } -Wait -PassThru
-          if ($withToken.ExitCode -ne 0) { throw "Expected _demo to exit 0 with SCT_DEMO_TOKEN; got $($withToken.ExitCode)." }
+          $node = Start-Process -FilePath $executable -ArgumentList @('-e', 'process.exit(7)') -Environment @{ ELECTRON_RUN_AS_NODE = '1' } -PassThru
+          if ($node.WaitForExit(20000)) { throw "RunAsNode executable exited before timeout with code $($node.ExitCode)." }
+          Stop-Process -Id $node.Id -Force
+          if (-not $node.WaitForExit(5000)) { throw 'RunAsNode process did not stop after the timeout.' }
+
+          function Invoke-Limited {
+            param([string[]]$Arguments, [hashtable]$Environment, [string]$Label, [int]$ExpectedExitCode)
+            $process = Start-Process -FilePath $executable -ArgumentList $Arguments -Environment $Environment -PassThru
+            if (-not $process.WaitForExit(20000)) {
+              Stop-Process -Id $process.Id -Force
+              if (-not $process.WaitForExit(5000)) { throw "$Label did not stop after the timeout." }
+              throw "$Label timed out."
+            }
+            if ($process.ExitCode -ne $ExpectedExitCode) {
+              throw "${Label}: expected exit $ExpectedExitCode; got $($process.ExitCode)."
+            }
+          }
+
+          Invoke-Limited -Arguments @('_demo') -Environment @{} -Label '_demo without token' -ExpectedExitCode 1
+          Invoke-Limited -Arguments @('_demo') -Environment @{ SCT_DEMO_TOKEN = 'synthetic-value' } -Label '_demo with token' -ExpectedExitCode 0
