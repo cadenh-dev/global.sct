@@ -13,7 +13,7 @@ The docs use some words with one fixed meaning:
 
 **Signing identity** — The `global.sct Development` certificate and private key in Keychain. A stable signature keeps Keychain access after rebuilds. See [macOS signing](macos-signing.md).
 
-**OS secret store** — The optional system store for the remembered master key and relay cache keys. It is macOS Keychain, Windows Credential Manager, or Linux libsecret.
+**OS secret store** — The optional system store for the remembered master key. It is macOS Keychain, Windows Credential Manager, or Linux libsecret. The old relay cache keys can be a one-time move source. The first relay use moves each key to the vault and deletes its OS item.
 
 **Local vault** — The encrypted `secrets.sct` files, `vault.json`, and `.internal/` values. It works offline. See [vault storage](storage.md).
 

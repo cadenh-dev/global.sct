@@ -112,7 +112,7 @@ The AAD is `internal/<name>`.
 The file mode is `0600`. Each write uses a unique `.tmp` file and a rename.
 
 The name grammar is `^[a-z][a-z0-9/_-]{0,200}$`.
-The names are `sharing/identity` and `relay/token/<sha256-of-server-name>`.
+The names are `sharing/identity`, `relay/token/<sha256-of-server-name>`, and `relay/cache/<name>/<sha256-of-server-name>`.
 One file for each name prevents a read-modify-write race between the desktop app and an agent session.
 
 ### Envelope encryption
@@ -460,6 +460,7 @@ Decisions taken on 2026-11-04:
 |---|---|
 | Parser | zod. It is already a dependency. |
 | Sharing identity, relay token, grant-cleanup key | Moved under the master key. The sharing identity and the relay token are in `.internal/`. The grant-cleanup data is in `grant-cleanup.sct`. |
+| Relay cache keys | Internal vault values under the master key, name `relay/cache/<name>/<sha256-of-server-name>`. The first use moves an existing OS key once, then deletes the OS item. |
 | CLI unlock | Ask the signed executable for one window. |
 | Existing tests | Edit the tests that the format change breaks. |
 | Project file key | Drop it. The master key seals the array. |
@@ -470,4 +471,3 @@ Decisions taken on 2026-11-04:
 Remaining questions:
 
 1. **Lockout and retry policy.** The vault has no retry limit or delay. Scrypt slows each attempt. Name the threat before adding a lockout.
-3. **Relay cache keys.** The relay keeps its per-server cache keys in the OS store. A Linux system with no secret service cannot use the relay mailbox until these keys move. Direct and link sharing do not need the relay cache keys.
