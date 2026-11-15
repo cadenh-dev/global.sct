@@ -30,8 +30,8 @@ test('a wrong passphrase releases no operation', async () => {
   await assert.rejects(operation, /cancelled/)
 })
 
-test('the confirmation expires at its real two-minute deadline', { timeout: 130_000 }, async () => {
-  const gate = new ShareGate(async () => undefined, () => undefined)
+test('the confirmation expires after its lifetime', async () => {
+  const gate = new ShareGate(async () => undefined, () => undefined, 50)
   const operation = gate.run(summary, async () => 'released')
   await assert.rejects(operation, /expired/)
   assert.equal(gate.current(), null)
