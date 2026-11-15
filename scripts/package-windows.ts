@@ -1,5 +1,7 @@
 import { packager } from '@electron/packager'
+import { join } from 'node:path'
 import electron from 'electron/package.json'
+import { flipElectronFuses } from './electron-fuses'
 import { stageDependencies } from './stage-dependencies'
 
 if (process.platform !== 'win32' || (process.arch !== 'arm64' && process.arch !== 'x64' && process.arch !== 'ia32')) {
@@ -16,7 +18,8 @@ const [output] = await packager({
   electronVersion: electron.version,
   platform: 'win32',
   arch: process.arch,
-  extraResource: ['out/demo', 'skills'],
+  afterExtract: [async ({ buildPath }) => flipElectronFuses(join(buildPath, 'electron.exe'))],
+  extraResource: ['skills'],
   // Windows cannot load a native library from inside the archive.
   asar: { unpack: '*.node' },
   overwrite: true
