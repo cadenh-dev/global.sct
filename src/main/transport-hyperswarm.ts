@@ -1,6 +1,7 @@
+import { writeFileAtomic } from './atomic-write.ts'
 import { randomBytes } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { z } from 'zod/v4'
@@ -569,6 +570,5 @@ async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T | null
 
 async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  await writeFile(`${path}.tmp`, JSON.stringify(value), { mode: 0o600 })
-  await rename(`${path}.tmp`, path)
+  await writeFileAtomic(path, JSON.stringify(value), 0o600)
 }

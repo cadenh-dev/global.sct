@@ -1,3 +1,4 @@
+import { writeFileAtomic } from './atomic-write.ts'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { cp, link, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
@@ -539,13 +540,10 @@ export class Vault {
       this.root = await this.readRoot()
       const file = this.internalFile(name)
       // Each write uses its own temporary file, so two processes cannot rename a partial file.
-      const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
       try {
         await mkdir(dirname(file), { recursive: true, mode: 0o700 })
-        await writeFile(temporary, encodeFile(internalMagic, seal(this.requireKey(), value, internalData(name))), { mode: 0o600 })
-        await rename(temporary, file)
+        await writeFileAtomic(file, encodeFile(internalMagic, seal(this.requireKey(), value, internalData(name))), 0o600)
       } catch (error) {
-        await rm(temporary, { force: true }).catch(() => undefined)
         throw new Error('Cannot save the encrypted internal secret.', { cause: error })
       }
     })
@@ -715,8 +713,7 @@ export class Vault {
     const filename = join(directory, secretsFileName)
     try {
       await mkdir(directory, { recursive: true, mode: 0o700 })
-      await writeFile(`${filename}.tmp`, contents, { mode: 0o600 })
-      await rename(`${filename}.tmp`, filename)
+      await writeFileAtomic(filename, contents, 0o600)
     } catch (error) {
       throw new Error(`Cannot save the secrets of ${project.name}. Check your local storage permissions.`, { cause: error })
     }
@@ -750,9 +747,8 @@ export class Vault {
     const file = this.cleanupFile()
     try {
       await mkdir(dirname(file), { recursive: true, mode: 0o700 })
-      await writeFile(`${file}.tmp`,
-        encodeFile(cleanupMagic, seal(this.requireKey(), Buffer.from(JSON.stringify(outcomes)), cleanupData)), { mode: 0o600 })
-      await rename(`${file}.tmp`, file)
+      await writeFileAtomic(file,
+        encodeFile(cleanupMagic, seal(this.requireKey(), Buffer.from(JSON.stringify(outcomes)), cleanupData)), 0o600)
     } catch (error) {
       throw new Error('Cannot save the encrypted grant cleanup history.', { cause: error })
     }
@@ -934,6 +930,5 @@ async function moveDirectory(from: string, to: string): Promise<void> {
 
 async function writeJson(filename: string, value: unknown): Promise<void> {
   await mkdir(dirname(filename), { recursive: true })
-  await writeFile(`${filename}.tmp`, JSON.stringify(value, null, 2), { mode: 0o600 })
-  await rename(`${filename}.tmp`, filename)
+  await writeFileAtomic(filename, JSON.stringify(value, null, 2), 0o600)
 }

@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { writeFileAtomic } from './atomic-write.ts'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
 import type { ThemePreference } from '../shared/api'
@@ -18,8 +19,7 @@ export async function writeThemePreference(file: string, input: unknown): Promis
   const parsed = themePreference.safeParse(input)
   if (!parsed.success) throw new Error('Select Light, Dark, or System.')
   await mkdir(dirname(file), { recursive: true, mode: 0o700 })
-  await writeFile(`${file}.tmp`, JSON.stringify({ theme: parsed.data }), { mode: 0o600 })
-  await rename(`${file}.tmp`, file)
+  await writeFileAtomic(file, JSON.stringify({ theme: parsed.data }), 0o600)
   return parsed.data
 }
 

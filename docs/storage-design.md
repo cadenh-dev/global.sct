@@ -444,7 +444,7 @@ The `SecretStore` only adds the optional skip of the passphrase prompt.
 | Corrupt vault file | `vault.json` fails the schema decode, or `secrets.sct` fails `decodeFile`, or a GCM tag check fails. | The vault returns a clear error and does not change the file. It reports which file is affected. |
 | Version mismatch | `version` in `vault.json` is not `1`. | The vault refuses to open the vault. It reports the version it supports. It does not guess or migrate. |
 | Locked vault | A vault operation runs before an unlock. The master key is not in memory. | The vault returns an error that asks for an unlock first. The CLI prompts for the passphrase. |
-| Concurrent access | The serial queue in `vault.ts` already orders operations in one process. Two processes can open the vault at the same time, for example the app and `sct run`. | Each process derives the master key on its own from the same passphrase or the same stored key. Reads are safe. For writes, the vault keeps the current write pattern: write a `.tmp` file, then `rename` over the target. This gives an atomic replace on one disk. Cross-process write ordering is an open question. See section 7. |
+| Concurrent access | The serial queue in `vault.ts` already orders operations in one process. Two processes can open the vault at the same time, for example the app and `sct run`. | Each process derives the master key on its own from the same passphrase or the same stored key. Reads are safe. Each write uses a unique temporary name and an atomic `rename`. The last complete rename wins. There is no lock file and no `fsync`. |
 
 Notes:
 
@@ -465,9 +465,9 @@ Decisions taken on 2026-11-04:
 | Project file key | Drop it. The master key seals the array. |
 | Master key form | Store the master key directly in "Remember this device". |
 | Scrypt cost | `N = 2^17`, `r = 8`, `p = 1`, about one second on a current laptop. |
+| Cross-process write ordering | Each write uses a unique temporary name and an atomic `rename`. The last complete rename wins. There is no lock file and no `fsync`. |
 
 Remaining questions:
 
 1. **Lockout and retry policy.** The vault has no retry limit or delay. Scrypt slows each attempt. Name the threat before adding a lockout.
-2. **Cross-process write ordering.** The app and the CLI can both write. The `.tmp` plus `rename` write is atomic on one disk. Confirm that this is enough, or name the failure that needs a lock file.
 3. **Relay cache keys.** The relay keeps its per-server cache keys in the OS store. A Linux system with no secret service cannot use the relay mailbox until these keys move. Direct and link sharing do not need the relay cache keys.
