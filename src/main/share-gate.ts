@@ -22,7 +22,8 @@ export class ShareGate {
   private timer: NodeJS.Timeout | undefined
   private confirming = false
 
-  constructor(private readonly verify: (passphrase: unknown) => Promise<void>, private readonly changed: () => void) {}
+  constructor(private readonly verify: (passphrase: unknown) => Promise<void>, private readonly changed: () => void,
+    private readonly lifetime = confirmationLifetime) {}
 
   run<T>(summary: ShareSummary, execute: () => Promise<T>): Promise<T> {
     if (this.queue.length >= queueLimit) return Promise.reject(new Error('Wait for the current share confirmation to finish.'))
@@ -84,9 +85,9 @@ export class ShareGate {
     if (this.active || this.queue.length === 0) return
     const entry = this.queue.shift()
     if (!entry) return
-    entry.expiresAt = Date.now() + confirmationLifetime
+    entry.expiresAt = Date.now() + this.lifetime
     this.active = entry
-    this.timer = setTimeout(() => this.expire(), confirmationLifetime)
+    this.timer = setTimeout(() => this.expire(), this.lifetime)
     this.changed()
   }
 
