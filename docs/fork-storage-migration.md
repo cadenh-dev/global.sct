@@ -15,7 +15,7 @@ The CLI remains `sct`. The SDK remains `@sct/env`.
 Project folders keep their readable names. Encrypted file formats and project IDs do not change.
 The fork accepts old pairing, import, and receipt links through paste. It does not claim the upstream protocol scheme.
 OS protocol registration remains task 2.5 in the implementation plan.
-Relay cache keys stay under `.sct-relay`, so the copied relay records remain readable.
+Keep the OS items until the first start of the new build. On the first relay use, the new build moves each cache key from `.sct-relay` into the vault, then deletes that OS item. The copied relay records remain readable because the key bytes do not change.
 
 ## Explicit migration
 

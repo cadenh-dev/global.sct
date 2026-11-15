@@ -52,7 +52,7 @@ The passphrase still opens the vault.
 
 The new build reads no `SCT1` file and no old transfer file.
 Add your secrets again after the first unlock.
-The old `.sct-sharing` credential items stay in the OS store. You can delete them. The fork keeps relay cache keys under `.sct-relay`, so copied relay records remain readable. Do not delete those keys if you migrate relay records.
+Keep the old OS items until the first start of the new build. The old `.sct-sharing` credential items stay in the OS store and you can delete them. On the first relay use, the new build moves each cache key from `.sct-relay` into the vault, then deletes that OS item. Copied relay records stay readable because the key bytes do not change.
 
 The new build also does not read the old sharing identity or relay token.
 The device gets a new device card and a new relay identity.

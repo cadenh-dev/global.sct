@@ -345,9 +345,13 @@ export class Relay {
     const file = join(this.requestDirectory(), `${request.id}.sct`)
     await mkdir(this.requestDirectory(), { recursive: true, mode: 0o700 })
     const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
-    await writeFile(temporary, encodeFile(magic, seal(await this.sealedKey('requests'), Buffer.from(JSON.stringify(request)),
-      this.requestData(request.id))), { mode: 0o600 })
-    await rename(temporary, file)
+    const key = await this.sealedKey('requests')
+    try {
+      await writeFile(temporary, encodeFile(magic, seal(key, Buffer.from(JSON.stringify(request)), this.requestData(request.id))), { mode: 0o600 })
+      await rename(temporary, file)
+    } finally {
+      key.fill(0)
+    }
     return request.id
   }
 
@@ -1217,22 +1221,25 @@ export class Relay {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
       throw error
     }
-    const key = await this.entry(`requests/${this.serverName()}`).getSecret()
-    if (!key) return []
-    const requests = await Promise.all(names.map(async (name): Promise<TaskRequest | null> => {
-      const id = /^([0-9a-f-]{36})\.sct$/.exec(name)?.[1]
-      if (!id) return null
-      try {
-        const sealed = decodeFile(magic, await readFile(join(this.requestDirectory(), name)))
-        // The authenticated data contains the ID, so a renamed file does not open.
-        const request: unknown = sealed && JSON.parse(open(Buffer.from(key), sealed, this.requestData(id)).toString('utf8'))
-        return isTaskRequest(request) && request.id === id ? request : null
-      } catch {
-        // A file that does not open did not come from this app. It cannot start a task.
-        return null
-      }
-    }))
-    return requests.filter((request): request is TaskRequest => request !== null)
+    const key = await this.sealedKey('requests')
+    try {
+      const requests = await Promise.all(names.map(async (name): Promise<TaskRequest | null> => {
+        const id = /^([0-9a-f-]{36})\.sct$/.exec(name)?.[1]
+        if (!id) return null
+        try {
+          const sealed = decodeFile(magic, await readFile(join(this.requestDirectory(), name)))
+          // The authenticated data contains the ID, so a renamed file does not open.
+          const request: unknown = sealed && JSON.parse(open(key, sealed, this.requestData(id)).toString('utf8'))
+          return isTaskRequest(request) && request.id === id ? request : null
+        } catch {
+          // A file that does not open did not come from this app. It cannot start a task.
+          return null
+        }
+      }))
+      return requests.filter((request): request is TaskRequest => request !== null)
+    } finally {
+      key.fill(0)
+    }
   }
 
   private requestDirectory(): string {
@@ -1279,11 +1286,15 @@ export class Relay {
   // An unreadable file returns the empty value. The cache refills from the next subscription.
   private async readSealed<T>(name: SealedName, empty: T): Promise<T> {
     try {
-      const sealed = decodeFile(magic, await readFile(this.sealedFile(name)))
-      const key = await this.entry(`${name}/${this.serverName()}`).getSecret()
-      if (!sealed || !key) return empty
-      // GCM authenticates the contents, so only this app can produce them.
-      return JSON.parse(open(Buffer.from(key), sealed, this.sealedData(name)).toString('utf8')) as T
+      const key = await this.sealedKey(name)
+      try {
+        const sealed = decodeFile(magic, await readFile(this.sealedFile(name)))
+        if (!sealed) return empty
+        // GCM authenticates the contents, so only this app can produce them.
+        return JSON.parse(open(key, sealed, this.sealedData(name)).toString('utf8')) as T
+      } finally {
+        key.fill(0)
+      }
     } catch {
       return empty
     }
@@ -1291,20 +1302,58 @@ export class Relay {
 
   private async writeSealed(name: SealedName, value: unknown): Promise<void> {
     const key = await this.sealedKey(name)
-    const file = this.sealedFile(name)
-    await mkdir(this.directory, { recursive: true, mode: 0o700 })
-    // The app and agent sessions share this folder, so each write uses its own temporary file.
-    const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
-    await writeFile(temporary, encodeFile(magic, seal(key, Buffer.from(JSON.stringify(value)), this.sealedData(name))), { mode: 0o600 })
-    await rename(temporary, file)
+    try {
+      const file = this.sealedFile(name)
+      await mkdir(this.directory, { recursive: true, mode: 0o700 })
+      // The app and agent sessions share this folder, so each write uses its own temporary file.
+      const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
+      await writeFile(temporary, encodeFile(magic, seal(key, Buffer.from(JSON.stringify(value)), this.sealedData(name))), { mode: 0o600 })
+      await rename(temporary, file)
+    } finally {
+      key.fill(0)
+    }
   }
 
   private async sealedKey(name: SealedName | 'requests'): Promise<Buffer> {
-    const saved = await this.entry(`${name}/${this.serverName()}`).getSecret()
-    if (saved) return Buffer.from(saved)
+    const internalName = `relay/cache/${name}/${createHash('sha256').update(this.serverName()).digest('hex')}`
+    const saved = await this.vault.readInternal(internalName)
+    if (saved) return saved
+    return this.moveOldKey(name, internalName)
+  }
+
+  private async moveOldKey(name: SealedName | 'requests', internalName: string): Promise<Buffer> {
+    let oldKey: number[] | null = null
+    try { oldKey = await this.entry(`${name}/${this.serverName()}`).getSecret() } catch { /* The old OS item can be unavailable. */ }
+    if (oldKey) {
+      const key = Buffer.from(oldKey)
+      let returnKey = false
+      try {
+        const existing = await this.vault.writeInternalIfAbsent(internalName, key)
+        if (existing) {
+          key.fill(0)
+          try { await this.entry(`${name}/${this.serverName()}`).deletePassword() } catch { /* The vault copy is already durable. */ }
+          return existing
+        }
+        try { await this.entry(`${name}/${this.serverName()}`).deletePassword() } catch { /* The vault copy is already durable. */ }
+        returnKey = true
+        return key
+      } finally {
+        oldKey.fill(0)
+        if (!returnKey) key.fill(0)
+      }
+    }
     const key = randomBytes(32)
-    await this.entry(`${name}/${this.serverName()}`).setSecret(key)
-    return key
+    try {
+      const existing = await this.vault.writeInternalIfAbsent(internalName, key)
+      if (existing) {
+        key.fill(0)
+        return existing
+      }
+      return key
+    } catch (error) {
+      key.fill(0)
+      throw error
+    }
   }
 
   // Each relay server has its own identity, so each server has its own files. A test server cannot replace the files of the live relay.

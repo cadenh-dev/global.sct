@@ -136,7 +136,6 @@ Rules:
 - The Windows and Linux packages are unsigned. Signing waits on D12 and D13.
 - The Windows caller check uses the Authenticode signer and product metadata. It does not pin a certificate thumbprint yet.
 - A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
-- A Linux system without `libsecret` cannot use the relay mailbox. The relay cache keys stay in the OS secret store.
 - The existing Playwright suite now unlocks the vault, but it still uses macOS and POSIX assumptions. `tests/platform.spec.ts` is the Windows smoke test.
 
 ## Docs

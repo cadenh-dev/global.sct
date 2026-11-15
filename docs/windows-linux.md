@@ -13,7 +13,7 @@ global.sct runs on Windows and Linux. The macOS-only features stay on macOS.
 | Direct sharing | Yes | Yes | Yes |
 | WebRTC sharing | Yes | Yes | Yes |
 | Link sharing | Yes | Yes | Yes |
-| Relay sharing | Yes | Yes | Yes, with libsecret |
+| Relay sharing | Yes | Yes | Yes |
 | AirDrop sharing | Yes | No | No |
 | Wallet cards | Yes | No | No |
 | Caller signature check | Apple code signature | Authenticode signer | No code signature. The caller is unverified |
@@ -100,8 +100,7 @@ Verify the metadata with the real Claude Code build before release. A certificat
 
 - Windows does not use process groups. `sct run` stops the child tree with `taskkill /T /F /PID`. It cannot always let the child exit cleanly after Ctrl+C.
 - Linux has no code signature. A process name match gives an unverified caller. The app asks for the extra confirmation.
-- The relay keeps its per-server cache keys in the OS secret store. A Linux system with no secret service cannot use the relay mailbox until these keys move. See [Relay cache keys](storage-design.md#7-decisions-and-remaining-questions).
-- Linux needs `libsecret` for "Remember this device" and the relay cache keys. The passphrase path works without it.
+- Linux needs `libsecret` for "Remember this device". The passphrase path works without it.
 - The Linux package uses the native packages that Bun selects for the host platform. Treat a musl build as unverified until its package loads the keyring and Hyperswarm native modules.
 - On Windows, file access uses the folder ACL. Keep the vault in a folder that only your account can access.
 - A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
