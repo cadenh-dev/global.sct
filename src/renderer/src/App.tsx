@@ -42,12 +42,12 @@ export function App() {
     return <UnlockView status={status.value} onUnlocked={(value) => setStatus({ state: 'ready', value })} />
   }
   return <>
-    {route.view === 'agent' ? <AgentAccessView /> : <DesktopApp route={route} isMac={isMac} />}
+    {route.view === 'agent' ? <AgentAccessView /> : <DesktopApp route={route} isMac={isMac} onLocked={(value) => setStatus({ state: 'ready', value })} />}
     <ShareConfirmation />
   </>
 }
 
-function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>; isMac: boolean }) {
+function DesktopApp({ route, isMac, onLocked }: { route: Exclude<Route, { view: 'agent' }>; isMac: boolean; onLocked: (status: VaultStatus) => void }) {
   const [projects, setProjects] = useState<Loaded<Project[]>>({ state: 'loading' })
   const [secrets, setSecrets] = useState<Loaded<SecretMetadata[]>>({ state: 'loading' })
   const [pendingLink, setPendingLink] = useState<PendingLink | null>(null)
@@ -116,7 +116,7 @@ function DesktopApp({ route, isMac }: { route: Exclude<Route, { view: 'agent' }>
           <ProjectSecretsView projectId={route.id} projects={projects} secrets={secrets} updateSecrets={updateSecrets} />
         )}
         {route.view === 'secrets' && <AllSecretsView projects={projects} secrets={secrets} />}
-        {route.view === 'storage' && <StorageView />}
+        {route.view === 'storage' && <StorageView onLocked={onLocked} />}
         {route.view === 'cards' && <CardsView />}
         {route.view === 'sharing' && (
           <SharingView key={route.projectId ?? 'sharing'} projectId={route.projectId}

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { errorText, StatusLine, useOperation } from './operation'
 import type { Loaded } from './types'
 import type { ProtocolStatus, ThemePreference } from '../../shared/api'
+import type { VaultStatus } from '../../shared/vault'
 
 const themeLabels: Record<ThemePreference, string> = { light: 'Light (Cream)', dark: 'Dark (Terminal)', system: 'System' }
 
-export function StorageView() {
+export function StorageView({ onLocked }: { onLocked: (status: VaultStatus) => void }) {
   const [location, setLocation] = useState<Loaded<string>>({ state: 'loading' })
   const [theme, setTheme] = useState<Loaded<ThemePreference>>({ state: 'loading' })
   const operation = useOperation()
@@ -43,6 +44,14 @@ export function StorageView() {
     })
   }
 
+  async function lock() {
+    let status: VaultStatus | undefined
+    if (await operation.run('Locking the vault…', async () => {
+      status = await window.sct.lockVault()
+      return 'The vault is locked.'
+    }) && status) onLocked(status)
+  }
+
   return (
     <>
       <div className="page-heading">
@@ -53,6 +62,13 @@ export function StorageView() {
       </div>
 
       <StatusLine status={operation.status} />
+
+      <section className="panel" aria-labelledby="lock-heading">
+        <h2 id="lock-heading">Vault access</h2>
+        <p className="field-help">Lock the vault to stop sharing and relay activity.</p>
+        <div className="form-actions"><button type="button" className="secondary" disabled={operation.busy}
+          onClick={() => { void lock() }}>Lock vault</button></div>
+      </section>
 
       <section className="panel" aria-labelledby="location-heading">
         <h2 id="location-heading">Vault folder</h2>
