@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sct": {
+      "type": "stdio",
+      "command": "sct",
+      "args": ["mcp"],
+      "enabledTools": ["list_secrets", "describe_secret", "run_demo"]
+    }
+  }
+}

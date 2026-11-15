@@ -143,7 +143,7 @@ Rules:
 - [Runtime injection](docs/runtime-injection.md) and the [`@sct/env` SDK](packages/env/README.md)
 - [Sharing](docs/sharing.md) and [relay setup](docs/relay.md)
 - [Windows and Linux](docs/windows-linux.md) and [Windows/Linux signing](docs/windows-linux-signing.md)
-- [Agent Access](docs/agent-access.md) and the [Claude Code demo project](examples/claude-code/README.md)
+- [Agent Access](docs/agent-access.md) the [Claude Code demo project](examples/claude-code/README.md), and the [Factory Droid demo project](examples/factory/README.md)
 - [Architecture](docs/architecture.md), [vault storage](docs/storage.md), the [glossary](docs/glossary.md), and [open status](docs/status.md)
 - [Fork plan and change assessment](docs/archive/fork-plan.md)
 
