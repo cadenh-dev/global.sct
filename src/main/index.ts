@@ -425,7 +425,8 @@ async function startDesktopOnce(vault: Vault, projects: ProjectStore): Promise<v
   const relay = new Relay(relayServer(), join(app.getPath('userData'), 'relay'), async () => service,
     () => mainWindow?.webContents.send('relay:changed'), vault, {
       runTask: async (projectId, grantId) => demoOutcome(await vault.withGrantSecrets(projectId, grantId,
-        (project, values) => startFixedDemo(project, values, process.execPath))),
+        (project, values) => startFixedDemo(project, values, process.execPath, undefined,
+          process.defaultApp ? [app.getAppPath()] : []))),
       cleanupGrants: () => vault.cleanupExpiredGrants()
     })
   await relay.start()
@@ -538,7 +539,8 @@ async function runAgentSession(projects: ProjectStore, vault: Vault): Promise<nu
         caller,
         relayState: async () => (await getRelay()).state(),
         requestRemoteDemo: async (grantId) => (await getRelay()).requestTask(grantId),
-        executable: process.execPath
+        executable: process.execPath,
+        demoArguments: process.defaultApp ? [app.getAppPath()] : []
       })
       return access
     })().catch((error: unknown) => { loading = undefined; throw error })

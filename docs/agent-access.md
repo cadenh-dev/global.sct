@@ -242,3 +242,5 @@ sct run -- sct _demo
 ```
 
 The `_demo` command prints no token value. It creates no project files and uses no network service. The packaged executable has four fuses set: it disables Node execution, Node option variables, and Node inspect arguments, and it loads the app from ASAR only.
+
+The command exits with code 0 when `SCT_DEMO_TOKEN` is present. It exits with code 1 when the value is not present. Read the result with `sct run -- sct _demo; echo $?`. The RunAsNode fuse disables `ELECTRON_RUN_AS_NODE`.

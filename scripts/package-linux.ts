@@ -1,7 +1,7 @@
 import { packager } from '@electron/packager'
-import { flipFuses, FuseV1Options, FuseVersion } from '@electron/fuses'
 import { join } from 'node:path'
 import electron from 'electron/package.json'
+import { flipElectronFuses } from './electron-fuses'
 import { stageDependencies } from './stage-dependencies'
 
 if (process.platform !== 'linux' || (process.arch !== 'arm64' && process.arch !== 'x64')) {
@@ -18,10 +18,7 @@ const [output] = await packager({
   electronVersion: electron.version,
   platform: 'linux',
   arch: process.arch,
-  afterExtract: [async ({ buildPath }) => { await flipFuses(join(buildPath, 'electron'), { version: FuseVersion.V1,
-    [FuseV1Options.RunAsNode]: false, [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-    [FuseV1Options.EnableNodeCliInspectArguments]: false, [FuseV1Options.OnlyLoadAppFromAsar]: true
-  }) }],
+  afterExtract: [async ({ buildPath }) => flipElectronFuses(join(buildPath, 'electron'))],
   extraResource: ['skills'],
   // Linux cannot load a native library from inside the archive.
   asar: { unpack: '*.node' },
