@@ -30,21 +30,13 @@ const kdfSchema = z.object({
   p: z.number().int().min(1).max(16),
   keyLength: z.literal(32)
 })
-const headerSchema = z.discriminatedUnion('version', [
-  z.object({
-    version: z.literal(1),
-    kdf: kdfSchema,
-    salt: z.string(),
-    verifier: sealedSchema
-  }),
-  z.object({
+const headerSchema = z.object({
     version: z.literal(2),
     kdf: kdfSchema,
     salt: z.string(),
     verifier: sealedSchema,
     wrappedKey: sealedSchema
-  })
-])
+})
 
 export async function readVaultHeader(file: string): Promise<VaultHeader | null> {
   let text: string
@@ -104,7 +96,6 @@ export async function createWrappedVaultHeader(passphrase: string, masterKey: Bu
 }
 
 export async function openMasterKey(passphrase: string, header: VaultHeader): Promise<Buffer> {
-  if (header.version === 1) return await deriveMasterKey(passphrase, header.kdf, header.salt)
   const wrappingKey = await deriveMasterKey(passphrase, header.kdf, header.salt)
   try {
     let opened: Buffer
@@ -166,8 +157,8 @@ function decodeHeader(text: string): VaultHeader | undefined {
   if (!isBase64(parsed.data.salt, saltLength)) return undefined
   if (!isBase64(parsed.data.verifier.iv, ivLength) || !isBase64(parsed.data.verifier.tag, tagLength)) return undefined
   if (!isBase64(parsed.data.verifier.ciphertext, verifierText.length)) return undefined
-  if (parsed.data.version === 2 && (!isBase64(parsed.data.wrappedKey.iv, ivLength) ||
-    !isBase64(parsed.data.wrappedKey.tag, tagLength) || !isBase64(parsed.data.wrappedKey.ciphertext, 32))) return undefined
+  if (!isBase64(parsed.data.wrappedKey.iv, ivLength) ||
+    !isBase64(parsed.data.wrappedKey.tag, tagLength) || !isBase64(parsed.data.wrappedKey.ciphertext, 32)) return undefined
   return parsed.data
 }
 

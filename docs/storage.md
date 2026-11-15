@@ -39,8 +39,7 @@ The folder also has `vault.json` and `.internal/`. `vault.json` holds the key se
 
 The passphrase is not stored. A wrong passphrase fails the verifier, and global.sct clears the derived key.
 
-New vaults use header version 2. The header salt belongs to the passphrase wrapping key. The verifier stays sealed by the master key.
-When global.sct first opens a version 1 vault with the correct passphrase, it writes a version 2 header. It does not change the secret files.
+The vault uses header version 2 only. A version 1 header is unsupported and is not migrated. The header salt belongs to the passphrase wrapping key. The verifier stays sealed by the master key.
 To change the passphrase, open **Storage**, then enter the current passphrase and the new passphrase twice. Use at least 8 characters.
 The change writes a new salt and wrapped master key. The master key stays the same, so remembered devices and secret files keep working.
 

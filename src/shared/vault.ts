@@ -1,14 +1,5 @@
 // The vault header holds no plaintext secret. Version 2 wraps the master key.
-export type VaultHeader = VaultHeaderV1 | VaultHeaderV2
-
-export interface VaultHeaderV1 {
-  version: 1
-  kdf: ScryptParams
-  salt: string
-  verifier: SealedField
-}
-
-export interface VaultHeaderV2 {
+export interface VaultHeader {
   version: 2
   kdf: ScryptParams
   salt: string

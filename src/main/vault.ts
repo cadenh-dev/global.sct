@@ -102,7 +102,6 @@ export class Vault {
         let keepMasterKey = false
         try {
           if (!checkPassphrase(masterKey, saved)) throw new Error('The passphrase is not correct. Try again.')
-          if (saved.version === 1) await writeVaultHeader(file, await createWrappedVaultHeader(passphrase, masterKey))
           this.setMasterKey(masterKey)
           keepMasterKey = true
         } finally {
