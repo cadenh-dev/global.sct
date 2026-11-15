@@ -8,6 +8,7 @@ import type { ProtocolStatus } from '../shared/api'
 
 const scheme = 'global-sct'
 const desktopFile = 'app.global-sct.desktop'
+const schemeMimeType = 'x-scheme-handler/global-sct'
 const managedMarker = 'X-Sct-Managed=true'
 const run = promisify(execFile)
 
@@ -108,13 +109,7 @@ function escapedExecutable(): string {
 }
 
 async function linuxStatus(): Promise<ProtocolStatus> {
-  let installed = false
-  try {
-    const contents = await readFile(desktopPath(), 'utf8')
-    installed = contents.includes(managedMarker) && contents.includes(`"${escapedExecutable()}"`)
-  } catch {
-    // A missing desktop entry means that this app is not installed as a handler.
-  }
+  const installed = await ownsDesktopEntry()
   let owner: string | null
   try {
     owner = (await run('xdg-mime', ['query', 'default', 'x-scheme-handler/global-sct'])).stdout.trim() || null
@@ -139,25 +134,59 @@ async function registerLinux(): Promise<ProtocolStatus> {
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, desktopContents(), { mode: 0o644 })
   await run('xdg-mime', ['default', desktopFile, 'x-scheme-handler/global-sct'])
-  try {
-    await run('update-desktop-database', [dirname(path)])
-  } catch {
-    // The desktop database helper is optional. The mimeapps association is enough.
-  }
+  await refreshDesktopDatabase()
   const status = await linuxStatus()
   if (!status.registered) throw new Error('The desktop did not accept the global-sct link registration.')
   return status
 }
 
 async function removeLinux(): Promise<ProtocolStatus> {
-  const path = desktopPath()
-  try {
-    const contents = await readFile(path, 'utf8')
-    if (contents.includes(managedMarker) && contents.includes(`"${escapedExecutable()}"`)) await rm(path, { force: true })
-  } catch {
-    // A missing file means that this app owns no desktop entry.
+  if (await ownsDesktopEntry()) {
+    await rm(desktopPath(), { force: true })
+    await removeAssociation()
+    // The cache from the registration still lists the deleted entry until this refresh.
+    await refreshDesktopDatabase()
   }
   const status = await linuxStatus()
   if (status.registered) throw new Error('The desktop still uses global.sct for global-sct links.')
   return status
+}
+
+async function refreshDesktopDatabase(): Promise<void> {
+  try {
+    await run('update-desktop-database', [dirname(desktopPath())])
+  } catch {
+    // The desktop database helper is optional. The mimeapps association is enough.
+  }
+}
+
+async function ownsDesktopEntry(): Promise<boolean> {
+  try {
+    const contents = await readFile(desktopPath(), 'utf8')
+    return contents.includes(managedMarker) && contents.includes(`"${escapedExecutable()}"`)
+  } catch {
+    // A missing desktop entry means that this app is not installed as a handler.
+    return false
+  }
+}
+
+// xdg-mime has no command that removes an association. Delete only this app's entry for this scheme.
+// The other lines stay unchanged. The write keeps the file in place, because mimeapps.list can be a symbolic link.
+async function removeAssociation(): Promise<void> {
+  const file = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'mimeapps.list')
+  let contents: string
+  try {
+    contents = await readFile(file, 'utf8')
+  } catch {
+    // A missing file means that no association exists.
+    return
+  }
+  const next = contents.split('\n').flatMap((line) => {
+    if (!line.startsWith(`${schemeMimeType}=`)) return [line]
+    const entries = line.slice(schemeMimeType.length + 1).split(';').filter(Boolean)
+    if (!entries.includes(desktopFile)) return [line]
+    const others = entries.filter((entry) => entry !== desktopFile)
+    return others.length > 0 ? [`${schemeMimeType}=${others.join(';')};`] : []
+  }).join('\n')
+  if (next !== contents) await writeFile(file, next)
 }
