@@ -13,7 +13,7 @@ const scrypt = promisify(scryptCallback) as (password: Buffer, salt: Buffer, key
 
 const verifierText = Buffer.from('sct-vault-v1')
 const verifierData = Buffer.from('vault-verifier')
-const headerVersion = 1
+const wrappedKeyData = Buffer.from('vault-master-key')
 const saltLength = 16
 const ivLength = 12
 const tagLength = 16
@@ -23,18 +23,28 @@ const maxMem = 256 * 1024 * 1024
 export const defaultScrypt: ScryptParams = { name: 'scrypt', n: 131072, r: 8, p: 1, keyLength: 32 }
 
 const sealedSchema = z.object({ iv: z.string(), tag: z.string(), ciphertext: z.string() })
-const headerSchema = z.object({
-  version: z.literal(headerVersion),
-  kdf: z.object({
-    name: z.literal('scrypt'),
-    n: z.number().int().min(2).max(1_048_576),
-    r: z.number().int().min(1).max(32),
-    p: z.number().int().min(1).max(16),
-    keyLength: z.literal(32)
-  }),
-  salt: z.string(),
-  verifier: sealedSchema
+const kdfSchema = z.object({
+  name: z.literal('scrypt'),
+  n: z.number().int().min(2).max(1_048_576),
+  r: z.number().int().min(1).max(32),
+  p: z.number().int().min(1).max(16),
+  keyLength: z.literal(32)
 })
+const headerSchema = z.discriminatedUnion('version', [
+  z.object({
+    version: z.literal(1),
+    kdf: kdfSchema,
+    salt: z.string(),
+    verifier: sealedSchema
+  }),
+  z.object({
+    version: z.literal(2),
+    kdf: kdfSchema,
+    salt: z.string(),
+    verifier: sealedSchema,
+    wrappedKey: sealedSchema
+  })
+])
 
 export async function readVaultHeader(file: string): Promise<VaultHeader | null> {
   let text: string
@@ -60,30 +70,73 @@ export async function writeVaultHeader(file: string, header: VaultHeader): Promi
 
 export async function createVaultHeader(passphrase: string): Promise<{ header: VaultHeader; masterKey: Buffer }> {
   const salt = randomBytes(saltLength)
+  const masterKey = randomBytes(32)
   try {
-    const masterKey = await deriveMasterKey(passphrase, defaultScrypt, salt.toString('base64'))
-    const header: VaultHeader = {
-      version: headerVersion,
-      kdf: defaultScrypt,
-      salt: salt.toString('base64'),
-      verifier: encodeSealed(seal(masterKey, verifierText, verifierData))
-    }
-    return { header, masterKey }
+    return { header: await createWrappedVaultHeader(passphrase, masterKey, salt), masterKey }
+  } catch (error) {
+    masterKey.fill(0)
+    throw error
   } finally {
     salt.fill(0)
   }
 }
 
+export async function createWrappedVaultHeader(passphrase: string, masterKey: Buffer,
+  salt = randomBytes(saltLength)): Promise<VaultHeader> {
+  try {
+    const saltText = salt.toString('base64')
+    const wrappingKey = await deriveMasterKey(passphrase, defaultScrypt, saltText)
+    try {
+      return {
+        version: 2,
+        kdf: defaultScrypt,
+        salt: saltText,
+        verifier: encodeSealed(seal(masterKey, verifierText, verifierData)),
+        wrappedKey: encodeSealed(seal(wrappingKey, masterKey, wrappedKeyData))
+      }
+    } finally {
+      wrappingKey.fill(0)
+    }
+  } finally {
+    salt.fill(0)
+  }
+}
+
+export async function openMasterKey(passphrase: string, header: VaultHeader): Promise<Buffer> {
+  if (header.version === 1) return await deriveMasterKey(passphrase, header.kdf, header.salt)
+  const wrappingKey = await deriveMasterKey(passphrase, header.kdf, header.salt)
+  try {
+    let opened: Buffer
+    try {
+      opened = open(wrappingKey, decodeSealed(header.wrappedKey), Buffer.from(wrappedKeyData))
+    } catch {
+      throw new Error('The passphrase is not correct. Try again.')
+    }
+    let keepOpened = false
+    try {
+      if (opened.length !== 32) throw new Error('The vault master key is invalid.')
+      keepOpened = true
+      return opened
+    } finally {
+      if (!keepOpened) opened.fill(0)
+    }
+  } finally {
+    wrappingKey.fill(0)
+  }
+}
+
 export async function deriveMasterKey(passphrase: string, kdf: ScryptParams, salt: string): Promise<Buffer> {
   const password = Buffer.from(passphrase, 'utf8')
+  const saltBytes = Buffer.from(salt, 'base64')
   try {
-    return await scrypt(password, Buffer.from(salt, 'base64'), kdf.keyLength, {
+    return await scrypt(password, saltBytes, kdf.keyLength, {
       N: kdf.n, r: kdf.r, p: kdf.p, maxmem: maxMem
     })
   } catch (error) {
     throw new Error('Cannot derive the vault key. The stored key settings are not usable.', { cause: error })
   } finally {
     password.fill(0)
+    saltBytes.fill(0)
   }
 }
 
@@ -112,6 +165,8 @@ function decodeHeader(text: string): VaultHeader | undefined {
   if (!isBase64(parsed.data.salt, saltLength)) return undefined
   if (!isBase64(parsed.data.verifier.iv, ivLength) || !isBase64(parsed.data.verifier.tag, tagLength)) return undefined
   if (!isBase64(parsed.data.verifier.ciphertext, verifierText.length)) return undefined
+  if (parsed.data.version === 2 && (!isBase64(parsed.data.wrappedKey.iv, ivLength) ||
+    !isBase64(parsed.data.wrappedKey.tag, tagLength) || !isBase64(parsed.data.wrappedKey.ciphertext, 32))) return undefined
   return parsed.data
 }
 

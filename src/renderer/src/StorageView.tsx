@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { errorText, StatusLine, useOperation } from './operation'
 import type { Loaded } from './types'
 import type { ProtocolStatus, ThemePreference } from '../../shared/api'
@@ -9,6 +10,9 @@ const themeLabels: Record<ThemePreference, string> = { light: 'Light (Cream)', d
 export function StorageView({ onLocked }: { onLocked: (status: VaultStatus) => void }) {
   const [location, setLocation] = useState<Loaded<string>>({ state: 'loading' })
   const [theme, setTheme] = useState<Loaded<ThemePreference>>({ state: 'loading' })
+  const [currentPassphrase, setCurrentPassphrase] = useState('')
+  const [nextPassphrase, setNextPassphrase] = useState('')
+  const [nextPassphraseAgain, setNextPassphraseAgain] = useState('')
   const operation = useOperation()
 
   useEffect(() => {
@@ -52,6 +56,18 @@ export function StorageView({ onLocked }: { onLocked: (status: VaultStatus) => v
     }) && status) onLocked(status)
   }
 
+  async function changePassphrase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await operation.run('Changing the passphrase…', async () => {
+      if (nextPassphrase !== nextPassphraseAgain) throw new Error('The two new passphrases are different.')
+      await window.sct.changePassphrase({ currentPassphrase, nextPassphrase })
+      return 'The vault passphrase changed.'
+    })
+    setCurrentPassphrase('')
+    setNextPassphrase('')
+    setNextPassphraseAgain('')
+  }
+
   return (
     <>
       <div className="page-heading">
@@ -68,6 +84,30 @@ export function StorageView({ onLocked }: { onLocked: (status: VaultStatus) => v
         <p className="field-help">Lock the vault to stop sharing and relay activity.</p>
         <div className="form-actions"><button type="button" className="secondary" disabled={operation.busy}
           onClick={() => { void lock() }}>Lock vault</button></div>
+      </section>
+
+      <section className="panel" aria-labelledby="passphrase-heading">
+        <h2 id="passphrase-heading">Change passphrase</h2>
+        <form onSubmit={(event) => { void changePassphrase(event) }}>
+          <label htmlFor="current-passphrase">Current passphrase</label>
+          <input id="current-passphrase" type="password" autoComplete="current-password"
+            value={currentPassphrase} disabled={operation.busy}
+            onChange={(event) => setCurrentPassphrase(event.target.value)} />
+          <label htmlFor="next-passphrase">New passphrase</label>
+          <input id="next-passphrase" type="password" autoComplete="new-password"
+            value={nextPassphrase} disabled={operation.busy}
+            onChange={(event) => setNextPassphrase(event.target.value)} />
+          <label htmlFor="next-passphrase-again">New passphrase again</label>
+          <input id="next-passphrase-again" type="password" autoComplete="new-password"
+            value={nextPassphraseAgain} disabled={operation.busy}
+            onChange={(event) => setNextPassphraseAgain(event.target.value)} />
+          <p className="field-help">Use at least 8 characters.</p>
+          <div className="form-actions">
+            <button type="submit" disabled={operation.busy || !currentPassphrase || !nextPassphrase || !nextPassphraseAgain}>
+              Change passphrase
+            </button>
+          </div>
+        </form>
       </section>
 
       <section className="panel" aria-labelledby="location-heading">

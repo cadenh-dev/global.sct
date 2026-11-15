@@ -28,16 +28,21 @@ If the Mac is off or asleep, cleanup starts when the app starts or the Mac resum
 ## Files and keys
 
 When global.sct starts, it makes the vault folder `~/global.sct`. Each project has one file: `global.sct/[project-name]/secrets.sct`.
-The folder also has `vault.json` and `.internal/`. `vault.json` holds the key settings, the salt, and the verifier. It holds no secret.
+The folder also has `vault.json` and `.internal/`. `vault.json` holds the key settings, the salt, the verifier, and the wrapped master key. It holds no plaintext secret.
 `.internal/` holds the sharing identity and the relay tokens.
 
-- One master key opens the whole vault. A passphrase derives it with `scrypt`.
+- One master key opens the whole vault. A passphrase derives a wrapping key with `scrypt`. The wrapping key opens the master key in `vault.json`.
 - Each value has its own data key. The master key wraps that data key. This is envelope encryption.
 - `secrets.sct` holds encrypted names and encrypted values. Its magic value is `SCT2`.
 - `.internal/` holds one sealed file for the sharing identity and one for each relay token. Its magic value is `SCI2`.
 - The OS secret store is optional. "Remember this device" keeps a copy of the master key there.
 
 The passphrase is not stored. A wrong passphrase fails the verifier, and global.sct clears the derived key.
+
+New vaults use header version 2. The header salt belongs to the passphrase wrapping key. The verifier stays sealed by the master key.
+When global.sct first opens a version 1 vault with the correct passphrase, it writes a version 2 header. It does not change the secret files.
+To change the passphrase, open **Storage**, then enter the current passphrase and the new passphrase twice. Use at least 8 characters.
+The change writes a new salt and wrapped master key. The master key stays the same, so remembered devices and secret files keep working.
 
 ## Unlock
 

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import type { ProtocolStatus, Reply, SctAPI, ThemePreference, ThemeVariant } from '../shared/api'
+import type { ChangePassphraseInput, ProtocolStatus, Reply, SctAPI, ThemePreference, ThemeVariant } from '../shared/api'
 import type { Project, ProjectInput, ProjectRename } from '../shared/projects'
 import type { SecretInput, SecretMetadata, SecretReference, SecretUpdate } from '../shared/secrets'
 import type { PairingPreview, SharingDevice, SharingState, TransferPreview } from '../shared/sharing'
@@ -62,6 +62,7 @@ const api: SctAPI = {
   chooseVaultLocation: () => invoke<string | null>('vault:choose-location'),
   getVaultStatus: () => invoke<VaultStatus>('vault:status'),
   unlockVault: (input: UnlockInput) => invoke<VaultStatus>('vault:unlock', input),
+  changePassphrase: (input: ChangePassphraseInput) => invoke<void>('vault:change-passphrase', input),
   lockVault: () => invoke<VaultStatus>('vault:lock'),
   forgetDevice: () => invoke<VaultStatus>('vault:forget'),
   getShareRequest: () => invoke<ShareRequestView | null>('share:current'),
