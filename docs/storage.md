@@ -49,6 +49,8 @@ The app asks for the passphrase at each start, unless "Remember this device" sto
 Select **Storage**, then select **Lock vault** to lock it by hand. A lock stops Direct, WebRTC, and the relay. It also stops grant cleanup. Unlock the vault to restore these services and run grant cleanup once.
 The paths `sct run`, `sct _env`, and `sct mcp` open one unlock window when the vault is locked.
 The master key stays in main-process memory. It never reaches the renderer.
+After five incorrect passphrases, the app makes you wait before the next attempt. The wait is 5, 15, and 30 seconds, then 60 seconds after each later failure.
+A correct passphrase or an app restart resets the count.
 
 If the system has no secret service, "Remember this device" is off.
 The passphrase still opens the vault.

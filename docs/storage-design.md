@@ -482,6 +482,10 @@ Decisions taken on 2026-11-04:
 | Scrypt cost | `N = 2^17`, `r = 8`, `p = 1`, about one second on a current laptop. |
 | Cross-process write ordering | Each write uses a unique temporary name and an atomic `rename`. The last complete rename wins. There is no lock file and no `fsync`. |
 
-Remaining questions:
+Decision taken on 2026-11-15:
 
-1. **Lockout and retry policy.** The vault has no retry limit or delay. Scrypt slows each attempt. Name the threat before adding a lockout.
+| Question | Decision |
+|---|---|
+| Lockout and retry policy | A stepped delay in main-process memory. The first four failed unlocks have no delay. The next failures start delays of 5, 15, and 30 seconds, then 60 seconds for each later failure. A correct passphrase or an app restart resets the count. The threat is a person who guesses through the unlock window. The delay does not stop a person who has the vault files, because that person can guess without the app. Scrypt slows those guesses. There is no permanent lockout. |
+
+No questions remain.

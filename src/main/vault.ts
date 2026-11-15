@@ -11,7 +11,7 @@ import type { RelayGrant } from '../shared/envelope.ts'
 import type { SealedField, UnlockInput, VaultStatus } from '../shared/vault.ts'
 import type { TransferSecret } from './transfer.ts'
 import { decodeFile, encodeFile, open, seal } from './seal.ts'
-import { createVaultHeader, createWrappedVaultHeader, decodeSealed, encodeSealed, openMasterKey, readVaultHeader,
+import { IncorrectPassphraseError, createVaultHeader, createWrappedVaultHeader, decodeSealed, encodeSealed, openMasterKey, readVaultHeader,
   verifyPassphrase as checkPassphrase, writeVaultHeader } from './vault-header.ts'
 import type { SecretStore } from './key-store.ts'
 
@@ -26,6 +26,10 @@ const cleanupFileName = 'grant-cleanup.sct'
 const internalDirectoryName = '.internal'
 const cleanupData = Buffer.from('grant-cleanup')
 const minimumPassphraseLength = 8
+// The fifth failed unlock starts the first delay. Each later failure uses the next delay, then the longest delay.
+const freeUnlockFailures = 4
+const unlockDelaySeconds = [5, 15, 30]
+const longestUnlockDelaySeconds = 60
 const passphraseChangeSchema = z.object({
   currentPassphrase: z.string().min(1).max(1024),
   nextPassphrase: z.string().min(1).max(1024)
@@ -57,6 +61,9 @@ export class Vault {
   private pending: Promise<void> = Promise.resolve()
   private root = ''
   private masterKey: Buffer | null = null
+  // This process holds the count. A correct passphrase or an app restart resets it.
+  private failedUnlocks = 0
+  private unlockAllowedAt = 0
   private readonly projects: ProjectStore
   private readonly settingsFile: string
   private readonly defaultRoot: string
@@ -98,10 +105,14 @@ export class Vault {
       const file = this.headerFile()
       const saved = await readVaultHeader(file)
       if (saved) {
-        const masterKey = await openMasterKey(passphrase, saved)
+        this.requireUnlockAttempt()
+        const masterKey = await openMasterKey(passphrase, saved).catch((error: unknown) => {
+          throw error instanceof IncorrectPassphraseError ? this.recordFailedUnlock() : error
+        })
         let keepMasterKey = false
         try {
-          if (!checkPassphrase(masterKey, saved)) throw new Error('The passphrase is not correct. Try again.')
+          if (!checkPassphrase(masterKey, saved)) throw this.recordFailedUnlock()
+          this.failedUnlocks = 0
           this.setMasterKey(masterKey)
           keepMasterKey = true
         } finally {
@@ -137,6 +148,20 @@ export class Vault {
       }
       return await this.readStatus()
     })
+  }
+
+  private requireUnlockAttempt(): void {
+    const seconds = Math.ceil((this.unlockAllowedAt - Date.now()) / 1000)
+    if (seconds > 0) throw new Error(`Too many incorrect passphrases. Wait ${waitText(seconds)}, then try again.`)
+  }
+
+  // The delay slows guesses through the app only. A person with the vault files can guess without the app.
+  private recordFailedUnlock(): Error {
+    this.failedUnlocks += 1
+    if (this.failedUnlocks <= freeUnlockFailures) return new Error('The passphrase is not correct. Try again.')
+    const seconds = unlockDelaySeconds[this.failedUnlocks - freeUnlockFailures - 1] ?? longestUnlockDelaySeconds
+    this.unlockAllowedAt = Date.now() + seconds * 1000
+    return new Error(`The passphrase is not correct. Wait ${waitText(seconds)}, then try again.`)
   }
 
   // The app calls this at each start. A missing or wrong remembered key falls back to the passphrase.
@@ -895,6 +920,10 @@ function isSecretName(name: unknown): name is string {
 
 function isSecretValue(value: unknown): value is string {
   return typeof value === 'string' && value.length <= 65536 && !value.includes('\0')
+}
+
+function waitText(seconds: number): string {
+  return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`
 }
 
 function requireUnlockInput(input: unknown): UnlockInput {
