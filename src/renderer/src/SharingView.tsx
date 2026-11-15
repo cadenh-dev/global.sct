@@ -12,7 +12,7 @@ import { DevicesTab } from './DevicesTab'
 import { AirDropSendTab } from './AirDropSendTab'
 import { AirDropReceiveTab } from './AirDropReceiveTab'
 import { RelayTab } from './RelayTab'
-import { SendTab } from './SendTab'
+import { SendSharing } from './SendSharing'
 import { sharingRoute } from './sharingHelpers'
 import type { Receipt } from './sharingHelpers'
 
@@ -97,7 +97,7 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
           operation={operation} updateProjects={updateProjects} updateSecrets={updateSecrets}
           pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />)}
       <div hidden={activeTab !== 'send'}>
-        <SendTab projectId={projectId} active={activeTab === 'send'} projects={projects} secrets={secrets}
+        <SendSharing projectId={projectId} active={activeTab === 'send'} projects={projects} secrets={secrets}
           busy={operation.busy} run={operation.run} />
       </div>
       {sharing.state === 'ready' && <div hidden={activeTab !== 'link'}>
