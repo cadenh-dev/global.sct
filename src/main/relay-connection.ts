@@ -24,7 +24,7 @@ import { RelayCache } from './relay-cache'
 import type { SealedName } from './relay-cache'
 import type { CachedInboxItem, CachedPeer, CachedSentItem, Cache, CachedExpiryNotice, Pin } from './relay-cache'
 import type { OutboundTransfer, ReceivedTransfer, ReceivedTask, ReceivedResult, TaskRequest, PendingResult } from './relay-tasks'
-import { taskApprovalPeriod, taskRefusal } from './relay-tasks'
+import { openReceivedResult, openReceivedTask, taskApprovalPeriod, taskRefusal } from './relay-tasks'
 import { requireAcceptInput, requireActivityKey, requireConfirmation, requireMessageId, requirePairId,
   requireQueueInput, requireTaskDecision } from './relay-input'
 
@@ -840,33 +840,14 @@ export class Relay {
   private async openTask(identity: string, incoming: CachedInboxItem): Promise<ReceivedTask> {
     const [crypto, sender] = await Promise.all([this.crypto(), this.verifiedPeer(incoming.sender)])
     const receivedAt = Date.now()
-    const opened = await crypto.openRelayMessage(identity, sender, 'task', Buffer.from(incoming.payload, 'base64'),
-      Buffer.from(incoming.wrappedKey, 'base64'))
-    const refusal = taskRefusal(this.received.find((item) => item.messageId === opened.contents.grantId),
-      sender.identity, opened.contents.approveBy, receivedAt)
-    return {
-      messageId: incoming.messageId, digest: opened.digest, sender: sender.identity, createdAt: incoming.createdAt,
-      deliverBy: opened.transfer.deliverBy, grantId: opened.contents.grantId, approveBy: opened.contents.approveBy,
-      state: refusal?.state ?? 'awaiting-approval', exitCode: null, secretPresent: null,
-      finishedAt: refusal ? receivedAt : null, reason: refusal?.reason ?? null, reviewed: false,
-      receipt: (await crypto.sealRelayMessageReceipt(identity, sender, opened.transfer, receivedAt)).toString('base64'),
-      acknowledged: false, error: null
-    }
+    return openReceivedTask(identity, incoming, crypto, sender,
+      (grantId) => this.received.find((item) => item.messageId === grantId), receivedAt)
   }
 
   private async openResult(identity: string, incoming: CachedInboxItem): Promise<ReceivedResult> {
     const [crypto, sender] = await Promise.all([this.crypto(), this.verifiedPeer(incoming.sender)])
-    const opened = await crypto.openRelayMessage(identity, sender, 'result', Buffer.from(incoming.payload, 'base64'),
-      Buffer.from(incoming.wrappedKey, 'base64'))
-    if (!this.outbox.some((item) => item.kind === 'task' && item.messageId === opened.contents.taskId && item.recipient === sender.identity)) {
-      throw new Error('This result answers no task that this device sent to that device.')
-    }
-    return {
-      messageId: incoming.messageId, digest: opened.digest, sender: sender.identity, deliverBy: opened.transfer.deliverBy,
-      ...opened.contents,
-      receipt: (await crypto.sealRelayMessageReceipt(identity, sender, opened.transfer, Date.now())).toString('base64'),
-      acknowledged: false, error: null
-    }
+    return openReceivedResult(identity, incoming, crypto, sender,
+      (taskId, recipient) => this.outbox.some((item) => item.kind === 'task' && item.messageId === taskId && item.recipient === recipient))
   }
 
   // Each outcome gets one result with one ID. Retries publish that same result.
