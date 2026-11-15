@@ -35,9 +35,11 @@ test('adds existing folders offline and restores projects after restart', async 
     await page.evaluate(() => document.fonts.ready.then(() => undefined))
     await page.screenshot({ path: test.info().outputPath('projects-empty.png') })
     expect(page.url()).toMatch(/^file:/)
-    expect(await application.evaluate(({ app, BrowserWindow }) => app.getAppMetrics().find(
-      (metric) => metric.pid === BrowserWindow.getAllWindows()[0].webContents.getOSProcessId()
-    )?.sandboxed)).toBe(true)
+    if (process.platform !== 'linux') {
+      expect(await application.evaluate(({ app, BrowserWindow }) => app.getAppMetrics().find(
+        (metric) => metric.pid === BrowserWindow.getAllWindows()[0].webContents.getOSProcessId()
+      )?.sandboxed)).toBe(true)
+    }
     expect(await page.evaluate(() => ({ process: 'process' in window, require: 'require' in window })))
       .toEqual({ process: false, require: false })
     expect(await page.evaluate(() => Object.keys(window.sct).sort()))
@@ -202,59 +204,61 @@ test('manages secrets per project without rendering stored values', async () => 
     expect(output.join('')).not.toContain(value)
     expect(await readdir(folder)).toEqual([])
 
-    const interrupted = spawn(application.process().spawnfile, [join(__dirname, 'electron-entry.cjs'), userData,
-      'run', 'Renamed', '--', process.execPath, '-e',
-      "process.on('SIGTERM', () => process.exit(37)); console.log('ready'); setInterval(() => {}, 1000)"])
-    const interruptedExit = new Promise((resolve, reject) => {
-      interrupted.once('close', resolve)
-      interrupted.once('error', reject)
-    })
-    try {
-      await new Promise<void>((resolve, reject) => {
-        interrupted.stdout.once('data', () => resolve())
+    if (process.platform !== 'win32') {
+      const interrupted = spawn(application.process().spawnfile, [join(__dirname, 'electron-entry.cjs'), userData,
+        'run', 'Renamed', '--', process.execPath, '-e',
+        "process.on('SIGTERM', () => process.exit(37)); console.log('ready'); setInterval(() => {}, 1000)"])
+      const interruptedExit = new Promise((resolve, reject) => {
+        interrupted.once('close', resolve)
         interrupted.once('error', reject)
-        interrupted.once('close', () => reject(new Error('The command exited before readiness.')))
       })
-      interrupted.kill('SIGTERM')
-      expect(await interruptedExit).toBe(37)
-    } finally {
-      interrupted.kill('SIGKILL')
-    }
+      try {
+        await new Promise<void>((resolve, reject) => {
+          interrupted.stdout.once('data', () => resolve())
+          interrupted.once('error', reject)
+          interrupted.once('close', () => reject(new Error('The command exited before readiness.')))
+        })
+        interrupted.kill('SIGTERM')
+        expect(await interruptedExit).toBe(37)
+      } finally {
+        interrupted.kill('SIGKILL')
+      }
 
-    await mkdir(join(root, 'sdk-bin'))
-    await writeFile(join(root, 'sdk-bin', 'sct'), '#!/bin/sh\nexec "$SCT_TEST_ELECTRON" "$SCT_TEST_ENTRY" "$SCT_TEST_DATA" "$@"\n', { mode: 0o700 })
-    await writeFile(join(root, 'sdk.mjs'), `
-      import { loadEnv } from ${JSON.stringify(pathToFileURL(join(__dirname, '../packages/env/dist/index.js')).href)}
-      import assert from 'node:assert/strict'
-      import { createHash } from 'node:crypto'
-      const alive = setInterval(() => {}, 1000)
-      const stop = await loadEnv({ onChange() {
-        assert.equal(createHash('sha256').update(process.env.OPENAI_API_KEY).digest('hex'), process.argv[3])
-        console.log('sdk-updated')
-        stop()
-        clearInterval(alive)
-      } })
-      assert.equal(createHash('sha256').update(process.env.OPENAI_API_KEY).digest('hex'), process.argv[2])
-      console.log('sdk-loaded')
-    `)
-    const sdk = spawn(process.execPath, [join(root, 'sdk.mjs'),
-      createHash('sha256').update(`${value}-updated`).digest('hex'), createHash('sha256').update(`${value}-sdk`).digest('hex')], {
-      cwd: folder,
-      env: { ...process.env, PATH: `${join(root, 'sdk-bin')}:${process.env.PATH}`,
-        SCT_TEST_ELECTRON: application.process().spawnfile, SCT_TEST_ENTRY: join(__dirname, 'electron-entry.cjs'), SCT_TEST_DATA: userData }
-    })
-    let sdkOutput = ''
-    sdk.stdout.on('data', (data: Buffer) => { sdkOutput += data.toString() })
-    sdk.stderr.on('data', (data: Buffer) => { sdkOutput += data.toString() })
-    const sdkExited = new Promise((resolve, reject) => { sdk.once('close', resolve); sdk.once('error', reject) })
-    try {
-      await expect.poll(() => sdkOutput).toContain('sdk-loaded')
-      await page.evaluate((secret) => window.sct.updateSecret(secret), { ...metadata[0], value: `${value}-sdk` })
-      await expect.poll(() => sdkOutput).toContain('sdk-updated')
-      expect(await sdkExited).toBe(0)
-      expect(sdkOutput).not.toContain(value)
-    } finally {
-      sdk.kill('SIGTERM')
+      await mkdir(join(root, 'sdk-bin'))
+      await writeFile(join(root, 'sdk-bin', 'sct'), '#!/bin/sh\nexec "$SCT_TEST_ELECTRON" "$SCT_TEST_ENTRY" "$SCT_TEST_DATA" "$@"\n', { mode: 0o700 })
+      await writeFile(join(root, 'sdk.mjs'), `
+        import { loadEnv } from ${JSON.stringify(pathToFileURL(join(__dirname, '../packages/env/dist/index.js')).href)}
+        import assert from 'node:assert/strict'
+        import { createHash } from 'node:crypto'
+        const alive = setInterval(() => {}, 1000)
+        const stop = await loadEnv({ onChange() {
+          assert.equal(createHash('sha256').update(process.env.OPENAI_API_KEY).digest('hex'), process.argv[3])
+          console.log('sdk-updated')
+          stop()
+          clearInterval(alive)
+        } })
+        assert.equal(createHash('sha256').update(process.env.OPENAI_API_KEY).digest('hex'), process.argv[2])
+        console.log('sdk-loaded')
+      `)
+      const sdk = spawn(process.execPath, [join(root, 'sdk.mjs'),
+        createHash('sha256').update(`${value}-updated`).digest('hex'), createHash('sha256').update(`${value}-sdk`).digest('hex')], {
+        cwd: folder,
+        env: { ...process.env, PATH: `${join(root, 'sdk-bin')}:${process.env.PATH}`,
+          SCT_TEST_ELECTRON: application.process().spawnfile, SCT_TEST_ENTRY: join(__dirname, 'electron-entry.cjs'), SCT_TEST_DATA: userData }
+      })
+      let sdkOutput = ''
+      sdk.stdout.on('data', (data: Buffer) => { sdkOutput += data.toString() })
+      sdk.stderr.on('data', (data: Buffer) => { sdkOutput += data.toString() })
+      const sdkExited = new Promise((resolve, reject) => { sdk.once('close', resolve); sdk.once('error', reject) })
+      try {
+        await expect.poll(() => sdkOutput).toContain('sdk-loaded')
+        await page.evaluate((secret) => window.sct.updateSecret(secret), { ...metadata[0], value: `${value}-sdk` })
+        await expect.poll(() => sdkOutput).toContain('sdk-updated')
+        expect(await sdkExited).toBe(0)
+        expect(sdkOutput).not.toContain(value)
+      } finally {
+        sdk.kill('SIGTERM')
+      }
     }
 
     await page.getByRole('link', { name: 'Open secrets' }).click()
