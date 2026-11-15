@@ -1,5 +1,6 @@
+import { writeFileAtomic } from './atomic-write.ts'
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute } from 'node:path'
 import type { Project, ProjectInput, ProjectRename } from '../shared/projects.ts'
 
@@ -133,8 +134,7 @@ export class ProjectStore {
   private async write(projects: Project[]): Promise<void> {
     try {
       await mkdir(dirname(this.filename), { recursive: true })
-      await writeFile(`${this.filename}.tmp`, JSON.stringify(projects, null, 2), { mode: 0o600 })
-      await rename(`${this.filename}.tmp`, this.filename)
+      await writeFileAtomic(this.filename, JSON.stringify(projects, null, 2), 0o600)
     } catch (error) {
       throw new Error('Cannot save the project list. Check your local storage permissions.', { cause: error })
     }

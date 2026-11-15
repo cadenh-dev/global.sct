@@ -2,6 +2,7 @@ import { packager } from '@electron/packager'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import electron from 'electron/package.json'
+import { flipElectronFuses } from './electron-fuses'
 import { stageDependencies } from './stage-dependencies'
 
 const identityName = 'global.sct Development'
@@ -47,7 +48,8 @@ const [output] = await packager({
   electronVersion: electron.version,
   platform: 'darwin',
   arch: process.arch,
-  extraResource: ['out/demo', 'out/airdrop', 'skills'],
+  afterExtract: [async ({ buildPath }) => flipElectronFuses(join(buildPath, 'Electron.app'))],
+  extraResource: ['out/airdrop', 'skills'],
   // macOS cannot load a native library from inside the archive.
   asar: { unpack: '*.node' },
   overwrite: true,

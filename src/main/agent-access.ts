@@ -27,7 +27,7 @@ interface AgentServices {
   // Resolves to null when the caller fails the signature check of a listed agent.
   caller: Promise<AgentCaller | null>
   executable: string
-  demo: string
+  demoArguments: string[]
 }
 
 interface PendingRequest {
@@ -237,7 +237,8 @@ export class AgentAccess {
       requireReviewedProject(request, project)
       requireExternalVault(project, this.vault.location())
       requireActive(request)
-      return startFixedDemo(project, { SCT_DEMO_TOKEN: value }, this.services.executable, this.services.demo, request.controller.signal)
+      return startFixedDemo(project, { SCT_DEMO_TOKEN: value }, this.services.executable, request.controller.signal,
+        this.services.demoArguments)
     }
     return demoOutcome(request.stdinValue !== undefined ? await launch(await this.projects.find(requireProject(request).id), request.stdinValue)
       : await this.vault.withSelectedSecrets(requireProject(request).id, request.view.secrets.map((secret) => secret.id),

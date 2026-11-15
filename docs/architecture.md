@@ -3,7 +3,7 @@
 global.sct uses Electron, React, and TypeScript. The Electron main process owns every sensitive operation on a Mac.
 These operations include vault access, the vault key, encryption, child processes, sharing, relay connections, and Agent Access.
 A passphrase derives the master key. The OS secret store only remembers it.
-The sandboxed renderer calls a narrow preload bridge and receives metadata only.
+The sandboxed renderer calls a narrow preload bridge and receives metadata only. The packaged executable has four fuses set: it disables Node execution, Node option variables, and Node inspect arguments, and it loads the app from ASAR only.
 Each Mac keeps its own vault, private keys, cached activity, and pending messages. No local server or separate daemon runs.
 
 ## Local runtime injection

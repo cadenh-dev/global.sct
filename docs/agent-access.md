@@ -14,9 +14,8 @@ bun run package:mac
 bun run install:cli
 ```
 
-The first command builds and signs the app, CLI, MCP server, SDK, fixed demo, and skills. See [signing setup](macos-signing.md).
+The first command builds and signs the app, CLI, MCP server, SDK, and skills. The packaged executable has four fuses set: it disables Node execution, Node option variables, and Node inspect arguments, and it loads the app from ASAR only. See [signing setup](macos-signing.md).
 The second command installs the `sct` command script in `~/.local/bin`.
-Use `bun run build:demo` to rebuild only the demo at `out/demo/index.cjs`.
 
 ## CLI
 
@@ -239,7 +238,9 @@ See [relay configuration](relay.md) for `SCT_RELAY` and the cache behavior.
 `sct run` needs no Agent Access approval. For a manual demo, save `SCT_DEMO_TOKEN` in a registered project and run from that project:
 
 ```sh
-sct run -- node /absolute/path/to/global.sct/out/demo/index.cjs
+sct run -- sct _demo
 ```
 
-The demo prints presence only. It creates no project files and uses no network service.
+The `_demo` command prints no token value. It creates no project files and uses no network service. The packaged executable has four fuses set: it disables Node execution, Node option variables, and Node inspect arguments, and it loads the app from ASAR only.
+
+The command exits with code 0 when `SCT_DEMO_TOKEN` is present. It exits with code 1 when the value is not present. Read the result with `sct run -- sct _demo; echo $?`. The RunAsNode fuse disables `ELECTRON_RUN_AS_NODE`.
