@@ -1,5 +1,6 @@
+import { writeFileAtomic } from './atomic-write.ts'
 import { createHash, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, randomUUID, sign, verify } from 'node:crypto'
-import { mkdir, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, open, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod/v4'
 import { createIdentity, decodeIdentity, decryptTransfer, describeDevice, encodeIdentity, encryptTransfer, exportPublic,
@@ -439,8 +440,7 @@ export class Sharing {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       }
-      await writeFile(`${target}.tmp`, JSON.stringify(envelope), { mode: 0o600 })
-      await rename(`${target}.tmp`, target)
+      await writeFileAtomic(target, JSON.stringify(envelope), 0o600)
       return preview
     })
   }
@@ -625,8 +625,7 @@ export class Sharing {
 
   private async writeJson(name: string, value: unknown): Promise<void> {
     await mkdir(this.root, { recursive: true, mode: 0o700 })
-    await writeFile(join(this.root, `${name}.tmp`), JSON.stringify(value), { mode: 0o600 })
-    await rename(join(this.root, `${name}.tmp`), join(this.root, name))
+    await writeFileAtomic(join(this.root, name), JSON.stringify(value), 0o600)
   }
 
   private async incomingFiles(): Promise<string[]> {

@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { writeFileAtomic } from './atomic-write.ts'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod/v4'
 import { readReceipt, readTransfer } from './envelope'
@@ -500,6 +501,5 @@ async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T | null
 
 async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  await writeFile(`${path}.tmp`, JSON.stringify(value), { mode: 0o600 })
-  await rename(`${path}.tmp`, path)
+  await writeFileAtomic(path, JSON.stringify(value), 0o600)
 }

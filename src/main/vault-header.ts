@@ -1,6 +1,7 @@
+import { writeFileAtomic } from './atomic-write.ts'
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
 import type { ScryptOptions } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { promisify } from 'node:util'
 import { z } from 'zod/v4'
@@ -51,8 +52,7 @@ export async function readVaultHeader(file: string): Promise<VaultHeader | null>
 export async function writeVaultHeader(file: string, header: VaultHeader): Promise<void> {
   try {
     await mkdir(dirname(file), { recursive: true, mode: 0o700 })
-    await writeFile(`${file}.tmp`, JSON.stringify(header, null, 2), { mode: 0o600 })
-    await rename(`${file}.tmp`, file)
+    await writeFileAtomic(file, JSON.stringify(header, null, 2), 0o600)
   } catch (error) {
     throw new Error('Cannot save the vault header. Check the storage permissions.', { cause: error })
   }
