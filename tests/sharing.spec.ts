@@ -113,7 +113,7 @@ test('shares selected secrets into the recipient project without exposing values
 
     if (process.platform === 'darwin') {
       await source.getByRole('link', { name: 'Continue to Send secrets', exact: true }).click()
-      await expect(source.getByLabel('Source project').locator('option:checked')).toHaveText('backend')
+      await expect(source.locator('#sharing-project option:checked')).toHaveText('backend')
       await expect(source.getByLabel('Verified recipient')).toBeFocused()
       await source.getByLabel('Verified recipient').selectOption({ index: 1 })
       await source.getByLabel('Select all secrets').check()
@@ -125,7 +125,7 @@ test('shares selected secrets into the recipient project without exposing values
       await source.getByRole('navigation', { name: 'Sharing', exact: true }).getByRole('link', { name: 'Verify devices', exact: true }).click()
       await expect(source.getByRole('heading', { name: 'Send secrets', exact: true })).not.toBeVisible()
       await source.getByRole('navigation', { name: 'Sharing', exact: true }).getByRole('link', { name: 'Send secrets', exact: true }).click()
-      await expect(source.getByLabel('Source project').locator('option:checked')).toHaveText('backend')
+      await expect(source.locator('#sharing-project option:checked')).toHaveText('backend')
       await expect(source.getByLabel('API_TOKEN', { exact: true })).toBeChecked()
       await expect(source.getByLabel('SECOND_TOKEN', { exact: true })).not.toBeChecked()
       await source.getByRole('button', { name: 'Send to…' }).click()
