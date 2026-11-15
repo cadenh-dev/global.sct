@@ -80,15 +80,14 @@ It holds the material to derive and verify the master key.
 
 Field meanings:
 
-- `version` is the format version. The reader accepts versions `1` and `2`.
+- `version` is the format version. The reader accepts version `2` only.
 - `kdf` holds the scrypt parameters. See section 3.
-- In version 1, `salt` derives the master key. In version 2, it derives the wrapping key. It is random and is not a secret.
+- `salt` derives the wrapping key. It is random and is not a secret.
 - `verifier` is a sealed constant under the master key. It proves the opened master key is correct. See section 3.
-- `wrappedKey` is version 2 only. It holds the master key sealed by the passphrase wrapping key with AAD `vault-master-key`.
+- `wrappedKey` holds the master key sealed by the passphrase wrapping key with AAD `vault-master-key`.
 
 The master key does not appear in plaintext in `vault.json`.
 The passphrase opens it each time. The OS secret store can hold a copy. See section 4.
-After the first successful unlock of a version 1 header, global.sct writes a version 2 header with a new salt. It keeps the master key and does not rewrite secret files.
 The user can change the passphrase in the Storage screen. global.sct checks the current passphrase, then seals the same master key with a new wrapping key and salt. A remembered master key stays valid.
 
 ### The per-project file `secrets.sct`
@@ -266,7 +265,7 @@ async function openMasterKey(passphrase: string, header: VaultHeader): Promise<B
 
 The vault stores a verifier in `vault.json`.
 The verifier is a known constant, sealed with the master key and the `vault-verifier` AAD.
-A correct master key opens the verifier. A wrong version 2 passphrase fails to open `wrappedKey`. A wrong version 1 passphrase fails to open the verifier.
+A correct master key opens the verifier. A wrong passphrase fails to open `wrappedKey`.
 
 ```ts
 const verifierPlaintext = Buffer.from('sct-vault-v1')
@@ -395,16 +394,7 @@ This file joins the existing shared files such as `src/shared/secrets.ts`.
 ```ts
 // src/shared/vault.ts
 
-export type VaultHeader = VaultHeaderV1 | VaultHeaderV2
-
-export interface VaultHeaderV1 {
-  version: 1
-  kdf: ScryptParams
-  salt: string
-  verifier: SealedField
-}
-
-export interface VaultHeaderV2 {
+export interface VaultHeader {
   version: 2
   kdf: ScryptParams
   salt: string
@@ -461,10 +451,10 @@ The `SecretStore` only adds the optional skip of the passphrase prompt.
 
 | Case | Detection | Behavior |
 |---|---|---|
-| Wrong passphrase | Version 2 cannot open `wrappedKey`. Version 1 cannot open the verifier, or the opened constant does not match. | The vault returns a clear error. It does not unlock. It clears temporary keys. The user tries again. |
+| Wrong passphrase | The wrapping key cannot open `wrappedKey`. | The vault returns a clear error. It does not unlock. It clears temporary keys. The user tries again. |
 | Missing OS secret store | A `read` or `available` call on `@napi-rs/keyring` fails, or the platform has no service. | The vault uses `PassphraseOnlySecretStore`. It disables "remember this device". The passphrase path still works. |
 | Corrupt vault file | `vault.json` fails the schema decode, or `secrets.sct` fails `decodeFile`, or a GCM tag check fails. | The vault returns a clear error and does not change the file. It reports which file is affected. |
-| Version mismatch | `version` in `vault.json` is not `1` or `2`. | The vault refuses to open the vault. It reports the version it supports. It does not guess or migrate. |
+| Version mismatch | `version` in `vault.json` is not `2`. | The vault refuses to open the vault. It reports the version it supports. A version 1 header is unsupported and is not migrated. |
 | Locked vault | A vault operation runs before an unlock. The master key is not in memory. | The vault returns an error that asks for an unlock first. The CLI prompts for the passphrase. |
 | Concurrent access | The serial queue in `vault.ts` already orders operations in one process. Two processes can open the vault at the same time, for example the app and `sct run`. | Each process derives the master key on its own from the same passphrase or the same stored key. Reads are safe. Each write uses a unique temporary name and an atomic `rename`. The last complete rename wins. There is no lock file and no `fsync`. |
 
@@ -487,7 +477,8 @@ Decisions taken on 2026-11-04:
 | Existing tests | Edit the tests that the format change breaks. |
 | Project file key | Drop it. The master key seals the array. |
 | Master key form | Store the master key directly in "Remember this device". |
-| Passphrase wrapper | Version 2 wraps the master key with a key derived from the passphrase and a random salt. The verifier stays sealed by the master key. A successful version 1 unlock writes version 2 without changing secret files. A passphrase change writes a new salt and wrapped master key. |
+| Header version | Version 2 only. A version 1 header is unsupported and is not migrated. |
+| Passphrase wrapper | Version 2 wraps the master key with a key derived from the passphrase and a random salt. The verifier stays sealed by the master key. A passphrase change writes a new salt and wrapped master key. |
 | Scrypt cost | `N = 2^17`, `r = 8`, `p = 1`, about one second on a current laptop. |
 | Cross-process write ordering | Each write uses a unique temporary name and an atomic `rename`. The last complete rename wins. There is no lock file and no `fsync`. |
 

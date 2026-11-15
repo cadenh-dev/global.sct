@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,8 +10,6 @@ import { ProjectStore } from '../src/main/projects.ts'
 import { Vault } from '../src/main/vault.ts'
 import { InMemorySecretStore } from '../src/main/key-store.ts'
 import { launchProject, runProject } from '../src/main/launch.ts'
-import { defaultScrypt, deriveMasterKey, encodeSealed, writeVaultHeader } from '../src/main/vault-header.ts'
-import { seal } from '../src/main/seal.ts'
 
 const passphrase = 'test passphrase for the vault'
 
@@ -73,7 +71,7 @@ test('secrets stay encrypted at rest and renderer operations return only metadat
   await assert.rejects(vault.withSecret(secret, () => assert.fail('A deleted secret must not reach the consumer.')), /does not exist/)
 })
 
-test('legacy vaults migrate and a passphrase change preserves secrets and remembered unlock', async (t) => {
+test('a passphrase change preserves secrets and remembered unlock', async (t) => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sct-passphrase-')))
   t.after(() => rm(root, { recursive: true, force: true }))
   const folder = async (name: string) => {
@@ -84,47 +82,27 @@ test('legacy vaults migrate and a passphrase change preserves secrets and rememb
   const store = new InMemorySecretStore()
   const projects = new ProjectStore(join(root, 'app-data', 'projects.json'))
   const settings = join(root, 'app-data', 'settings.json')
-  const legacyPassphrase = 'legacy synthetic passphrase'
-  const legacySalt = randomBytes(16)
-  const legacyMasterKey = await deriveMasterKey(legacyPassphrase, defaultScrypt, legacySalt.toString('base64'))
-  try {
-    await writeVaultHeader(join(root, 'global.sct', 'vault.json'), {
-      version: 1,
-      kdf: defaultScrypt,
-      salt: legacySalt.toString('base64'),
-      verifier: encodeSealed(seal(legacyMasterKey, Buffer.from('sct-vault-v1'), Buffer.from('vault-verifier')))
-    })
-  } finally {
-    legacySalt.fill(0)
-    legacyMasterKey.fill(0)
-  }
-
-  const legacyVault = new Vault(projects, settings, root, store)
-  await legacyVault.start()
-  await legacyVault.unlock({ passphrase: legacyPassphrase, remember: false })
-  const project = await legacyVault.addProject({ name: 'Legacy', directory: await folder('legacy') })
-  const secret = await legacyVault.addSecret({ projectId: project.id, name: 'TOKEN', value: 'synthetic-secret-value' })
-  await legacyVault.lock()
-
-  const migratedVault = new Vault(projects, settings, root, store)
-  await migratedVault.start()
-  await migratedVault.unlock({ passphrase: legacyPassphrase, remember: true })
-  assert.equal(JSON.parse(await readFile(join(root, 'global.sct', 'vault.json'), 'utf8')).version, 2)
-  assert.deepEqual(await migratedVault.listSecrets(), [secret])
-  await migratedVault.changePassphrase({ currentPassphrase: legacyPassphrase, nextPassphrase: 'new synthetic passphrase' })
+  const vault = new Vault(projects, settings, root, store)
+  await vault.start()
+  await vault.unlock({ passphrase, remember: true })
+  const project = await vault.addProject({ name: 'Project', directory: await folder('project') })
+  const secret = await vault.addSecret({ projectId: project.id, name: 'TOKEN', value: 'synthetic-secret-value' })
+  await vault.lock()
+  await vault.unlock({ passphrase, remember: true })
+  await vault.changePassphrase({ currentPassphrase: passphrase, nextPassphrase: 'new synthetic passphrase' })
 
   const oldPassphraseVault = new Vault(projects, settings, root, new InMemorySecretStore())
   await oldPassphraseVault.start()
-  await assert.rejects(oldPassphraseVault.unlock({ passphrase: legacyPassphrase, remember: false }), /passphrase is not correct/)
+  await assert.rejects(oldPassphraseVault.unlock({ passphrase, remember: false }), /passphrase is not correct/)
   const newPassphraseVault = new Vault(projects, settings, root, new InMemorySecretStore())
   await newPassphraseVault.start()
   await newPassphraseVault.unlock({ passphrase: 'new synthetic passphrase', remember: false })
   assert.deepEqual(await newPassphraseVault.listSecrets(), [secret])
   await newPassphraseVault.withSecret(secret, (value) => assert.equal(value.toString(), 'synthetic-secret-value'))
 
-  await migratedVault.lock()
-  assert.equal(await migratedVault.unlockWithRememberedKey(), true)
-  assert.deepEqual(await migratedVault.listSecrets(), [secret])
+  await vault.lock()
+  assert.equal(await vault.unlockWithRememberedKey(), true)
+  assert.deepEqual(await vault.listSecrets(), [secret])
 })
 
 test('a locked vault refuses every secret operation', async (t) => {
