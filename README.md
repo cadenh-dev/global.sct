@@ -122,7 +122,7 @@ Set up global.sct on this computer. Follow these steps in sequence:
 5. Run the package command for this platform, then run `bun run install:cli`.
    macOS: `bun run package:mac`. Windows: `bun run package:win`. Linux: `bun run package:linux`.
 6. Add the MCP server "sct" with the command `sct` and the argument `mcp`.
-   On Windows, use `cmd /c sct mcp` or the full `sct.exe` path because a direct MCP client cannot start a `.cmd` file.
+   On Windows, first add the folder that the installer prints to `PATH`. That folder contains `sct.exe`.
 7. Open the app from dist/. Tell me to choose a vault location outside every project folder.
 
 Rules:
@@ -135,7 +135,6 @@ Rules:
 
 - The Windows and Linux packages are unsigned. Signing waits on D12 and D13.
 - The Windows caller check uses the Authenticode signer and product metadata. It does not pin a certificate thumbprint yet.
-- A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
 - The Windows check runner runs the Playwright suite. It excludes the test `manages secrets per project without rendering stored values`, as the Linux job and the macOS job do.
 
 ## Docs

@@ -5,7 +5,6 @@
 - The Windows and Linux packages still need signing. [README](../README.md#known-limitations)
 - A Mac test must confirm the package that `bun run package:mac` signs with the `global.sct Development` identity. CI covers only the ad-hoc signature. [macOS signing](macos-signing.md#ci-release-builds)
 - The Windows caller check does not pin a certificate thumbprint. [README](../README.md#known-limitations)
-- A direct Windows MCP client cannot start `sct.cmd`. [README](../README.md#known-limitations)
 - On Windows, the excluded secret test also starts `cmd.exe` and stops at its prompt. [Windows and Linux](windows-linux.md)
 - The Linux, macOS, and Windows UI jobs exclude the test `manages secrets per project without rendering stored values`. Its `sct run` step opens a second unlock window that Playwright does not drive. [Test](../tests/app.spec.ts), [Checks workflow](../.github/workflows/checks.yml)
 - Public STUN, remote TURN, and cross-network WebRTC remain unverified. [Windows and Linux](windows-linux.md)

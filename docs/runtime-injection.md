@@ -41,7 +41,7 @@ Electron finds its helper apps only from the real executable path. Thus the comm
 - The installer replaces an earlier global.sct symbolic link to the same executable.
 - The installer keeps other commands. It rejects a script or a link for another application.
 - After a rebuild, the script uses the same app location. If you move the app, install the command again.
-- A direct MCP client cannot start `sct.cmd`. Use `cmd /c sct mcp` or the full `sct.exe` path.
+- A direct MCP client cannot start `sct.cmd`. On Windows, add the folder that the installer prints to `PATH`. That folder contains `sct.exe`, so the name `sct` starts the executable.
 - The `@sct/env` SDK reads `sct.json` on Windows. Set `SCT_CLI` to use another executable path.
 
 ## CLI: one command in your project
