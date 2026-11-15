@@ -71,13 +71,14 @@ export async function writeVaultHeader(file: string, header: VaultHeader): Promi
 export async function createVaultHeader(passphrase: string): Promise<{ header: VaultHeader; masterKey: Buffer }> {
   const salt = randomBytes(saltLength)
   const masterKey = randomBytes(32)
+  let keepMasterKey = false
   try {
-    return { header: await createWrappedVaultHeader(passphrase, masterKey, salt), masterKey }
-  } catch (error) {
-    masterKey.fill(0)
-    throw error
+    const header = await createWrappedVaultHeader(passphrase, masterKey, salt)
+    keepMasterKey = true
+    return { header, masterKey }
   } finally {
     salt.fill(0)
+    if (!keepMasterKey) masterKey.fill(0)
   }
 }
 

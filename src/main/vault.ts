@@ -99,13 +99,14 @@ export class Vault {
       const saved = await readVaultHeader(file)
       if (saved) {
         const masterKey = await openMasterKey(passphrase, saved)
+        let keepMasterKey = false
         try {
           if (!checkPassphrase(masterKey, saved)) throw new Error('The passphrase is not correct. Try again.')
           if (saved.version === 1) await writeVaultHeader(file, await createWrappedVaultHeader(passphrase, masterKey))
           this.setMasterKey(masterKey)
-        } catch (error) {
-          masterKey.fill(0)
-          throw error
+          keepMasterKey = true
+        } finally {
+          if (!keepMasterKey) masterKey.fill(0)
         }
       } else {
         if (passphrase.length < minimumPassphraseLength) {
@@ -148,13 +149,18 @@ export class Vault {
       if (!header) return false
       const stored = await this.store.read()
       if (!stored) return false
-      if (!checkPassphrase(stored, header)) {
-        stored.fill(0)
-        await this.store.clear()
-        return false
+      let keepStored = false
+      try {
+        if (!checkPassphrase(stored, header)) {
+          await this.store.clear()
+          return false
+        }
+        this.setMasterKey(stored)
+        keepStored = true
+        return true
+      } finally {
+        if (!keepStored) stored.fill(0)
       }
-      this.setMasterKey(stored)
-      return true
     })
   }
 
@@ -612,14 +618,16 @@ export class Vault {
   private async readStatus(): Promise<VaultStatus> {
     const [header, rememberAvailable] = await Promise.all([readVaultHeader(this.headerFile()), this.store.available()])
     const remembered = rememberAvailable ? await this.store.read() : null
-    const status = {
-      initialized: header !== null,
-      locked: this.masterKey === null,
-      rememberAvailable,
-      rememberEnabled: remembered !== null
+    try {
+      return {
+        initialized: header !== null,
+        locked: this.masterKey === null,
+        rememberAvailable,
+        rememberEnabled: remembered !== null
+      }
+    } finally {
+      remembered?.fill(0)
     }
-    remembered?.fill(0)
-    return status
   }
 
   private headerFile(): string {
