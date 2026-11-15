@@ -130,6 +130,9 @@ test('shares selected secrets into the recipient project without exposing values
       await expect(sendForm.getByLabel('API_TOKEN', { exact: true })).toBeChecked()
       await expect(sendForm.getByLabel('SECOND_TOKEN', { exact: true })).not.toBeChecked()
       await sendForm.getByRole('button', { name: 'Send to…' }).click()
+      const confirmation = source.getByRole('dialog', { name: 'Confirm this share' })
+      await confirmation.getByLabel('Vault passphrase', { exact: true }).fill(passphrase)
+      await confirmation.getByRole('button', { name: 'Confirm share', exact: true }).click()
       await expect(source.getByRole('status').first()).toContainText('the encrypted secrets are on their way')
       const packages = (await readdir(join(sender.data, 'sharing', 'outbox'))).filter((name) => name.endsWith('.sct-transfer'))
       expect(packages).toHaveLength(1)
@@ -167,7 +170,7 @@ test('shares selected secrets into the recipient project without exposing values
 
       await writeFile(join(root, 'recipient', 'received.sct-transfer'), transfer)
       await destination.getByRole('button', { name: 'Choose received file…' }).click()
-      await expect(destination.getByRole('alert')).toContainText(/already|imported/i)
+      await expect(destination.getByRole('alert')).toHaveText('This transfer was already imported. No secrets were imported again.')
       expect(await destination.evaluate(() => window.sct.listSecrets())).toHaveLength(1)
       await source.screenshot({ path: test.info().outputPath('send-secrets.png') })
     }
