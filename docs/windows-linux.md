@@ -79,6 +79,7 @@ Use the packaged app. Open **Storage**, find **Links**, and select **Register gl
 
 - Windows writes per-user registry values under `HKCU\Software\Classes\global-sct`. It needs no administrator rights. Moving the portable folder requires registration again.
 - Linux writes `app.global-sct.desktop` under `$XDG_DATA_HOME/applications`, or `~/.local/share/applications`, and calls `xdg-mime`. A desktop session with `xdg-mime` is required.
+  **Remove registration** deletes that desktop entry and the app's `global-sct` line in `$XDG_CONFIG_HOME/mimeapps.list`. Other lines stay unchanged.
 - macOS uses the `CFBundleURLTypes` entry in the packaged `global.sct.app`.
 
 If another app owns the scheme, select **Replace handler** in the app.
@@ -178,6 +179,22 @@ Two `app.spec.ts` checks do not pass on the headless ARM64 server:
 - The second test exceeds the default 30-second timeout.
 
 These are test-platform issues. They do not show a product failure. Do not change the tests without approval.
+
+### Linux x64 platform checks (CachyOS, 2026-11-15)
+
+Two app instances with independent vaults ran on one CachyOS x64 computer with KDE and Wayland.
+Temporary Playwright checks drove the apps. The check files were not committed.
+
+- WebRTC with no server: the apps paired through device cards, connected, sent one synthetic secret, imported it, and returned the signed receipt. The sender showed `received`.
+- WebRTC with a public STUN server: the same flow passed after a correction. The computer has container and virtual interfaces, so candidate gathering stayed open after the 10-second limit and the offer failed. The app now continues with the candidates that are ready at the limit.
+  Both apps were on one computer. This check does not show NAT traversal between networks.
+- Link mode: the sender created a link, the recipient imported it, and the sender verified the receipt link. The state changed to `received`.
+- Link delivery: a second app instance with a `global-sct://import/` argument opened the **Link** tab in the first instance and filled **Paste import link**.
+- Packaged link registration: the packaged app ran with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` folders. **Register global.sct links** wrote the desktop entry, and `xdg-mime` returned `app.global-sct.desktop`. `xdg-open` delivered a link to the running app.
+- Packaged link removal: **Remove registration** left the association in `mimeapps.list` and in the desktop cache, so the app reported a stale association. The app now deletes its own line and refreshes the desktop database. After the correction, the status is "No app is registered for global-sct links." and the other lines in `mimeapps.list` are unchanged.
+- Sharing UI: the Send, Link, WebRTC, link review, link receipt, share confirmation, and Links registration states showed correctly in Cream and Terminal.
+
+Remote TURN, cross-network WebRTC, and the macOS checks remain open.
 
 ### Windows result (2026-11-05)
 

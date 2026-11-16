@@ -7,6 +7,6 @@
 - The Windows caller check does not pin a certificate thumbprint. [README](../README.md#known-limitations)
 - On Windows, the excluded secret test also starts `cmd.exe` and stops at its prompt. [Windows and Linux](windows-linux.md)
 - The Linux, macOS, and Windows UI jobs exclude the test `manages secrets per project without rendering stored values`. Its `sct run` step opens a second unlock window that Playwright does not drive. [Test](../tests/app.spec.ts), [Checks workflow](../.github/workflows/checks.yml)
-- Public STUN, remote TURN, and cross-network WebRTC remain unverified. [Windows and Linux](windows-linux.md)
-- macOS and Linux platform checks remain open for Direct, WebRTC, app links, and sharing UI. [Archived implementation plan](archive/implementation-plan.md)
+- Remote TURN and cross-network WebRTC remain unverified. A public STUN server is checked only between two apps on one Linux computer. [Windows and Linux](windows-linux.md)
+- macOS platform checks remain open for Direct, WebRTC, app links, and sharing UI. [Archived implementation plan](archive/implementation-plan.md)
 - Live VS Code verification remains open. [Archived remaining feature plan](archive/remaining-features-plan.md#starting-point)
