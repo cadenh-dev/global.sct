@@ -6,6 +6,7 @@ import { errorText } from './operation'
 import { ProjectSecretsView } from './ProjectSecretsView'
 import { ProjectsView } from './ProjectsView'
 import { SettingsView } from './SettingsView'
+import { HelpView } from './HelpView'
 import { SharingView } from './SharingView'
 import { AgentAccessView } from './AgentAccessView'
 import { CardsView } from './CardsView'
@@ -15,7 +16,7 @@ import type { Loaded, SharingTab, UpdateProjects, UpdateSecrets } from './types'
 import type { VaultStatus } from '../../shared/vault'
 import type { PendingLink } from '../../shared/transport'
 
-type Route = { view: 'projects' } | { view: 'project'; id: string } | { view: 'secrets' } | { view: 'settings' } | { view: 'sharing'; projectId?: string; tab?: SharingTab } | { view: 'cards' } | { view: 'agent' }
+type Route = { view: 'projects' } | { view: 'project'; id: string } | { view: 'secrets' } | { view: 'settings' } | { view: 'help' } | { view: 'sharing'; projectId?: string; tab?: SharingTab } | { view: 'cards' } | { view: 'agent' }
 
 export function App() {
   const isMac = window.sct.platform === 'darwin'
@@ -98,13 +99,7 @@ function DesktopApp({ route, isMac, onLocked }: { route: Exclude<Route, { view: 
       <header className="app-header">
         <div className="header-start">
           <span className="wordmark">global.sct</span>
-          <nav aria-label="Main">
-            <a href="#/" aria-current={route.view === 'projects' || route.view === 'project' ? 'page' : undefined}>Projects</a>
-            <a href="#/secrets" aria-current={route.view === 'secrets' ? 'page' : undefined}>All secrets</a>
-            <a href="#/sharing" aria-current={route.view === 'sharing' ? 'page' : undefined}>Sharing</a>
-            {isMac && <a href="#/cards" aria-current={route.view === 'cards' ? 'page' : undefined}>Cards</a>}
-            <a href="#/settings" aria-current={route.view === 'settings' ? 'page' : undefined}>Settings</a>
-          </nav>
+          <MainNavigation view={route.view} isMac={isMac} />
         </div>
         <span className="local-label">On this device</span>
       </header>
@@ -117,6 +112,7 @@ function DesktopApp({ route, isMac, onLocked }: { route: Exclude<Route, { view: 
         )}
         {route.view === 'secrets' && <AllSecretsView projects={projects} secrets={secrets} />}
         {route.view === 'settings' && <SettingsView onLocked={onLocked} />}
+        {route.view === 'help' && <HelpView isMac={isMac} />}
         {route.view === 'cards' && <CardsView />}
         {route.view === 'sharing' && (
           <SharingView key={route.projectId ?? 'sharing'} projectId={route.projectId}
@@ -131,6 +127,19 @@ function DesktopApp({ route, isMac, onLocked }: { route: Exclude<Route, { view: 
   )
 }
 
+function MainNavigation({ view, isMac }: { view: Route['view']; isMac: boolean }) {
+  return (
+    <nav aria-label="Main">
+      <a href="#/" aria-current={view === 'projects' || view === 'project' ? 'page' : undefined}>Projects</a>
+      <a href="#/secrets" aria-current={view === 'secrets' ? 'page' : undefined}>All secrets</a>
+      <a href="#/sharing" aria-current={view === 'sharing' ? 'page' : undefined}>Sharing</a>
+      {isMac && <a href="#/cards" aria-current={view === 'cards' ? 'page' : undefined}>Cards</a>}
+      <a href="#/settings" aria-current={view === 'settings' ? 'page' : undefined}>Settings</a>
+      <a href="#/help" aria-current={view === 'help' ? 'page' : undefined}>Help</a>
+    </nav>
+  )
+}
+
 function subscribeToHash(onChange: () => void): () => void {
   window.addEventListener('hashchange', onChange)
   return () => window.removeEventListener('hashchange', onChange)
@@ -141,6 +150,7 @@ function parseRoute(hash: string, isMac: boolean): Route {
   if (view === 'projects' && id) return { view: 'project', id: decodeURIComponent(id) }
   if (view === 'secrets') return { view: 'secrets' }
   if (view === 'settings') return { view: 'settings' }
+  if (view === 'help') return { view: 'help' }
   if (view === 'cards' && isMac) return { view: 'cards' }
   if (view === 'agent') return { view: 'agent' }
   if (view === 'sharing') {
