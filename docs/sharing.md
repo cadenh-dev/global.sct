@@ -9,13 +9,14 @@ global.sct sends encrypted copies of secrets to a verified device.
 The Link, Direct, WebRTC, Mailbox, and AirDrop flows need no agent.
 The Link, Direct, and WebRTC flows need no relay.
 The AirDrop flow also needs no network connection other than AirDrop.
-On macOS, the **Sharing** screen has these tabs: **Verify devices**, **Send**, **Send secrets**, **Receive secrets**, **Relay**, **Link**, **Direct**, and **WebRTC**.
-On Windows and Linux, it has these tabs: **Verify devices**, **Send**, **Relay**, **Link**, **Direct**, and **WebRTC**.
-The **Send** tab chooses a delivery mode from the connections that are available now.
-The **Send secrets** tab uses AirDrop on macOS.
-The **Relay** tab configures Mailbox delivery and shows relay activity.
-This page describes pairing, the delivery modes, and the macOS AirDrop tabs.
-See [relay setup](relay.md) for the **Relay** tab.
+On macOS, the **Sharing** screen has a list of these pages: **Verify devices**, **Send**, **Send secrets**, **Receive secrets**, **Relay**, **Link**, **Direct**, and **WebRTC**.
+On Windows and Linux, it has these pages: **Verify devices**, **Send**, **Relay**, **Link**, **Direct**, and **WebRTC**.
+Each list entry has one line that says when to use the page. In a window of 700 px or less, the list is a row of names.
+The **Send** page chooses a delivery mode from the connections that are available now.
+The **Send secrets** page uses AirDrop on macOS.
+The **Relay** page configures Mailbox delivery and shows relay activity.
+This document describes pairing, the delivery modes, and the macOS AirDrop pages.
+See [relay setup](relay.md) for the **Relay** page.
 See [Windows and Linux](windows-linux.md) for the platform limits.
 
 Build the signed app with `bun run package:mac`. Then macOS opens `.sct-transfer` files in global.sct.
@@ -26,7 +27,7 @@ The development window registers no file type.
 When you open **Sharing** for the first time, global.sct creates a sharing identity in the vault.
 Do these steps on both devices:
 
-1. Open **Sharing**, then open the **Verify devices** tab.
+1. Open **Sharing**, then open the **Verify devices** page.
 2. Select **Copy pairing link**, or select **Save device card…** to write a `.sct-device` file.
 3. Send the link or the file to the other device.
 4. Ask the other person to send their link or file back.
@@ -37,8 +38,8 @@ Do these steps on both devices:
 
 On macOS, you can also select **Send my card to…** and choose the other Mac in the AirDrop picker.
 If the keys of one device change, verify that device again.
-The **Send secrets** tab stays unavailable until you verify one device.
-On Windows and Linux, use the **Send** tab with Link, Direct, WebRTC, or Mailbox.
+The **Send secrets** page stays unavailable until you verify one device.
+On Windows and Linux, use the **Send** page with Link, Direct, WebRTC, or Mailbox.
 
 ## Confirm every share
 
@@ -53,7 +54,7 @@ Receipts and relay acknowledgments do not need a confirmation.
 
 ## Choose a delivery mode
 
-1. Open the **Send** tab.
+1. Open the **Send** page.
 2. Choose the source project and the secret names.
 3. Choose a mode that is available now.
 4. Set the optional access expiry and the injection-only rule.
@@ -71,7 +72,7 @@ If a Link is too large, select fewer secrets or choose Direct, WebRTC, or Mailbo
 
 ## Send by AirDrop
 
-1. Open the **Send secrets** tab. You can also select **Share secrets** on a project page. Then global.sct keeps that project selected.
+1. Open the **Send secrets** page. You can also select **Share secrets** on a project page. Then global.sct keeps that project selected.
 2. Choose the source project.
 3. Choose a verified recipient.
 4. Choose the secrets.
@@ -86,7 +87,7 @@ macOS reports the same result for a sent file and for **Cancel**. Thus the sende
 
 1. Accept the AirDrop file. macOS saves it in Downloads.
 2. Open the file. The signed app opens `.sct-transfer` files.
-   As an alternative, open the **Receive secrets** tab and select **Choose received file…**.
+   As an alternative, open the **Receive secrets** page and select **Choose received file…**.
 3. Choose a local destination project.
 4. Select **Import secrets**.
 
@@ -100,8 +101,8 @@ Direct mode sends an encrypted transfer to a verified peer without a relay.
 Both apps must be open and unlocked. Both peers must be online at the same time.
 Hyperswarm is the normal Direct path.
 
-1. Open **Sharing**, then open the **Direct** tab to check the connection.
-2. Open the **Send** tab. Choose the source project, the secrets, and the Direct mode.
+1. Open **Sharing**, then open the **Direct** page to check the connection.
+2. Open the **Send** page. Choose the source project, the secrets, and the Direct mode.
 3. Select **Send secrets**. Then enter the vault passphrase.
 4. On the recipient, choose a destination project and select **Import and send receipt**.
 
@@ -109,7 +110,7 @@ A device shows **online** after both apps authenticate.
 The sender receives the signed receipt in the same session and the row changes to `received`.
 If the session closes before the receipt returns, the row changes to `manual` after ten minutes.
 Paste the receipt link from the recipient to verify it.
-The recipient can open **Receipts to return** in the **Direct** tab and copy the saved signed link.
+The recipient can open **Receipts to return** in the **Direct** page and copy the saved signed link.
 
 Direct uses Hyperswarm discovery and an encrypted connection. The discovery topic changes each UTC day.
 A failed connection shows **Peer not reachable**. Use Link, WebRTC, or Mailbox.
@@ -122,12 +123,12 @@ WebRTC mode uses one manual offer link and one manual answer link.
 Both apps must be open and unlocked.
 No signalling server exists.
 
-1. On the sender, open the **WebRTC** tab. Choose a verified device and select **Create WebRTC offer**.
+1. On the sender, open the **WebRTC** page. Choose a verified device and select **Create WebRTC offer**.
 2. Send the offer link to the recipient through a trusted conversation.
 3. On the recipient, paste the offer link and select **Create answer**.
 4. Send the answer link back to the sender.
 5. On the sender, paste the answer link and select **Accept answer**.
-6. When the connection is ready, open the **Send** tab and choose the WebRTC mode.
+6. When the connection is ready, open the **Send** page and choose the WebRTC mode.
 
 The offer and answer links are signed and encrypted for the verified peer.
 Each link expires after five minutes.
@@ -136,7 +137,7 @@ The connection starts within 30 seconds after the answer.
 The app sends framed data in chunks and stops an oversized or incomplete transfer.
 The sender receives the signed receipt over the same data channel.
 If the receipt does not return, the row changes to `manual` after ten minutes.
-The recipient can open **Receipts to return** in the **WebRTC** tab and copy the saved signed link.
+The recipient can open **Receipts to return** in the **WebRTC** page and copy the saved signed link.
 
 The **WebRTC network settings** panel configures the connection:
 - No server is the default. Connections use direct candidates.
@@ -147,17 +148,17 @@ The **WebRTC network settings** panel configures the connection:
 - The connection label shows **Direct via TURN** when the selected path uses a relay candidate.
 
 A TURN server forwards encrypted traffic. It is not durable Mailbox storage.
-A connection link from the operating system opens the **WebRTC** tab and shows the sender.
+A connection link from the operating system opens the **WebRTC** page and shows the sender.
 The app never accepts the link on arrival.
 
 ## Mailbox mode
 
 Mailbox mode uses the configured relay for an encrypted server copy.
 The relay stores ciphertext and routing metadata. It does not store secret values or private keys.
-Mailbox needs a configured relay, a verified relay device, and the permission checkbox in the **Send** tab.
+Mailbox needs a configured relay, a verified relay device, and the permission checkbox in the **Send** page.
 The permission checkbox starts off for each new operation.
-For peers that you paired only outside the relay, pair them again in the **Relay** tab.
-The **Relay** tab shows the same delivery and receipt states.
+For peers that you paired only outside the relay, pair them again in the **Relay** page.
+The **Relay** page shows the same delivery and receipt states.
 See [relay setup](relay.md) for the server, pairing, and retention rules.
 
 ## Link mode
@@ -169,7 +170,7 @@ A link has a maximum of 16,384 characters and expires after 24 hours.
 
 ### Send a link
 
-1. Open **Sharing**, then open the **Link** tab.
+1. Open **Sharing**, then open the **Link** page.
 2. Choose the source project.
 3. Choose a verified recipient.
 4. Choose the secrets.
@@ -182,7 +183,7 @@ If the link is too large, select fewer secrets or use Direct, WebRTC, or Mailbox
 
 ### Receive a link
 
-1. Open the **Link** tab.
+1. Open the **Link** page.
 2. Paste the import link in **Paste import link**.
 3. Select **Review link**.
 4. Check the sender, project name, secret names, deadline, access expiry, and injection-only rule.
@@ -252,7 +253,7 @@ A modal shows each send and each arrival. The **Cards** screen uses the same mod
   Thus the object goes into the rings and never lands on the recipient. The caption tells you that macOS does not confirm delivery.
 - A relay send shows a SpacetimeDB hub in the middle. The key waits in the hub while the transfer is in the queue.
   The key lands on the recipient only when the relay reports `received`. You can close the modal while the key waits.
-- A relay arrival shows the modal only while the **Relay** tab is open.
+- A relay arrival shows the modal only while the **Relay** page is open.
 - After an import, the key lands on the project that you chose. An AirDrop import starts at the sender.
   A relay import goes from the sender through the hub.
 - A relay send plays a quiet swoosh. The app makes the sound at run time with the Web Audio API.

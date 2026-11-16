@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import type { Project } from '../../shared/projects'
 import type { SecretMetadata } from '../../shared/secrets'
 import { relayInboxFinished, relaySentFinished, relayTaskFinished } from '../../shared/relay'
@@ -8,7 +8,7 @@ import { errorText, StatusLine, useOperation } from './operation'
 import { HandoffModal, Scramble } from './SharingMotion'
 import { SecretSelection } from './SecretSelection'
 import type { Loaded, Run, UpdateProjects, UpdateSecrets } from './types'
-import { secretCount, selectedNames } from './sharingHelpers'
+import { accessExpiryHelp, injectionOnlyHelp, secretCount, selectedNames } from './sharingHelpers'
 
 export function RelayTab({ projectId, active, projects, secrets, busy, run, updateProjects, updateSecrets }: {
   projectId?: string
@@ -167,14 +167,15 @@ function RelayPairing({ state, busy, run }: { state: RelayState; busy: boolean; 
         <fieldset disabled={busy || state.connection !== 'connected'}>
           <label htmlFor="relay-peer-identity">Other device’s relay ID</label>
           <input id="relay-peer-identity" name="relayPeerIdentity" autoComplete="off" spellCheck="false"
-            value={identity} minLength={64} maxLength={64} pattern="[0-9a-f]{64}" required
+            value={identity} minLength={64} maxLength={64} pattern="[0-9a-f]{64}" required aria-describedby="relay-peer-identity-help"
             onChange={(event) => setIdentity(event.target.value.trim().toLowerCase())} />
+          <p id="relay-peer-identity-help" className="field-help">The other device shows its relay ID at the top of its Relay page. The ID has 64 characters.</p>
           <div className="form-actions">
             <button type="submit" disabled={busy || identity.length !== 64}>Request pairing</button>
           </div>
         </fieldset>
       </form>
-      {state.peers.length === 0 ? <p className="field-help">No relay devices are paired.</p> : (
+      {state.peers.length === 0 ? <p className="field-help">No relay devices are paired. Enter a relay ID above to pair the first device.</p> : (
         <ul className="relay-peers" aria-label="Relay devices">
           {state.peers.map((peer) => <li key={peer.pairId}>
             <div className="relay-peer-heading">
@@ -281,11 +282,14 @@ function RelaySend({ projectId, projects, secrets, state, busy, run }: {
           <SecretSelection secrets={secrets} source={source} selected={selected} onChange={setSelected} />
           <label htmlFor="relay-access-expires">Access expires (optional)</label>
           <input id="relay-access-expires" name="accessExpiresAt" type="datetime-local" value={accessExpiresAt}
-            onChange={(event) => setAccessExpiresAt(event.target.value)} />
+            aria-describedby="relay-access-help" onChange={(event) => setAccessExpiresAt(event.target.value)} />
+          <p id="relay-access-help" className="field-help">{accessExpiryHelp}</p>
           <label className="check-field">
-            <input type="checkbox" checked={injectionOnly} onChange={(event) => setInjectionOnly(event.target.checked)} />
+            <input type="checkbox" checked={injectionOnly} aria-describedby="relay-injection-help"
+              onChange={(event) => setInjectionOnly(event.target.checked)} />
             Allow command injection only. Block reveal, copy, and reshare.
           </label>
+          <p id="relay-injection-help" className="field-help">{injectionOnlyHelp}</p>
           <p className="field-help">Queued transfers stay encrypted on this device. Secret values never enter this screen.</p>
           <div className="form-actions">
             <button type="submit" disabled={busy || !source || !recipient || selected.size === 0}>Queue encrypted transfer</button>
@@ -303,7 +307,7 @@ interface RelayHandoffState {
   names: string[]
 }
 
-// The relay state drives the last stage. A failed or expired transfer closes the modal, and the activity table shows why.
+// The relay state drives the last stage. A failed or expired transfer closes the modal, and the activity list shows why.
 function RelayHandoff({ handoff, sent, onDone }: { handoff: RelayHandoffState; sent: RelaySentItem[]; onDone: () => void }) {
   const delivery = sent.find((item) => item.messageId === handoff.messageId)?.state
   if (delivery === 'failed' || delivery === 'expired') return null
@@ -343,27 +347,47 @@ function RelayActivity({ state, projects, busy, run, updateProjects, updateSecre
       {empty ? (
         <div className="empty-state compact"><p>No relay delivery activity is saved on this device.</p></div>
       ) : <>
-        {state.sent.length > 0 && <table>
-          <caption>Sent transfers</caption>
-          <thead><tr><th scope="col">Transfer</th><th scope="col">Recipient</th><th scope="col">Delivery</th>
-            <th scope="col">Receipt</th><th scope="col">Delivery deadline</th><th scope="col">Recipient access</th><th scope="col">Remote demo</th>
-            <th scope="col"><span className="sr-only">Delete</span></th></tr></thead>
-          <tbody>{state.sent.map((item) => <RelayActivityRow key={`${item.messageId}/${item.recipient}`} item={item} state={state}
-            busy={busy} run={run} />)}</tbody>
-        </table>}
+        {state.sent.length > 0 && <div className="relay-inbox">
+          <h3>Sent transfers</h3>
+          <PagedList label="Sent transfers" items={state.sent}>
+            {(item) => <RelaySentTransfer key={`${item.messageId}/${item.recipient}`} item={item} state={state} busy={busy} run={run} />}
+          </PagedList>
+        </div>}
         {state.tasks.length > 0 && <div className="relay-inbox">
           <h3>Remote demo runs</h3>
-          <ul>{state.tasks.map((task) => <RelayTask key={`${task.direction}/${task.messageId}`} task={task} state={state} busy={busy} run={run} />)}</ul>
+          <PagedList label="Remote demo runs" items={state.tasks}>
+            {(task) => <RelayTask key={`${task.direction}/${task.messageId}`} task={task} state={state} busy={busy} run={run} />}
+          </PagedList>
         </div>}
         {state.inbox.length > 0 && <div className="relay-inbox">
           <h3>Received transfers</h3>
-          <ul>{state.inbox.map((item) => <RelayInboxTransfer key={item.messageId} item={item} state={state}
-            projects={projects} busy={busy} run={run} updateProjects={updateProjects} updateSecrets={updateSecrets}
-            onImported={onImported} />)}</ul>
+          <PagedList label="Received transfers" items={state.inbox}>
+            {(item) => <RelayInboxTransfer key={item.messageId} item={item} state={state}
+              projects={projects} busy={busy} run={run} updateProjects={updateProjects} updateSecrets={updateSecrets}
+              onImported={onImported} />}
+          </PagedList>
         </div>}
       </>}
     </section>
   )
+}
+
+const pageSize = 5
+
+// Each activity list shows one page of rows. The controls show only when the list has more rows than one page.
+function PagedList<T>({ label, items, children }: { label: string; items: T[]; children: (item: T) => ReactNode }) {
+  const [page, setPage] = useState(0)
+  // A deleted row can remove the last page.
+  const current = Math.min(page, Math.ceil(items.length / pageSize) - 1)
+  return <>
+    <ul>{items.slice(current * pageSize, (current + 1) * pageSize).map(children)}</ul>
+    {items.length > pageSize && <nav className="pages" aria-label={`${label} pages`}>
+      <button type="button" className="secondary" disabled={current === 0} onClick={() => setPage(current - 1)}>Previous</button>
+      <p role="status">Page {current + 1} of {Math.ceil(items.length / pageSize)}</p>
+      <button type="button" className="secondary" disabled={(current + 1) * pageSize >= items.length}
+        onClick={() => setPage(current + 1)}>Next</button>
+    </nav>}
+  </>
 }
 
 function RelayInboxTransfer({ item, state, projects, busy, run, updateProjects, updateSecrets, onImported }: {
@@ -563,27 +587,35 @@ function relayTaskText(task: RelayTaskItem): string {
   return task.finishedAt ? `Finished ${formatTime(task.finishedAt)}.${outcome} ${reply}` : reply
 }
 
-function RelayActivityRow({ item, state, busy, run }: { item: RelaySentItem; state: RelayState; busy: boolean; run: Run }) {
+function RelaySentTransfer({ item, state, busy, run }: { item: RelaySentItem; state: RelayState; busy: boolean; run: Run }) {
   const usable = item.state === 'received' && !item.accessExpiredAt && (!item.accessExpiresAt || Date.parse(item.accessExpiresAt) > Date.now())
-  return <tr>
-    <td><code>{shortId(item.messageId)}</code></td>
-    <td>{peerName(state, item.recipient)}</td>
-    <td>
+  const recipient = peerName(state, item.recipient)
+  return <li>
+    <div className="relay-inbox-heading">
+      <div>
+        <h4>To {recipient}</h4>
+        <p>Transfer <code>{shortId(item.messageId)}</code>.</p>
+      </div>
       <span className="delivery-state" data-state={item.state}>{item.state}</span>
-      {item.error && <span className="delivery-error">{item.error}</span>}
-    </td>
-    <td>{relayReceiptText(item)}</td>
-    <td>{item.deliverBy ? formatTime(item.deliverBy) : 'Not cached'}</td>
-    <td>{relayAccessText(item)}</td>
-    <td>{usable ? <button type="button" className="secondary" disabled={busy || state.connection !== 'connected'} onClick={() => {
-      void run('Encrypting and saving the task…', async () => {
-        await window.sct.queueRelayTask(item.messageId)
-        return `The task is queued. ${peerName(state, item.recipient)} must approve it on that device.`
-      })
-    }}>Request run</button> : 'Not available'}</td>
-    <td>{relaySentFinished(item) && <DeleteActivity activity={{ kind: 'sent', messageId: item.messageId, peer: item.recipient }}
-      label={`Delete transfer ${shortId(item.messageId)}`} busy={busy} run={run} />}</td>
-  </tr>
+    </div>
+    {item.error && <p className="delivery-error">{item.error}</p>}
+    <dl className="relay-facts">
+      <div><dt>Receipt</dt><dd>{relayReceiptText(item)}</dd></div>
+      <div><dt>Delivery deadline</dt><dd>{item.deliverBy ? formatTime(item.deliverBy) : 'Not cached'}</dd></div>
+      <div><dt>Recipient access</dt><dd>{relayAccessText(item)}</dd></div>
+      <div><dt>Remote demo</dt><dd>{usable ? 'Available' : 'Not available'}</dd></div>
+    </dl>
+    {(usable || relaySentFinished(item)) && <div className="form-actions">
+      {usable && <button type="button" className="secondary" disabled={busy || state.connection !== 'connected'} onClick={() => {
+        void run('Encrypting and saving the task…', async () => {
+          await window.sct.queueRelayTask(item.messageId)
+          return `The task is queued. ${recipient} must approve it on that device.`
+        })
+      }}>Request run</button>}
+      {relaySentFinished(item) && <DeleteActivity activity={{ kind: 'sent', messageId: item.messageId, peer: item.recipient }}
+        label={`Delete transfer ${shortId(item.messageId)}`} busy={busy} run={run} />}
+    </div>}
+  </li>
 }
 
 function relayReceiptText(item: RelaySentItem): string {

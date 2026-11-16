@@ -93,7 +93,7 @@ export function ProjectSecretsView({ projectId, projects, secrets, updateSecrets
       {secrets.state === 'ready' && projectSecrets.length === 0 && (
         <section className="empty-state compact" aria-labelledby="no-secrets-heading">
           <h3 id="no-secrets-heading">No secrets in {project.name}</h3>
-          <p>Add a name and value above. Approved local agents use these secrets later.</p>
+          <p>Add a name and value above. Approved local agents use these secrets later. To send them to a verified device, select Share secrets.</p>
         </section>
       )}
       <footer>Secret names and values are encrypted in the vault.</footer>

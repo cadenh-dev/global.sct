@@ -74,8 +74,8 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
     <>
       <div className="page-heading">
         <div>
-          <h1>Sharing</h1>
-          <p className="description">{isMac ? 'Send encrypted secrets by link, Direct, WebRTC, AirDrop, or Mailbox.' : 'Send encrypted secrets by link, Direct, WebRTC, or Mailbox.'} Received values stay in the main process.</p>
+            <h1>Sharing</h1>
+            <p className="description">Send encrypted secrets to a device that you verified. Verify the device first.</p>
         </div>
       </div>
 
@@ -89,30 +89,36 @@ export function SharingView({ projectId, tab, projects, secrets, updateProjects,
       {projects.state === 'error' && <p className="error" role="alert">{projects.error}</p>}
       {secrets.state === 'error' && <p className="error" role="alert">{secrets.error}</p>}
 
-      {sharing.state === 'ready' && (isMac ? <MacSharing sharing={sharing.value} activeTab={activeTab} projectId={projectId}
-        projects={projects} secrets={secrets} receipt={receipt} setReceipt={setReceipt} operation={operation}
-        setSharing={setSharing} updateProjects={updateProjects} updateSecrets={updateSecrets}
-        pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
-        : <RelayAndPairing sharing={sharing.value} setSharing={setSharing} activeTab={activeTab} projectId={projectId} projects={projects} secrets={secrets}
-          operation={operation} updateProjects={updateProjects} updateSecrets={updateSecrets}
-          pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />)}
-      <div hidden={activeTab !== 'send'}>
-        <SendSharing projectId={projectId} active={activeTab === 'send'} projects={projects} secrets={secrets}
-          busy={operation.busy} run={operation.run} />
-      </div>
-      {sharing.state === 'ready' && <div hidden={activeTab !== 'link'}>
-        <LinkSharing projectId={projectId} active={activeTab === 'link'} projects={projects} secrets={secrets}
-          peers={sharing.value.peers} busy={operation.busy} run={operation.run} updateSecrets={updateSecrets}
+      <div className="sharing-layout">
+        {sharing.state === 'ready' && <SharingTabs activeTab={activeTab} projectId={projectId}
+          canShare={sharing.value.peers.length > 0} isMac={isMac} />}
+        <div>
+        {sharing.state === 'ready' && (isMac ? <MacSharing sharing={sharing.value} activeTab={activeTab} projectId={projectId}
+          projects={projects} secrets={secrets} receipt={receipt} setReceipt={setReceipt} operation={operation}
+          setSharing={setSharing} updateProjects={updateProjects} updateSecrets={updateSecrets}
           pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
-      </div>}
-      <div hidden={activeTab !== 'direct'}>
-        <DirectSharing projectId={projectId} active={activeTab === 'direct'} projects={projects} secrets={secrets}
-          updateSecrets={updateSecrets} busy={operation.busy} run={operation.run} />
-      </div>
-      <div hidden={activeTab !== 'webrtc'}>
-        <WebRtcSharing projectId={projectId} active={activeTab === 'webrtc'} projects={projects} secrets={secrets}
-          updateSecrets={updateSecrets} busy={operation.busy} run={operation.run}
-          pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
+          : <RelayAndPairing sharing={sharing.value} setSharing={setSharing} activeTab={activeTab} projectId={projectId} projects={projects} secrets={secrets}
+            operation={operation} updateProjects={updateProjects} updateSecrets={updateSecrets}
+            pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />)}
+        <div hidden={activeTab !== 'send'}>
+          <SendSharing projectId={projectId} active={activeTab === 'send'} projects={projects} secrets={secrets}
+            busy={operation.busy} run={operation.run} />
+        </div>
+        {sharing.state === 'ready' && <div hidden={activeTab !== 'link'}>
+          <LinkSharing projectId={projectId} active={activeTab === 'link'} projects={projects} secrets={secrets}
+            peers={sharing.value.peers} busy={operation.busy} run={operation.run} updateSecrets={updateSecrets}
+            pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
+        </div>}
+        <div hidden={activeTab !== 'direct'}>
+          <DirectSharing projectId={projectId} active={activeTab === 'direct'} projects={projects} secrets={secrets}
+            updateSecrets={updateSecrets} busy={operation.busy} run={operation.run} />
+        </div>
+        <div hidden={activeTab !== 'webrtc'}>
+          <WebRtcSharing projectId={projectId} active={activeTab === 'webrtc'} projects={projects} secrets={secrets}
+            updateSecrets={updateSecrets} busy={operation.busy} run={operation.run}
+            pendingLink={pendingLink} onDismissPendingLink={onDismissPendingLink} />
+        </div>
+        </div>
       </div>
     </>
   )
@@ -127,7 +133,6 @@ function MacSharing({ sharing, activeTab, projectId, projects, secrets, receipt,
           {sharing.incoming.length === 1 ? 'A received transfer is waiting.' : `${sharing.incoming.length} received transfers are waiting.`}
         </a>
       </p>}
-      <SharingTabs activeTab={activeTab} projectId={projectId} canShare={sharing.peers.length > 0} isMac />
       {sharing.peers.length > 0 && <div hidden={activeTab !== 'secrets'}>
         <AirDropSendTab projectId={projectId} active={activeTab === 'secrets'} projects={projects} secrets={secrets}
           peers={sharing.peers} busy={operation.busy} run={operation.run} />
@@ -164,7 +169,6 @@ function RelayAndPairing({ sharing, setSharing, activeTab, projectId, projects, 
   'pendingLink' | 'onDismissPendingLink'>) {
   return (
     <>
-      <SharingTabs activeTab={activeTab} projectId={projectId} canShare={false} isMac={false} />
       <div hidden={activeTab !== 'devices'}>
         <DevicesTab key={pendingLink?.kind === 'pairing' ? pendingLink.id : 'device-verification'}
           projectId={projectId} device={sharing.device} peers={sharing.peers}
@@ -219,25 +223,36 @@ function SharingTabs({ activeTab, projectId, canShare, isMac }: {
   }, [activeTab])
 
   return (
-    <>
+    <div>
       <nav ref={navigation} className="sharing-tabs" aria-label="Sharing">
-        <a href={sharingRoute('devices', projectId)} aria-current={activeTab === 'devices' ? 'page' : undefined}>Verify devices</a>
-        <a href={sharingRoute('send', projectId)} aria-current={activeTab === 'send' ? 'page' : undefined}>Send</a>
-        {isMac && (canShare ? (
-          <a href={sharingRoute('secrets', projectId)} aria-current={activeTab === 'secrets' ? 'page' : undefined}>Send secrets</a>
-        ) : <span aria-disabled="true" aria-describedby="sharing-verification-required">Send secrets</span>)}
-        {isMac && <a href={sharingRoute('receive', projectId)} aria-current={activeTab === 'receive' ? 'page' : undefined}>Receive secrets</a>}
-        <a href={sharingRoute('relay', projectId)} aria-current={activeTab === 'relay' ? 'page' : undefined}>Relay</a>
-        <a href={sharingRoute('link', projectId)} aria-current={activeTab === 'link' ? 'page' : undefined}
-          aria-label="Link sharing">Link</a>
-        <a href={sharingRoute('direct', projectId)} aria-current={activeTab === 'direct' ? 'page' : undefined}
-          aria-label="Direct sharing">Direct</a>
-        <a href={sharingRoute('webrtc', projectId)} aria-current={activeTab === 'webrtc' ? 'page' : undefined}
-          aria-label="WebRTC sharing">WebRTC</a>
+        {sharingEntries.filter((entry) => isMac || !entry.macOnly).map((entry) => entry.tab === 'secrets' && !canShare ? (
+          <span key={entry.tab}>
+            <span className="sharing-entry-name" aria-disabled="true" aria-describedby="sharing-verification-required">{entry.name}</span>
+            <span className="sharing-entry-line">{entry.line}</span>
+          </span>
+        ) : (
+          <a key={entry.tab} href={sharingRoute(entry.tab, projectId)} aria-current={activeTab === entry.tab ? 'page' : undefined}
+            aria-label={entry.label ?? entry.name} aria-describedby={`sharing-line-${entry.tab}`}>
+            <span className="sharing-entry-name">{entry.name}</span>
+            <span id={`sharing-line-${entry.tab}`} className="sharing-entry-line">{entry.line}</span>
+          </a>
+        ))}
       </nav>
       {isMac && !canShare && activeTab !== 'relay' && <p id="sharing-verification-required" className="field-help sharing-tab-help">
         Verify a device before you can send secrets.
       </p>}
-    </>
+    </div>
   )
 }
+
+// The line tells the user when to use the entry. It is the description of the link, not a part of its name.
+const sharingEntries: { tab: SharingTab; name: string; label?: string; line: string; macOnly?: boolean }[] = [
+  { tab: 'devices', name: 'Verify devices', line: 'Do this one time for each device before you send.' },
+  { tab: 'send', name: 'Send', line: 'Choose a mode that is available now, then send.' },
+  { tab: 'secrets', name: 'Send secrets', line: 'Send a transfer file by AirDrop.', macOnly: true },
+  { tab: 'receive', name: 'Receive secrets', line: 'Import a transfer that you received.', macOnly: true },
+  { tab: 'relay', name: 'Relay', line: 'Pair relay devices and see delivery states. Mailbox needs a configured relay.' },
+  { tab: 'link', name: 'Link', label: 'Link sharing', line: 'Send a text link through a conversation that you trust.' },
+  { tab: 'direct', name: 'Direct', label: 'Direct sharing', line: 'Send between two apps that are open now. Needs no relay.' },
+  { tab: 'webrtc', name: 'WebRTC', label: 'WebRTC sharing', line: 'Connect two open apps with one offer link and one answer link.' }
+]

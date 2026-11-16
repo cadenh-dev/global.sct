@@ -31,7 +31,7 @@ See [Agent Access](agent-access.md).
 
 The AirDrop sharing flow encrypts selected secrets for one verified device and sends the file through AirDrop.
 Device pairing uses a device card link or file, so it works on macOS, Windows, and Linux.
-See [sharing](sharing.md). Relay sharing below is the Mailbox transport. The **Relay** tab of **Sharing** configures it, and the **Send** tab selects it.
+See [sharing](sharing.md). Relay sharing below is the Mailbox transport. The **Relay** page of **Sharing** configures it, and the **Send** page selects it.
 
 ## Delivery boundary and share gate
 
@@ -299,7 +299,7 @@ The task can start no other program. It contains no command, approval, or secret
 2. The sender app seals a `task` envelope and publishes it through `publishSecret`. The approval deadline is 24 hours.
 3. The recipient app opens the task and checks the sender, the recipient, the grant, and the deadlines.
    It saves the task record. Then it sends a delivery receipt through `acknowledge`.
-4. The recipient user approves or refuses the task in the **Relay** tab. The decision contains the task digest, so it applies to one exact task.
+4. The recipient user approves or refuses the task in the **Relay** page. The decision contains the task digest, so it applies to one exact task.
 5. Before the start, the app runs grant cleanup and checks the grant and the deadline again. Then it saves the execution claim.
 6. The app starts the fixed demo with only the secrets of that grant in the child environment.
 7. The app saves the outcome. Then it seals a `result` envelope and publishes it with one fixed ID. Retries reuse that ID.

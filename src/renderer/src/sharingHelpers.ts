@@ -13,6 +13,10 @@ export function sharingRoute(tab: SharingTab, projectId?: string): string {
   return `#/sharing/${tab}${projectId ? `/${encodeURIComponent(projectId)}` : ''}`
 }
 
+// The same help text shows below these fields on the Send, Link, and Relay forms.
+export const accessExpiryHelp = 'After this time, the recipient cannot use the secrets in global.sct. Copies outside global.sct stay.'
+export const injectionOnlyHelp = 'Injection passes the secrets to a command when it starts. The command can read the values.'
+
 export interface Receipt {
   id: string
   sender: string

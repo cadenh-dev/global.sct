@@ -62,8 +62,8 @@ The check file was deleted after the run.
 The check did these steps:
 
 1. Both app instances connected to Maincloud and registered their device keys.
-2. The devices paired in the **Relay** tab. Both users compared the same code.
-3. The sender selected **Mailbox** in the **Send** tab and permitted the encrypted server copy.
+2. The devices paired in the **Relay** page. Both users compared the same code.
+3. The sender selected **Mailbox** in the **Send** page and permitted the encrypted server copy.
 4. The sender entered the vault passphrase in the share dialog.
 5. The recipient imported the transfer and the app returned the signed receipt.
 6. The sender showed the transfer as `received`.

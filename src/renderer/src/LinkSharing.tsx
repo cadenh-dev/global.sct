@@ -6,6 +6,7 @@ import type { SharingDevice } from '../../shared/sharing'
 import type { LinkImportResult, LinkPreview, LinkRecord, LinkState, PendingLink } from '../../shared/transport'
 import { SecretSelection } from './SecretSelection'
 import { errorText } from './operation'
+import { accessExpiryHelp, injectionOnlyHelp } from './sharingHelpers'
 import type { Loaded, Run, UpdateSecrets } from './types'
 
 interface LinkSharingProps {
@@ -105,11 +106,15 @@ function LinkSend({ projectId, projects, secrets, peers, busy, run, refresh }: P
         </select>
         <SecretSelection secrets={secrets} source={source} selected={selected} onChange={setSelected} />
         <label htmlFor="link-access-expires">Access expires (optional)</label>
-        <input id="link-access-expires" type="datetime-local" value={accessExpiresAt} onChange={(event) => setAccessExpiresAt(event.target.value)} />
+        <input id="link-access-expires" type="datetime-local" value={accessExpiresAt} aria-describedby="link-access-help"
+          onChange={(event) => setAccessExpiresAt(event.target.value)} />
+        <p id="link-access-help" className="field-help">{accessExpiryHelp}</p>
         <label className="check-field">
-          <input type="checkbox" checked={injectionOnly} onChange={(event) => setInjectionOnly(event.target.checked)} />
+          <input type="checkbox" checked={injectionOnly} aria-describedby="link-injection-help"
+            onChange={(event) => setInjectionOnly(event.target.checked)} />
           Allow command injection only. Block reveal, copy, and reshare.
         </label>
+        <p id="link-injection-help" className="field-help">{injectionOnlyHelp}</p>
         <p className="field-help">Import within 24 hours. For links above 16,384 characters, use Relay or select fewer secrets.</p>
         <div className="form-actions"><button type="submit" disabled={!source || !recipient || selected.size === 0}>Create link</button></div>
       </fieldset>

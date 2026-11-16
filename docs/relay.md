@@ -145,9 +145,9 @@ The `SCT_RELAY` environment variable selects the relay:
 
 ## Mailbox consent
 
-The **Send** tab calls this mode Mailbox. The **Relay** tab configures it and shows its activity.
+The **Send** page calls this mode Mailbox. The **Relay** page configures it and shows its activity.
 Mailbox stores one encrypted server copy until the recipient imports it.
-The **Send** tab shows Mailbox only when all of these conditions are true:
+The **Send** page shows Mailbox only when all of these conditions are true:
 
 - The relay is configured and registered.
 - At least one relay device is verified.
@@ -169,7 +169,7 @@ The recipient still approves each task on its own device.
 Two devices must pair before they share secrets. Pairing uses the same device keys as AirDrop.
 A device verified through AirDrop still needs a relay pairing, and the reverse is also true.
 
-Do these steps on the **Relay** tab of **Sharing**:
+Do these steps on the **Relay** page of **Sharing**:
 
 1. Device B shows its relay ID under **This device’s relay ID**: 64 hexadecimal characters. The user sends it to device A by any channel.
 2. Device A enters the relay ID and selects **Request pairing**. The app calls `requestPair`.
@@ -199,18 +199,18 @@ Each peer in `getRelayState` has a trust state:
 Before a device sends a secret, the relay pair must be `Verified` and the peer trust state must be `verified`.
 The recipient applies the same rule to the sender before it opens a transfer.
 
-The **Send** tab uses the same verified relay peers as the **Relay** tab.
+The **Send** page uses the same verified relay peers as the **Relay** page.
 The share confirmation is the same for Mailbox, Link, Direct, WebRTC, and AirDrop.
-The **Relay** tab uses the preload operations `requestRelayPair`, `confirmRelayPair`, and `removeRelayPair`.
+The **Relay** page uses the preload operations `requestRelayPair`, `confirmRelayPair`, and `removeRelayPair`.
 `confirmRelayPair` takes the code on the screen. It fails if the current code is different, for example after a key change.
 
 ## Relay delivery
 
-On the **Relay** tab, the sender selects a source project, a verified relay recipient, and secrets.
+On the **Relay** page, the sender selects a source project, a verified relay recipient, and secrets.
 As an option, the sender sets **Access expires**.
 The **Allow command injection only** option is on by default.
 Then the sender selects **Queue encrypted transfer** and enters the vault passphrase.
-The **Send** tab offers the same Mailbox operation with the other delivery modes.
+The **Send** page offers the same Mailbox operation with the other delivery modes.
 The main process reads the selected values and creates one signed encrypted transfer.
 The main process sets the delivery deadline to 7 days minus 1 minute after the queue time.
 The 1-minute margin lets the relay accept a sender clock that is slightly ahead of the relay clock.
@@ -239,6 +239,9 @@ It then removes these records.
 | `received` | The recipient acknowledged the transfer, and the sender verified the receipt. |
 | `failed` | The publication or the receipt check failed. The row shows the error. |
 | `expired` | The delivery deadline passed before the relay accepted the transfer. |
+
+**Sent transfers**, **Remote demo runs**, and **Received transfers** each show 5 rows on one page.
+When a list has more rows, select **Previous** or **Next** below the list.
 
 The recipient main process verifies and decrypts a pending transfer.
 The renderer receives the project name, secret names, deadlines, and grant restrictions.

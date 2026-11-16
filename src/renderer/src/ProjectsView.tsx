@@ -59,7 +59,7 @@ export function ProjectsView({ projects, secrets, updateProjects, updateSecrets 
       <div className="page-heading">
         <div>
           <h1>Projects</h1>
-          <p className="description">Your folders. Right where you left them.</p>
+          <p className="description">Add a project folder. Then open it to add secrets.</p>
         </div>
         <button ref={addButton} type="button" disabled={projects.state !== 'ready' || adding} onClick={() => {
           setAdding(true)
@@ -108,7 +108,7 @@ export function ProjectsView({ projects, secrets, updateProjects, updateSecrets 
       {projects.state === 'ready' && projects.value.length === 0 && !adding && (
         <section className="empty-state" aria-labelledby="empty-heading">
           <h2 id="empty-heading">Your projects start here</h2>
-          <p>Add an existing folder to get started.</p>
+          <p>Select Add a project. Then choose an existing folder.</p>
           <p className="empty-note">Your files stay on this device.</p>
         </section>
       )}
