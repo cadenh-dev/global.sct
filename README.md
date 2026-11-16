@@ -105,6 +105,8 @@ To receive secrets, open **Received transfers** on the recipient device. Select 
 AirDrop pairing and relay pairing are separate. A device that you verified through AirDrop must also pair on the **Relay** page.
 To use your own relay, see [relay setup](docs/relay.md).
 
+The **Help** page in the app shows the first steps, the sharing modes, and the terms.
+
 ## Agent setup prompt
 
 Paste this prompt into your coding agent:

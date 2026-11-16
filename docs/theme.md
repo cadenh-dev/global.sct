@@ -111,6 +111,7 @@ The full-window screenshots are 1200 × 800 on Windows. The Links image is a pan
 | Share confirmation | ![Cream share confirmation](media/themes/cream/share-gate.png) | ![Terminal share confirmation](media/themes/terminal/share-gate.png) |
 | Links registration | ![Cream links](media/themes/cream/links.png) | ![Terminal links](media/themes/terminal/links.png) |
 | Settings | ![Cream settings](media/themes/cream/settings.png) | ![Terminal settings](media/themes/terminal/settings.png) |
+| Help | ![Cream help](media/themes/cream/help.png) | ![Terminal help](media/themes/terminal/help.png) |
 
 The new screens use the same role tokens and components.
 The **Links** image shows the packaged registration controls.

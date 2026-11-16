@@ -89,7 +89,7 @@ a:hover { color: var(--color-ink); }
 .app-header { display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 0 32px; border-bottom: 1px solid var(--color-rule); background: var(--color-paper-2); }
 .header-start { display: flex; align-self: stretch; align-items: stretch; }
 .header-start nav { display: flex; }
-.header-start nav a { position: relative; display: flex; align-items: center; border-right: 1px solid var(--color-rule); padding: 0 24px; color: var(--color-ink-2); font-size: 12px; text-decoration: none; }
+.header-start nav a { position: relative; display: flex; align-items: center; border-right: 1px solid var(--color-rule); padding: 0 24px; color: var(--color-ink-2); font-size: 12px; text-decoration: none; white-space: nowrap; }
 .header-start nav a:hover { background: var(--color-paper-3); color: var(--color-ink); }
 .header-start nav a[aria-current="page"] { color: var(--color-ink); }
 /* The selected tab has a 4px accent rule at the top. The 1px ink rule at the bottom covers the header rule and marks the state. Both variants use this style. */
@@ -191,6 +191,11 @@ select:disabled { color: var(--color-muted); cursor: not-allowed; opacity: 0.55;
 .sharing-destination { margin-top: 12px; }
 .sharing-scramble { color: var(--color-accent-text); }
 .sharing-waiting { margin: 0 0 20px; font-size: 15px; }
+/* Below this width the header links and the device label do not fit in one row. */
+@media (max-width: 800px) {
+  .local-label { display: none; }
+  .header-start nav a { padding-inline: 16px; }
+}
 @media (max-width: 700px) {
   .header-start { flex-wrap: wrap; min-width: 0; }
   .header-start nav { flex-wrap: wrap; }
@@ -371,6 +376,23 @@ select:disabled { color: var(--color-muted); cursor: not-allowed; opacity: 0.55;
 .check-field input { width: 18px; min-height: 18px; flex: 0 0 auto; }
 .check-field span { color: var(--color-ink-2); font-size: 12px; }
 .unlock-panel .error { margin: 24px 0 0; }
+
+/* The Help page. In a narrow window each table row is a block, so the table needs no sideways scroll. */
+.help-table { width: 100%; margin-top: 20px; border-collapse: collapse; border-top: 1px solid var(--color-rule-2); }
+.help-table th, .help-table td { border-bottom: 1px solid var(--color-rule); padding: 12px 20px 12px 0; text-align: left; vertical-align: top; font-size: 13px; overflow-wrap: anywhere; }
+.help-table thead th { color: var(--color-muted); font-size: 11px; font-weight: 400; }
+.help-table tbody th { font-weight: 500; white-space: nowrap; }
+.help-terms { margin: 0; border-top: 1px solid var(--color-rule-2); }
+.help-terms > div { border-bottom: 1px solid var(--color-rule); padding-block: 12px; }
+.help-terms dt { font-size: 13px; font-weight: 500; }
+.help-terms dd { margin: 4px 0 0; color: var(--color-ink-2); font-size: 13px; }
+.panel > .help-address { margin-top: 12px; }
+@media (max-width: 700px) {
+  .help-table thead { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+  .help-table tr { display: block; border-bottom: 1px solid var(--color-rule); padding-block: 12px; }
+  .help-table th, .help-table td { display: block; border: 0; padding: 4px 0; }
+  .help-table td::before { content: attr(data-label); display: block; color: var(--color-muted); font-size: 11px; }
+}
 
 .link-text { display: block; width: 100%; min-height: 96px; padding: 8px 12px; border: 1px solid var(--color-input-border); border-radius: 0; background: var(--color-paper); color: var(--color-ink); font: inherit; resize: vertical; overflow-wrap: anywhere; }
 .link-text:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
