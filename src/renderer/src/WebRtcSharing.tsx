@@ -250,10 +250,12 @@ function WebRtcNetwork({ busy, run }: { busy: boolean; run: Run }) {
         <fieldset disabled={busy}>
           <label htmlFor="webrtc-stun">Public STUN server (optional)</label>
           <input id="webrtc-stun" value={stunUrl} placeholder="stun:stun.example.org" spellCheck={false}
-            onChange={(event) => setStunUrl(event.target.value)} />
+            aria-describedby="webrtc-stun-help" onChange={(event) => setStunUrl(event.target.value)} />
+          <p id="webrtc-stun-help" className="field-help">A STUN server helps two apps on different networks find a direct path.</p>
           <label htmlFor="webrtc-turn-urls">TURN server URLs (one per line, optional)</label>
           <textarea className="link-text" id="webrtc-turn-urls" value={turnUrls} placeholder="turn:turn.example.org:3478"
-            spellCheck={false} onChange={(event) => setTurnUrls(event.target.value)} />
+            spellCheck={false} aria-describedby="webrtc-turn-help" onChange={(event) => setTurnUrls(event.target.value)} />
+          <p id="webrtc-turn-help" className="field-help">A TURN server forwards the encrypted traffic when no direct path exists.</p>
           <label htmlFor="webrtc-turn-username">TURN username</label>
           <input id="webrtc-turn-username" value={turnUsername} autoComplete="off" spellCheck={false}
             onChange={(event) => setTurnUsername(event.target.value)} />

@@ -47,7 +47,7 @@ The Cream values come from the reference screenshot that the user supplied (2026
 | `--color-hover-ink` | Accent ink | Paper | |
 | `--color-scrim` | Paper at 86% | Paper at 86% | |
 
-In Cream, the dark green is only a fill for the wordmark and the 4px rule above the selected tab.
+In Cream, the dark green is only a fill for the wordmark and the 4px rule of the selected tab or the selected Sharing entry.
 The primary button also uses the green fill, with black text.
 Black text on this green has 3.1:1. This is a deliberate exception to the 4.5:1 text rule.
 All other Cream text, lines, and focus rings are ink.
@@ -59,9 +59,9 @@ Both variants use the same treatment:
 | Place | Selected style |
 |---|---|
 | Header links | Ink text, a 4px accent rule at the top (`::before`), and a 1px ink rule at the bottom (`::after`) |
-| Sharing tabs | Ink text, a 4px accent rule at the top (`::before`), and a 1px ink rule at the bottom (`::after`) |
+| Sharing list | Ink text, a 4px accent rule at the left (`::before`), and a 1px ink rule at the right (`::after`). In a window of 700 px or less, the list is a row with the header style |
 
-The 1px ink rule marks the selected state. The selected tab has no green text.
+The 1px ink rule marks the selected state. The selected tab or entry has no green text.
 
 The app uses no shadows.
 
@@ -75,7 +75,7 @@ The values come from the tokens, converted to sRGB relative luminance.
 | Cream | Ink on paper | 17.6 | Body text, links, status text, focus, selected-tab rule |
 | Cream | Ink on paper-2 | 19.2 | Panel and header text, links and focus in panels |
 | Cream | Ink on paper-3 | 15.1 | Hover text |
-| Cream | Green on paper | 5.6 | 4px selected-tab rule of the sharing tabs only. Not text or focus |
+| Cream | Green on paper | 5.6 | 4px selected rule of the Sharing list only. Not text or focus |
 | Cream | Green on paper-2 | 6.2 | 4px selected-tab rule in the header only |
 | Cream | Ink on green | 3.1 | Primary button and wordmark. Deliberate exception to the 4.5:1 text rule |
 | Cream | Paper on ink | 17.6 | Button hover |
@@ -86,7 +86,7 @@ The values come from the tokens, converted to sRGB relative luminance.
 | Terminal | Ink on paper | 17.1 | Body text, selected-tab rule |
 | Terminal | Ink-2 on paper-2 | 11.3 | Secondary text |
 | Terminal | Muted on paper-2 | 5.9 | Help text |
-| Terminal | Accent on paper | 14.5 | Links, status text, focus, 4px selected-tab rule of the sharing tabs |
+| Terminal | Accent on paper | 14.5 | Links, status text, focus, 4px selected rule of the Sharing list |
 | Terminal | Accent on paper-2 | 13.9 | 4px selected-tab rule in the header |
 | Terminal | Accent ink on accent | 14.3 | Primary button |
 | Terminal | Input border on paper | 3.4 | Input and select edges |

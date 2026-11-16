@@ -86,7 +86,7 @@ This check is optional. It requires the [SpacetimeDB CLI](docs/relay.md#install-
 spacetime describe sct-relay --server maincloud --anonymous
 ```
 
-Pair the two devices one time. On both devices, open **Sharing**, then the **Relay** tab.
+Pair the two devices one time. On both devices, open **Sharing**, then the **Relay** page.
 
 1. On device B, copy the ID under **This device’s relay ID**. Send it to device A by any channel.
 2. On device A, enter the relay ID and select **Request pairing**.
@@ -102,7 +102,7 @@ To send secrets:
 
 To receive secrets, open **Received transfers** on the recipient device. Select a local project and **Import and send receipt**.
 
-AirDrop pairing and relay pairing are separate. A device that you verified through AirDrop must also pair on the **Relay** tab.
+AirDrop pairing and relay pairing are separate. A device that you verified through AirDrop must also pair on the **Relay** page.
 To use your own relay, see [relay setup](docs/relay.md).
 
 ## Agent setup prompt

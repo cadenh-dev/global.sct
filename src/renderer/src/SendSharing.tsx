@@ -8,6 +8,7 @@ import type { WebRtcState } from '../../shared/webrtc'
 import type { RelayState } from '../../shared/relay'
 import { errorText } from './operation'
 import { SecretSelection } from './SecretSelection'
+import { accessExpiryHelp, injectionOnlyHelp } from './sharingHelpers'
 import type { Loaded, Run } from './types'
 
 type SendMode = 'link' | 'direct' | 'webrtc' | 'mailbox'
@@ -183,7 +184,7 @@ function RecipientFields({ mode, options, chosen, onRecipient }: {
     {mode === 'link' && <p className="field-help">A link has a 16,384-character limit. The app stops an oversized link before you share it.</p>}
     {mode === 'mailbox' && <p className="field-help">The Mailbox server stores one encrypted copy until the recipient imports it. Only choose this with the recipient’s agreement.</p>}
     {(mode === 'direct' || mode === 'webrtc') && options.length === 0 && <p className="field-help">
-      Open an authenticated session in the <a href="#/sharing/direct">Direct</a> or <a href="#/sharing/webrtc">WebRTC</a> tab first.
+      Open an authenticated session in the <a href="#/sharing/direct">Direct</a> or <a href="#/sharing/webrtc">WebRTC</a> page first.
     </p>}
   </>
 }
@@ -197,11 +198,14 @@ function AccessFields({ accessExpiresAt, injectionOnly, onAccessExpiresAt, onInj
   return <>
     <label htmlFor="send-access-expires">Access expires (optional)</label>
     <input id="send-access-expires" name="accessExpiresAt" type="datetime-local" value={accessExpiresAt}
-      onChange={(event) => onAccessExpiresAt(event.target.value)} />
+      aria-describedby="send-access-help" onChange={(event) => onAccessExpiresAt(event.target.value)} />
+    <p id="send-access-help" className="field-help">{accessExpiryHelp}</p>
     <label className="check-field">
-      <input type="checkbox" checked={injectionOnly} onChange={(event) => onInjectionOnly(event.target.checked)} />
+      <input type="checkbox" checked={injectionOnly} aria-describedby="send-injection-help"
+        onChange={(event) => onInjectionOnly(event.target.checked)} />
       Allow command injection only. Block reveal, copy, and reshare.
     </label>
+    <p id="send-injection-help" className="field-help">{injectionOnlyHelp}</p>
   </>
 }
 

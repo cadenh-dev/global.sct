@@ -73,7 +73,7 @@ export function SettingsView({ onLocked }: { onLocked: (status: VaultStatus) => 
       <div className="page-heading">
         <div>
           <h1>Settings</h1>
-          <p className="description">Where global.sct keeps encrypted secrets on this device, and how the window looks.</p>
+          <p className="description">Vault access, the passphrase, the vault folder, the appearance, and link registration.</p>
         </div>
       </div>
 

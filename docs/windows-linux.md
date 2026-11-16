@@ -18,7 +18,7 @@ global.sct runs on Windows and Linux. The macOS-only features stay on macOS.
 | Wallet cards | Yes | No | No |
 | Caller signature check | Apple code signature | Authenticode signer | No code signature. The caller is unverified |
 
-On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** tabs. Use **Verify devices** to pair devices without the relay. Use the **Send** tab to choose Direct, WebRTC, Link, or Mailbox.
+On Windows and Linux, the app hides the **Cards** link, the AirDrop controls, and the **Send secrets** and **Receive secrets** pages. Use **Verify devices** to pair devices without the relay. Use the **Send** page to choose Direct, WebRTC, Link, or Mailbox.
 Direct needs outbound UDP. Both apps must be open and unlocked. The Windows and Linux packages include the Hyperswarm native modules.
 WebRTC uses manual offer and answer links. It needs no inbound port and no signalling server. A public STUN server is optional. A TURN server can forward traffic when a direct path is blocked.
 Every send asks for the vault passphrase. The share gate is the same on all platforms.
@@ -189,7 +189,7 @@ Temporary Playwright checks drove the apps. The check files were not committed.
 - WebRTC with a public STUN server: the same flow passed after a correction. The computer has container and virtual interfaces, so candidate gathering stayed open after the 10-second limit and the offer failed. The app now continues with the candidates that are ready at the limit.
   Both apps were on one computer. This check does not show NAT traversal between networks.
 - Link mode: the sender created a link, the recipient imported it, and the sender verified the receipt link. The state changed to `received`.
-- Link delivery: a second app instance with a `global-sct://import/` argument opened the **Link** tab in the first instance and filled **Paste import link**.
+- Link delivery: a second app instance with a `global-sct://import/` argument opened the **Link** page in the first instance and filled **Paste import link**.
 - Packaged link registration: the packaged app ran with temporary `XDG_CONFIG_HOME` and `XDG_DATA_HOME` folders. **Register global.sct links** wrote the desktop entry, and `xdg-mime` returned `app.global-sct.desktop`. `xdg-open` delivered a link to the running app.
 - Packaged link removal: **Remove registration** left the association in `mimeapps.list` and in the desktop cache, so the app reported a stale association. The app now deletes its own line and refreshes the desktop database. After the correction, the status is "No app is registered for global-sct links." and the other lines in `mimeapps.list` are unchanged.
 - Sharing UI: the Send, Link, WebRTC, link review, link receipt, share confirmation, and Links registration states showed correctly in Cream and Terminal.
@@ -203,7 +203,7 @@ Remote TURN, cross-network WebRTC, and the macOS checks remain open.
 - `bun run package:win` passed. The packaged CLI printed `0.1.0`.
 - `platform.spec.ts` passed. `theme.spec.ts` passed.
 - `app.spec.ts` passed its project test. Its secrets test timed out at 30 seconds at the known CLI step.
-- `sharing.spec.ts` still expects the macOS-only disabled **Send secrets** tab on Windows. It is not run here.
+- `sharing.spec.ts` still expects the macOS-only disabled **Send secrets** page on Windows. It is not run here.
 - A temporary two-window Playwright check passed. It paired two vaults, rejected a wrong passphrase, accepted the correct passphrase, cancelled a share, and completed a 60,000-character WebRTC transfer with an import and receipt. The check file was not committed.
 - A temporary two-window Playwright check passed against the live Maincloud relay. The apps connected, registered, paired relay devices, queued a Mailbox transfer, imported it, and returned the signed receipt. The check file was not committed.
 - A temporary two-window WebRTC check passed through a local TURN-only server. The connection showed **Direct via TURN** and completed a transfer and receipt. Public STUN and a remote TURN server are not run.

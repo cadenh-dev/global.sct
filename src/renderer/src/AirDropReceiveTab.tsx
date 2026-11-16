@@ -70,7 +70,7 @@ export function AirDropReceiveTab({ device, incoming, canImport, receipt, projec
           </li>
           <li>
             <h3>Choose a project</h3>
-            <p>The secrets appear on this tab. Choose the local project that keeps them.</p>
+            <p>The secrets appear on this page. Choose the local project that keeps them.</p>
           </li>
         </ol>
       </section>

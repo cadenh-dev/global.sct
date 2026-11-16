@@ -210,18 +210,22 @@ select:disabled { color: var(--color-muted); cursor: not-allowed; opacity: 0.55;
 .sharing-details summary:focus-visible, .pairing-review h3:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 4px; }
 .sharing-details p { margin: 8px 0 0; }
 .sharing-details .sharing-peers { margin-top: 0; }
-.sharing-tabs { display: flex; border-bottom: 1px solid var(--color-rule-2); }
-.sharing-tabs a, .sharing-tabs > span { display: block; min-height: 44px; border: 1px solid var(--color-rule-2); border-bottom: 0; padding: 8px 20px; font-size: 15px; text-decoration: none; }
-.sharing-tabs > * + * { border-left: 0; }
+/* The Sharing entries are a list on the left. Each entry has its name and one line that says when to use it. */
+.sharing-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 28px; align-items: start; }
+/* Until sharing loads, the list is absent and the panels use the full width. */
+.sharing-layout > :only-child { grid-column: 1 / -1; }
+.sharing-tabs { display: flex; flex-direction: column; border-top: 1px solid var(--color-rule-2); }
+.sharing-tabs a, .sharing-tabs > span { display: block; border: 1px solid var(--color-rule-2); border-top: 0; padding: 12px 16px 12px 20px; text-decoration: none; }
 .sharing-tabs a { position: relative; color: var(--color-ink-2); background: var(--color-paper-2); }
 .sharing-tabs a:hover { color: var(--color-ink); background: var(--color-paper-3); }
 .sharing-tabs a[aria-current="page"] { color: var(--color-ink); background: var(--color-paper); }
-/* The same selected-tab style as the header. The -1px offsets cover the 1px tab edges and the 1px rule below the tabs. */
-.sharing-tabs a[aria-current="page"]::before { content: ""; position: absolute; inset: -1px -1px auto; height: 4px; background: var(--color-accent); }
-.sharing-tabs a[aria-current="page"]::after { content: ""; position: absolute; inset: auto -1px -1px; height: 1px; background: var(--color-ink); }
+/* The same selected style as the header, on the side edges: a 4px accent rule at the left and a 1px ink rule at the right. The -1px offsets cover the 1px entry edges. */
+.sharing-tabs a[aria-current="page"]::before { content: ""; position: absolute; inset: -1px auto -1px -1px; width: 4px; background: var(--color-accent); }
+.sharing-tabs a[aria-current="page"]::after { content: ""; position: absolute; inset: -1px -1px -1px auto; width: 1px; background: var(--color-ink); }
 .sharing-tabs > span { color: var(--color-muted); }
-.sharing-tabs { margin-bottom: 28px; }
-.sharing-tab-help { margin: -12px 0 28px; }
+.sharing-entry-name { display: block; font-size: 15px; font-weight: 500; }
+.sharing-entry-line { display: block; margin-top: 4px; color: var(--color-muted); font-size: 11px; line-height: 1.5; }
+.sharing-tab-help { margin: 12px 0 0; }
 .sharing-verified { margin-bottom: 28px; }
 .sharing-verified .sharing-details { margin-top: 0; }
 .sharing-verified .group-heading { align-items: center; flex-wrap: wrap; }
@@ -242,21 +246,24 @@ select:disabled { color: var(--color-muted); cursor: not-allowed; opacity: 0.55;
 .relay-code { margin-top: 20px; border-top: 1px solid var(--color-rule); padding-top: 16px; }
 .relay-code > p { margin: 0; color: var(--color-accent-text); font-size: 18px; font-stretch: var(--stretch-display); overflow-wrap: anywhere; }
 .relay-code > button { margin-top: 16px; }
-.relay-activity { margin-top: 36px; overflow-x: auto; }
+.relay-activity { margin-top: 36px; }
 .relay-activity .group-heading { align-items: center; margin-bottom: 16px; }
 .relay-activity .group-heading h2 { margin: 0; }
 .relay-activity .group-heading span { color: var(--color-muted); font-size: 12px; }
 .relay-activity .group-heading button { margin-left: auto; }
-.relay-activity table { width: 100%; min-width: 880px; border-collapse: collapse; margin-bottom: 28px; table-layout: fixed; }
-.relay-activity caption { padding: 12px 0; color: var(--color-ink-2); text-align: left; font-size: 12px; }
-.relay-activity th, .relay-activity td { border-bottom: 1px solid var(--color-rule); padding: 12px 16px 12px 0; text-align: left; font-size: 12px; overflow-wrap: anywhere; }
-.relay-activity th { color: var(--color-muted); font-weight: 400; white-space: nowrap; }
+/* Each sent transfer is a block with labelled facts. The block needs no sideways scroll at any width. */
+.relay-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 24px; margin: 16px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+.relay-facts dt { color: var(--color-muted); font-size: 11px; }
+.relay-facts dd { margin: 0; }
+.relay-inbox .form-actions { margin-top: 16px; }
+.pages { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: -12px 0 28px; }
+.pages p { margin: 0; color: var(--color-ink-2); font-size: 12px; }
 .delivery-state { color: var(--color-ink-2); }
 .delivery-state[data-state="received"], .delivery-state[data-state="completed"],
 .delivery-state[data-state="awaiting-approval"] { color: var(--color-accent-text); }
 .delivery-state[data-state="failed"], .delivery-state[data-state="expired"], .delivery-state[data-state="refused"],
 .delivery-state[data-state="uncertain"] { color: var(--color-muted); }
-.delivery-error { display: block; margin-top: 8px; color: var(--color-muted); overflow-wrap: anywhere; }
+.delivery-error { margin: 8px 0 0; color: var(--color-muted); font-size: 12px; overflow-wrap: anywhere; }
 .relay-inbox { margin-top: 28px; }
 .relay-inbox > h3 { margin-bottom: 16px; }
 .relay-inbox > ul { list-style: none; margin: 0 0 28px; border-top: 1px solid var(--color-rule-2); padding: 0; }
@@ -268,16 +275,22 @@ select:disabled { color: var(--color-muted); cursor: not-allowed; opacity: 0.55;
 .relay-inbox form { margin-top: 16px; border-top: 1px solid var(--color-rule); padding-top: 16px; }
 .relay-inbox form fieldset { margin-top: 0; }
 @media (max-width: 700px) {
-  .sharing-tabs { overflow-x: auto; }
+  /* In a narrow window the list is a row of names. The row scrolls sideways, and the lines are hidden. */
+  .sharing-layout { display: block; }
+  .sharing-tabs { flex-direction: row; overflow-x: auto; margin-bottom: 28px; border-top: 0; border-bottom: 1px solid var(--color-rule-2); }
   .sharing-tabs > * { flex: 0 0 auto; }
+  .sharing-tabs a, .sharing-tabs > span { min-height: 44px; border: 1px solid var(--color-rule-2); border-bottom: 0; padding: 8px 20px; }
+  .sharing-tabs > * + * { border-left: 0; }
+  .sharing-tabs a[aria-current="page"]::before { inset: -1px -1px auto; width: auto; height: 4px; }
+  .sharing-tabs a[aria-current="page"]::after { inset: auto -1px -1px; width: auto; height: 1px; }
+  .sharing-entry-name { font-weight: 400; }
+  .sharing-entry-line { display: none; }
+  .sharing-tab-help { margin: -12px 0 28px; }
   .relay-summary { grid-template-columns: minmax(0, 1fr); }
   .relay-state { justify-self: start; }
   .relay-identity { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .relay-peer-heading { align-items: flex-start; flex-direction: column; }
   .relay-inbox-heading { flex-direction: column; }
-  .relay-activity thead { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
-  .relay-activity tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--color-rule); padding-block: 12px; }
-  .relay-activity td { border: 0; padding: 8px 12px 8px 0; }
   input, select { font-size: 16px; }
 }
 
