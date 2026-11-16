@@ -88,7 +88,7 @@ Field meanings:
 
 The master key does not appear in plaintext in `vault.json`.
 The passphrase opens it each time. The OS secret store can hold a copy. See section 4.
-The user can change the passphrase in the Storage screen. global.sct checks the current passphrase, then seals the same master key with a new wrapping key and salt. A remembered master key stays valid.
+The user can change the passphrase in the Settings screen. global.sct checks the current passphrase, then seals the same master key with a new wrapping key and salt. A remembered master key stays valid.
 
 ### The per-project file `secrets.sct`
 

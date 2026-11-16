@@ -10,7 +10,7 @@ The app has two variants of the Hallmark Terminal theme (D15):
 | Dark | Terminal | Near-black paper with a green cast, pale ink, and a bright green accent |
 | System | Cream or Terminal | Follows the light or dark setting of the computer. The app changes when that setting changes |
 
-Select the setting in **Storage > Appearance**.
+Select the setting in **Settings > Appearance**.
 The main process keeps the setting in `userData/preferences.json`.
 It does not use `settings.json`, because a vault move writes that file again.
 
@@ -110,7 +110,7 @@ The full-window screenshots are 1200 × 800 on Windows. The Links image is a pan
 | Link receipt | ![Cream link receipt](media/themes/cream/link-receipt.png) | ![Terminal link receipt](media/themes/terminal/link-receipt.png) |
 | Share confirmation | ![Cream share confirmation](media/themes/cream/share-gate.png) | ![Terminal share confirmation](media/themes/terminal/share-gate.png) |
 | Links registration | ![Cream links](media/themes/cream/links.png) | ![Terminal links](media/themes/terminal/links.png) |
-| Storage | ![Cream storage](media/themes/cream/storage.png) | ![Terminal storage](media/themes/terminal/storage.png) |
+| Settings | ![Cream settings](media/themes/cream/settings.png) | ![Terminal settings](media/themes/terminal/settings.png) |
 
 The new screens use the same role tokens and components.
 The **Links** image shows the packaged registration controls.

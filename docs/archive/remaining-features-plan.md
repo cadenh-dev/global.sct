@@ -240,7 +240,7 @@ This section selects application limits. These limits do not describe library de
 ### Protocol registration and routing
 
 Add `src/main/protocol.ts` for routing and `src/main/protocol-registration.ts` for operating-system integration.
-Add **Storage > Links** with registration status, **Register sct links**, and **Remove registration**.
+Add **Settings > Links** with registration status, **Register sct links**, and **Remove registration**.
 Registration is per user. It needs no administrator privileges.
 Registration failures leave paste-based flows available and show the operating-system error without the incoming URL.
 
