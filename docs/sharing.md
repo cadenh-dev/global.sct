@@ -202,7 +202,7 @@ After a restart, the saved record and its receipt state stay in the vault sharin
 ### Open a link from another app
 
 The packaged app can receive `global-sct://` links from the operating system.
-Open **Storage**, find **Links**, and select **Register global.sct links**.
+Open **Settings**, find **Links**, and select **Register global.sct links**.
 The action is per user and needs no administrator rights.
 
 - A pairing link opens **Verify devices** and fills **Paste pairing link**.

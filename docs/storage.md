@@ -40,13 +40,13 @@ The folder also has `vault.json` and `.internal/`. `vault.json` holds the key se
 The passphrase is not stored. A wrong passphrase fails the verifier, and global.sct clears the derived key.
 
 The vault uses header version 2 only. A version 1 header is unsupported and is not migrated. The header salt belongs to the passphrase wrapping key. The verifier stays sealed by the master key.
-To change the passphrase, open **Storage**, then enter the current passphrase and the new passphrase twice. Use at least 8 characters.
+To change the passphrase, open **Settings**, then enter the current passphrase and the new passphrase twice. Use at least 8 characters.
 The change writes a new salt and wrapped master key. The master key stays the same, so remembered devices and secret files keep working.
 
 ## Unlock
 
 The app asks for the passphrase at each start, unless "Remember this device" stored the key.
-Select **Storage**, then select **Lock vault** to lock it by hand. A lock stops Direct, WebRTC, and the relay. It also stops grant cleanup. Unlock the vault to restore these services and run grant cleanup once.
+Select **Settings**, then select **Lock vault** to lock it by hand. A lock stops Direct, WebRTC, and the relay. It also stops grant cleanup. Unlock the vault to restore these services and run grant cleanup once.
 The paths `sct run`, `sct _env`, and `sct mcp` open one unlock window when the vault is locked.
 The master key stays in main-process memory. It never reaches the renderer.
 After five incorrect passphrases, the app makes you wait before the next attempt. The wait is 5, 15, and 30 seconds, then 60 seconds after each later failure.
@@ -67,7 +67,7 @@ Verify the sharing devices again, and pair the relay devices again.
 
 ## Move the vault
 
-To move the vault folder, select **Storage**, then select **Change location…**.
+To move the vault folder, select **Settings**, then select **Change location…**.
 global.sct saves the new location in `settings.json` in the `userData` folder.
 `vault.json` moves with the folder, so the same passphrase opens the vault in its new location.
 Keep the vault outside source folders.

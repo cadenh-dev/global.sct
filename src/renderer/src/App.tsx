@@ -5,7 +5,7 @@ import { AllSecretsView } from './AllSecretsView'
 import { errorText } from './operation'
 import { ProjectSecretsView } from './ProjectSecretsView'
 import { ProjectsView } from './ProjectsView'
-import { StorageView } from './StorageView'
+import { SettingsView } from './SettingsView'
 import { SharingView } from './SharingView'
 import { AgentAccessView } from './AgentAccessView'
 import { CardsView } from './CardsView'
@@ -15,7 +15,7 @@ import type { Loaded, SharingTab, UpdateProjects, UpdateSecrets } from './types'
 import type { VaultStatus } from '../../shared/vault'
 import type { PendingLink } from '../../shared/transport'
 
-type Route = { view: 'projects' } | { view: 'project'; id: string } | { view: 'secrets' } | { view: 'storage' } | { view: 'sharing'; projectId?: string; tab?: SharingTab } | { view: 'cards' } | { view: 'agent' }
+type Route = { view: 'projects' } | { view: 'project'; id: string } | { view: 'secrets' } | { view: 'settings' } | { view: 'sharing'; projectId?: string; tab?: SharingTab } | { view: 'cards' } | { view: 'agent' }
 
 export function App() {
   const isMac = window.sct.platform === 'darwin'
@@ -103,7 +103,7 @@ function DesktopApp({ route, isMac, onLocked }: { route: Exclude<Route, { view: 
             <a href="#/secrets" aria-current={route.view === 'secrets' ? 'page' : undefined}>All secrets</a>
             <a href="#/sharing" aria-current={route.view === 'sharing' ? 'page' : undefined}>Sharing</a>
             {isMac && <a href="#/cards" aria-current={route.view === 'cards' ? 'page' : undefined}>Cards</a>}
-            <a href="#/storage" aria-current={route.view === 'storage' ? 'page' : undefined}>Storage</a>
+            <a href="#/settings" aria-current={route.view === 'settings' ? 'page' : undefined}>Settings</a>
           </nav>
         </div>
         <span className="local-label">On this device</span>
@@ -116,7 +116,7 @@ function DesktopApp({ route, isMac, onLocked }: { route: Exclude<Route, { view: 
           <ProjectSecretsView projectId={route.id} projects={projects} secrets={secrets} updateSecrets={updateSecrets} />
         )}
         {route.view === 'secrets' && <AllSecretsView projects={projects} secrets={secrets} />}
-        {route.view === 'storage' && <StorageView onLocked={onLocked} />}
+        {route.view === 'settings' && <SettingsView onLocked={onLocked} />}
         {route.view === 'cards' && <CardsView />}
         {route.view === 'sharing' && (
           <SharingView key={route.projectId ?? 'sharing'} projectId={route.projectId}
@@ -140,7 +140,7 @@ function parseRoute(hash: string, isMac: boolean): Route {
   const [view, id, projectId] = hash.replace(/^#\/?/, '').split('/')
   if (view === 'projects' && id) return { view: 'project', id: decodeURIComponent(id) }
   if (view === 'secrets') return { view: 'secrets' }
-  if (view === 'storage') return { view: 'storage' }
+  if (view === 'settings') return { view: 'settings' }
   if (view === 'cards' && isMac) return { view: 'cards' }
   if (view === 'agent') return { view: 'agent' }
   if (view === 'sharing') {

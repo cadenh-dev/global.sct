@@ -168,7 +168,7 @@ Use the [explicit migration](../fork-storage-migration.md) to preserve an existi
 | 2026-11-04 | Use a standalone fork | D17 is closed. The release target is this repository |
 | 2026-11-04 | Use versioned Git tags and unsigned beta releases until signing is available | D13 is closed. D12 is deferred |
 | 2026-11-04 | Close Q7, D6, D7, D8, D14, D15, and the C12 form | The link uses the current envelope. The transport order is Link, Hyperswarm, WebRTC. The extension uses the CLI only. The theme has two variants. See [docs/implementation-plan.md](implementation-plan.md#7-cross-phase-decision-summary) |
-| 2026-11-04 | Theme setting: Light (Cream), Dark (Terminal), or System. Cream is the default | Q12 is closed. The setting is an Appearance section on the Storage page. AGENTS.md lists both variants |
+| 2026-11-04 | Theme setting: Light (Cream), Dark (Terminal), or System. Cream is the default | Q12 is closed. The setting is an Appearance section on the Settings page. AGENTS.md lists both variants |
 | 2026-11-04 | Cream uses the colors of the user's reference screenshot, with a dark forest green accent | Q13 is closed. Both variants use the same selected-tab style. See [docs/theme.md](../theme.md) |
 | 2026-11-04 | Add `sct run --interactive` for shells | Q11 is closed. The VS Code terminal uses `sct run --interactive -- <shell>` |
 | 2026-11-04 | Delegate the remaining technical choices | The remaining feature specification closes protocol choices P1–P6, D11, Q9, and Q10. It selects transport limits, receipt recovery, and the TURN credential exception. Implementation remains separate |

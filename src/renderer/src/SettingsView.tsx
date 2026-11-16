@@ -7,7 +7,7 @@ import type { VaultStatus } from '../../shared/vault'
 
 const themeLabels: Record<ThemePreference, string> = { light: 'Light (Cream)', dark: 'Dark (Terminal)', system: 'System' }
 
-export function StorageView({ onLocked }: { onLocked: (status: VaultStatus) => void }) {
+export function SettingsView({ onLocked }: { onLocked: (status: VaultStatus) => void }) {
   const [location, setLocation] = useState<Loaded<string>>({ state: 'loading' })
   const [theme, setTheme] = useState<Loaded<ThemePreference>>({ state: 'loading' })
   const [currentPassphrase, setCurrentPassphrase] = useState('')
@@ -72,7 +72,7 @@ export function StorageView({ onLocked }: { onLocked: (status: VaultStatus) => v
     <>
       <div className="page-heading">
         <div>
-          <h1>Storage</h1>
+          <h1>Settings</h1>
           <p className="description">Where global.sct keeps encrypted secrets on this device, and how the window looks.</p>
         </div>
       </div>

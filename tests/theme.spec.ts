@@ -19,7 +19,7 @@ test('Cream is the default and the selected theme stays after a restart', async 
     let page = await application.firstWindow()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'cream')
     await unlock(page, passphrase)
-    await page.getByRole('link', { name: 'Storage', exact: true }).click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByLabel('Theme')).toHaveValue('light')
     await page.getByLabel('Theme').selectOption('dark')
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'terminal')
@@ -31,7 +31,7 @@ test('Cream is the default and the selected theme stays after a restart', async 
     page = await application.firstWindow()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'terminal')
     await unlock(page, passphrase)
-    await page.getByRole('link', { name: 'Storage', exact: true }).click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByLabel('Theme')).toHaveValue('dark')
   } finally {
     await application.close()
